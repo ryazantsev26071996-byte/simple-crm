@@ -6,22 +6,28 @@ const STAGES = [
   'пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение',
 ]
 
-function formatPhone(raw) {
-  const digits = raw.replace(/\D/g, '')
-  let d = digits
-  if (d.startsWith('8')) d = '7' + d.slice(1)
-  if (d.startsWith('7')) d = d.slice(1)
-  
-  let result = '+7'
-  if (d.length > 0) result += ' ' + d.slice(0, 3)
-  if (d.length > 3) result += ' ' + d.slice(3, 6)
-  if (d.length > 6) result += ' ' + d.slice(6, 8)
-  if (d.length > 8) result += ' ' + d.slice(8, 10)
-  return result
+const SUBSCRIPTIONS = [
+  { name: 'Отдыхай с бонусами', lessons: 61, freeze: 14, months: 6, unlimited: false },
+  { name: 'Изучай с бонусами', lessons: 113, freeze: 30, months: 9, unlimited: false },
+  { name: 'Покоряй с бонусами', lessons: 0, freeze: 45, months: 12, unlimited: true },
+  { name: 'Отдыхай', lessons: 52, freeze: 14, months: 6, unlimited: false },
+  { name: 'Изучай', lessons: 104, freeze: 30, months: 9, unlimited: false },
+  { name: 'Покоряй', lessons: 0, freeze: 45, months: 12, unlimited: true },
+  { name: 'Тест-драйв', lessons: 3, freeze: 0, days: 7, unlimited: false },
+  { name: 'Пробный месяц', lessons: 4, freeze: 0, days: 30, unlimited: false },
+  { name: '8 занятий', lessons: 8, freeze: 0, days: 30, unlimited: false },
+]
+
+function addMonths(date, months) {
+  const d = new Date(date)
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().split('T')[0]
 }
 
-function isLink(value) {
-  return value.startsWith('@') || value.startsWith('http') || value.startsWith('vk.') || value.startsWith('t.me')
+function addDays(date, days) {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
 }
 
 export default function ClientForm({ mode, initialValue, disabled, onSubmit, submitLabel }) {
@@ -30,7 +36,13 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     phone: initialValue?.phone || "",
     source: initialValue?.source || "",
     stage: initialValue?.stage || "",
-    subscription: initialValue?.subscription || "",
+    subscription_type: initialValue?.subscription_type || "",
+    lessons_total: initialValue?.lessons_total || 0,
+    lessons_used: initialValue?.lessons_used || 0,
+    freeze_days_total: initialValue?.freeze_days_total || 0,
+    freeze_days_used: initialValue?.freeze_days_used || 0,
+    subscription_start: initialValue?.subscription_start || "",
+    is_unlimited: initialValue?.is_unlimited || false,
   })
   const [phoneError, setPhoneError] = React.useState("")
 
@@ -40,61 +52,92 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       phone: initialValue?.phone || "",
       source: initialValue?.source || "",
       stage: initialValue?.stage || "",
-      subscription: initialValue?.subscription || "",
+      subscription_type: initialValue?.subscription_type || "",
+      lessons_total: initialValue?.lessons_total || 0,
+      lessons_used: initialValue?.lessons_used || 0,
+      freeze_days_total: initialValue?.freeze_days_total || 0,
+      freeze_days_used: initialValue?.freeze_days_used || 0,
+      subscription_start: initialValue?.subscription_start || "",
+      is_unlimited: initialValue?.is_unlimited || false,
     })
     setPhoneError("")
   }, [initialValue?.id])
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }))
 
+  function handleSubscriptionChange(e) {
+    const name = e.target.value
+    const sub = SUBSCRIPTIONS.find(s => s.name === name)
+    if (!sub) { setForm(f => ({ ...f, subscription_type: '' })); return }
+    setForm(f => ({
+      ...f,
+      subscription_type: name,
+      lessons_total: sub.lessons,
+      freeze_days_total: sub.freeze,
+      is_unlimited: sub.unlimited,
+    }))
+  }
+
+  function handleStartChange(e) {
+    const start = e.target.value
+    const sub = SUBSCRIPTIONS.find(s => s.name === form.subscription_type)
+    let end = ''
+    if (sub && start) {
+      if (sub.months) end = addMonths(start, sub.months)
+      else if (sub.days) end = addDays(start, sub.days)
+    }
+    setForm(f => ({ ...f, subscription_start: start, subscription_end: end, subscription_end_with_freeze: end }))
+  }
+
+  function isLink(value) {
+    return value.startsWith('@') || value.startsWith('http') || value.startsWith('vk.') || value.startsWith('t.me')
+  }
+
   function handlePhoneChange(e) {
     const raw = e.target.value
-    
-    // Если это ссылка или @username — принимаем как есть
-    if (isLink(raw) || raw === '') {
-      setForm(f => ({ ...f, phone: raw }))
-      setPhoneError("")
-      return
-    }
-    
-    // Иначе форматируем как телефон
+    if (isLink(raw) || raw === '') { setForm(f => ({ ...f, phone: raw })); setPhoneError(""); return }
     const digits = raw.replace(/\D/g, '')
     let d = digits
     if (d.startsWith('8')) d = '7' + d.slice(1)
     if (d.startsWith('7')) d = d.slice(1)
-    
     const trimmed = d.slice(0, 10)
-    const formatted = formatPhone(trimmed)
-    setForm(f => ({ ...f, phone: formatted }))
-    
-    if (trimmed.length > 0 && trimmed.length < 10) {
-      setPhoneError("Введите полный номер (10 цифр после +7)")
-    } else {
-      setPhoneError("")
-    }
+    let result = '+7'
+    if (trimmed.length > 0) result += ' ' + trimmed.slice(0, 3)
+    if (trimmed.length > 3) result += ' ' + trimmed.slice(3, 6)
+    if (trimmed.length > 6) result += ' ' + trimmed.slice(6, 8)
+    if (trimmed.length > 8) result += ' ' + trimmed.slice(8, 10)
+    setForm(f => ({ ...f, phone: result }))
+    if (trimmed.length > 0 && trimmed.length < 10) setPhoneError("Введите полный номер")
+    else setPhoneError("")
   }
 
   function handleSubmit(e) {
     e.preventDefault()
     const phone = form.phone.trim()
-    
-    // Проверяем телефон только если это не ссылка
     if (phone && !isLink(phone)) {
       const digits = phone.replace(/\D/g, '')
-      if (digits.length < 11) {
-        setPhoneError("Введите полный номер (10 цифр после +7)")
-        return
-      }
+      if (digits.length < 11) { setPhoneError("Введите полный номер"); return }
     }
-    
     onSubmit({
       name: form.name.trim(),
       phone: form.phone.trim(),
       source: form.source.trim(),
       stage: form.stage,
-      subscription: form.subscription.trim(),
+      subscription_type: form.subscription_type,
+      lessons_total: Number(form.lessons_total),
+      lessons_used: Number(form.lessons_used),
+      freeze_days_total: Number(form.freeze_days_total),
+      freeze_days_used: Number(form.freeze_days_used),
+      subscription_start: form.subscription_start || null,
+      subscription_end: form.subscription_end || null,
+      subscription_end_with_freeze: form.subscription_end_with_freeze || null,
+      is_unlimited: form.is_unlimited,
     })
   }
+
+  const sub = SUBSCRIPTIONS.find(s => s.name === form.subscription_type)
+  const lessonsLeft = form.is_unlimited ? '∞' : Math.max(0, form.lessons_total - form.lessons_used)
+  const freezeLeft = form.freeze_days_total - form.freeze_days_used
 
   return (
     <form onSubmit={handleSubmit}>
@@ -105,19 +148,11 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Контакт</div>
-          <input
-            className="input"
-            value={form.phone}
-            disabled={disabled}
-            onChange={handlePhoneChange}
-            placeholder="+7 или @username / ссылка"
-            style={{ borderColor: phoneError ? '#e55' : '' }}
-          />
+          <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
           {phoneError && <div style={{ color: '#e55', fontSize: 11, marginTop: 3 }}>{phoneError}</div>}
-          <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>Телефон, @telegram, vk.com/... или t.me/...</div>
         </div>
       </div>
-      <div style={{ height: 10 }} />
+      <div style={{ height: 8 }} />
       <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Источник</div>
@@ -125,17 +160,56 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Стадия</div>
-          <select className="input" value={form.stage} disabled={disabled} onChange={set('stage')} style={{ cursor: disabled ? 'default' : 'pointer' }}>
+          <select className="input" value={form.stage} disabled={disabled} onChange={set('stage')}>
             <option value="">— выбрать —</option>
             {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
       </div>
-      <div style={{ height: 10 }} />
-      <div className="formGroup">
-        <div className="fieldLabel">Абонемент</div>
-        <input className="input" value={form.subscription} disabled={disabled} onChange={set('subscription')} placeholder="Например: 8 занятий, безлимит..." />
+      <div style={{ height: 8 }} />
+      <div className="grid2">
+        <div className="formGroup">
+          <div className="fieldLabel">Абонемент</div>
+          <select className="input" value={form.subscription_type} disabled={disabled} onChange={handleSubscriptionChange}>
+            <option value="">— выбрать —</option>
+            {SUBSCRIPTIONS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+          </select>
+          {form.subscription_type && (
+            <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>
+              {form.is_unlimited ? 'Безлимит' : `${form.lessons_total} занятий`}
+              {form.freeze_days_total > 0 && ` · заморозка ${form.freeze_days_total} дн`}
+            </div>
+          )}
+        </div>
+        <div className="formGroup">
+          <div className="fieldLabel">Начало абонемента</div>
+          <input className="input" type="date" value={form.subscription_start} disabled={disabled} onChange={handleStartChange} />
+        </div>
       </div>
+
+      {form.subscription_type && (
+        <div style={{ marginTop: 8, padding: '10px 12px', background: '#f8f9ff', borderRadius: 8, fontSize: 13, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ color: '#888' }}>Занятий осталось: </span>
+            <strong style={{ color: lessonsLeft === 0 ? '#e55' : '#333' }}>{lessonsLeft}</strong>
+            {!form.is_unlimited && <span style={{ color: '#aaa' }}> / {form.lessons_total}</span>}
+          </div>
+          {form.freeze_days_total > 0 && (
+            <div>
+              <span style={{ color: '#888' }}>Заморозка осталось: </span>
+              <strong>{freezeLeft}</strong>
+              <span style={{ color: '#aaa' }}> / {form.freeze_days_total} дн</span>
+            </div>
+          )}
+          {form.subscription_start && form.subscription_end && (
+            <div>
+              <span style={{ color: '#888' }}>Окончание: </span>
+              <strong>{new Date(form.subscription_end).toLocaleDateString('ru-RU')}</strong>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
         <button className="btn btnPrimary" type="submit" disabled={disabled}>{submitLabel}</button>
         <div className="muted" style={{ fontSize: 13 }}>{mode}</div>
