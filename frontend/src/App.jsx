@@ -9,6 +9,7 @@ import { LoginPage } from "./LoginPage";
 import { supabase } from "./supabase";
 import { AuditLog } from "./AuditLog.jsx";
 import { ImportClients } from "./ImportClients.jsx";
+import { TeacherView } from "./TeacherView.jsx";
 import { exportToExcel } from "./ExportExcel.jsx";
 
 export default function App() {
@@ -20,7 +21,7 @@ export default function App() {
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [view, setView] = React.useState("kanban");
+  const [view, setView] = React.useState(role === 'teacher' ? 'students' : 'kanban');
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [listSearch, setListSearch] = React.useState("");
@@ -64,12 +65,13 @@ export default function App() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #eee", flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <strong style={{ fontSize: 15 }}>Simple CRM</strong>
-          {(role === 'manager' || role === 'admin') && (
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
-              <button onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
+          <div style={{ display: 'flex', gap: 4 }}>
+              {(role === 'manager' || role === 'admin') && <>
+                <button onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
+                <button onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
+              </>}
+              <button onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
             </div>
-          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>
@@ -105,7 +107,10 @@ export default function App() {
 
           {loadingClients && <div style={{ padding: 16, color: '#888', fontSize: 13 }}>Загрузка клиентов...</div>}
 
-          {!loadingClients && (view === 'kanban' || role === 'teacher') && (
+          {!loadingClients && view === 'students' && (
+            <TeacherView clients={clients} onClientSelect={setSelectedId} />
+          )}
+          {!loadingClients && view === 'kanban' && role !== 'teacher' && (
             <KanbanBoard
               clients={clients}
               role={role}
