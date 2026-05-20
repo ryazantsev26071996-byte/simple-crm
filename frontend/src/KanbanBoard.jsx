@@ -17,15 +17,14 @@ function matchesSearch(client, query) {
   if (!query) return true
   const q = query.toLowerCase().trim()
   const digits = q.replace(/\D/g, '')
-  
   if (client.name?.toLowerCase().includes(q)) return true
   if (digits && normalizePhone(client.phone).endsWith(digits)) return true
   return false
 }
 
-export function KanbanBoard({ clients, role, onClientSelect, onStageChange }) {
+export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient }) {
   const [search, setSearch] = useState('')
-  
+
   const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
   const baseClients = role === 'teacher'
     ? clients.filter(c => TEACHER_STAGES.includes(c.stage))
@@ -39,22 +38,24 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Поиск */}
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', flexShrink: 0 }}>
+      <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', flexShrink: 0, display: 'flex', gap: 10, alignItems: 'center' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Поиск по имени или последним цифрам номера..."
-          style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+          style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
         />
-        {search && (
-          <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-            Найдено: {filteredClients.length} клиентов
-          </div>
+        {(role === 'manager' || role === 'admin') && (
+          <button
+            onClick={onAddClient}
+            style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#4a90e2', color: 'white', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}
+          >
+            + Добавить клиента
+          </button>
         )}
+        {search && <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>Найдено: {filteredClients.length}</div>}
       </div>
 
-      {/* Канбан */}
       <div style={{ overflowX: 'auto', flex: 1, padding: '12px 0' }}>
         <div style={{ display: 'flex', gap: 10, minWidth: 'max-content', padding: '0 16px', alignItems: 'flex-start' }}>
           {visibleStages.map(stage => (
@@ -64,7 +65,6 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange }) {
               clients={filteredClients.filter(c => c.stage === stage)}
               onClientSelect={onClientSelect}
               onDrop={handleDrop}
-              highlighted={!!search}
             />
           ))}
         </div>
@@ -73,7 +73,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange }) {
   )
 }
 
-function Column({ stage, clients, onClientSelect, onDrop, highlighted }) {
+function Column({ stage, clients, onClientSelect, onDrop }) {
   const [over, setOver] = useState(false)
 
   return (

@@ -77,9 +77,9 @@ export default function App() {
           {(role === 'manager' || role === 'admin') && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
               <ClientForm
-                mode="Add client"
+                mode="Новый клиент"
                 disabled={false}
-                submitLabel="Add"
+                submitLabel="Добавить"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
@@ -100,6 +100,7 @@ export default function App() {
               role={role}
               onClientSelect={setSelectedId}
               onStageChange={(id, stage) => setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c))}
+              onAddClient={() => setView('list')}
             />
           )}
 
