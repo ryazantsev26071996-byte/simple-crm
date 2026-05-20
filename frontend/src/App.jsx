@@ -8,6 +8,7 @@ import { useAuth } from "./AuthContext";
 import { LoginPage } from "./LoginPage";
 import { supabase } from "./supabase";
 import { AuditLog } from "./AuditLog.jsx";
+import { exportToExcel } from "./ExportExcel.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -70,6 +71,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>
+          {role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт Excel</button>}
           {role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
           <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
         </div>
