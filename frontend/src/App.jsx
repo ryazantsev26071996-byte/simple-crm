@@ -19,6 +19,8 @@ export default function App() {
   const [error, setError] = React.useState("");
   const [view, setView] = React.useState("kanban");
   const [listSearch, setListSearch] = React.useState("");
+  const [sortField, setSortField] = React.useState("name");
+  const [sortDir, setSortDir] = React.useState("asc");
 
   const role = profile?.role || "teacher";
   const authorName = profile?.full_name || user?.email || "";
@@ -119,9 +121,21 @@ export default function App() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500 }}>Имя</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500 }}>Телефон</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500 }}>Стадия</th>
+                  {[
+                    { key: 'name', label: 'Имя' },
+                    { key: 'stage', label: 'Стадия' },
+                    { key: 'subscription_type', label: 'Абонемент' },
+                    { key: 'lessons_left', label: 'Занятий осталось' },
+                    { key: 'freeze_left', label: 'Заморозка' },
+                    { key: 'subscription_end', label: 'До' },
+                    { key: 'last_visit', label: 'Последнее занятие' },
+                  ].map(col => (
+                    <th key={col.key}
+                      onClick={() => { if (sortField === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(col.key); setSortDir('asc'); } }}
+                      style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                      {col.label} {sortField === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -132,14 +146,31 @@ export default function App() {
                     if (c.name?.toLowerCase().includes(q)) return true;
                     if (digits && (c.phone||'').replace(/\D/g,'').endsWith(digits)) return true;
                     return false;
-                  }).map(c => (
-                  <tr key={c.id} onClick={() => setSelectedId(c.id)}
-                    style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
-                    <td style={{ padding: '8px 16px' }}>{c.name}</td>
-                    <td style={{ padding: '8px 16px', color: '#888' }}>{c.phone || '—'}</td>
-                    <td style={{ padding: '8px 16px', color: '#888' }}>{c.stage || '—'}</td>
-                  </tr>
-                ))}
+                  }).sort((a, b) => {
+                    let aVal, bVal;
+                    if (sortField === 'lessons_left') { aVal = a.is_unlimited ? 9999 : (a.lessons_total||0)-(a.lessons_used||0); bVal = b.is_unlimited ? 9999 : (b.lessons_total||0)-(b.lessons_used||0); }
+                    else if (sortField === 'freeze_left') { aVal = (a.freeze_days_total||0)-(a.freeze_days_used||0); bVal = (b.freeze_days_total||0)-(b.freeze_days_used||0); }
+                    else if (sortField === 'last_visit') { aVal = a.last_visit||''; bVal = b.last_visit||''; }
+                    else { aVal = (a[sortField]||'').toString().toLowerCase(); bVal = (b[sortField]||'').toString().toLowerCase(); }
+                    if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+                    return 0;
+                  }).map(c => {
+                    const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
+                    const freezeLeft = (c.freeze_days_total||0)-(c.freeze_days_used||0);
+                    const endDate = c.subscription_end_with_freeze || c.subscription_end;
+                    return (
+                    <tr key={c.id} onClick={() => setSelectedId(c.id)}
+                      style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
+                      <td style={{ padding: '8px 12px', color: '#888' }}>{c.stage || '—'}</td>
+                      <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
+                      <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
+                      <td style={{ padding: '8px 12px', color: '#888' }}>{c.freeze_days_total ? freezeLeft + ' дн' : '—'}</td>
+                      <td style={{ padding: '8px 12px', color: '#888' }}>{endDate ? new Date(endDate).toLocaleDateString('ru-RU') : '—'}</td>
+                      <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>
+                    </tr>
+                  )})}
               </tbody>
             </table>
           )}
