@@ -1,5 +1,4 @@
 import React from "react";
-import RoleBar from "./components/RoleBar.jsx";
 import ClientForm from "./components/ClientForm.jsx";
 import CommentsWall from "./components/CommentsWall.jsx";
 import { KanbanBoard } from "./KanbanBoard.jsx";
@@ -15,6 +14,9 @@ import { exportToExcel } from "./ExportExcel.jsx";
 export default function App() {
   const { user, profile, loading } = useAuth();
 
+  const role = profile?.role || "teacher";
+  const authorName = profile?.full_name || user?.email || "";
+
   const [clients, setClients] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
   const [comments, setComments] = React.useState([]);
@@ -22,38 +24,27 @@ export default function App() {
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
   const [view, setView] = React.useState('kanban');
-
-  // Переключаем на ученики если педагог
-  React.useEffect(() => {
-    if (role === 'teacher') setView('students');
-  }, [role]);
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [listSearch, setListSearch] = React.useState("");
   const [sortField, setSortField] = React.useState("name");
   const [sortDir, setSortDir] = React.useState("asc");
 
-  const role = profile?.role || "teacher";
-  const authorName = profile?.full_name || user?.email || "";
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
-  // Загружаем клиентов только при изменении role или user — без других зависимостей
+  React.useEffect(() => {
+    if (role === 'teacher') setView('students');
+  }, [role]);
+
   React.useEffect(() => {
     if (!user) return;
     setLoadingClients(true);
     setError("");
     getClients({ role, name: authorName })
-      .then(list => {
-        setClients(list);
-        setLoadingClients(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setLoadingClients(false);
-      });
+      .then(list => { setClients(list); setLoadingClients(false); })
+      .catch(err => { setError(err.message); setLoadingClients(false); });
   }, [user?.id, role]);
 
-  // Загружаем комментарии при выборе клиента
   React.useEffect(() => {
     if (!selectedId) { setComments([]); return; }
     setLoadingComments(true);
@@ -61,6 +52,13 @@ export default function App() {
       .then(list => { setComments(list); setLoadingComments(false); })
       .catch(err => { setError(err.message); setLoadingComments(false); });
   }, [selectedId]);
+
+  async function reloadClients() {
+    setLoadingClients(true);
+    const list = await getClients({ role, name: authorName });
+    setClients(list);
+    setLoadingClients(false);
+  }
 
   if (loading) return <div style={{ padding: 40 }}>Загрузка...</div>;
   if (!user) return <LoginPage />;
@@ -71,17 +69,17 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <strong style={{ fontSize: 15 }}>Simple CRM</strong>
           <div style={{ display: 'flex', gap: 4 }}>
-              {(role === 'manager' || role === 'admin') && <>
-                <button onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
-                <button onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
-              </>}
-              <button onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
-            </div>
+            {(role === 'manager' || role === 'admin') && <>
+              <button onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
+              <button onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
+            </>}
+            <button onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>
           {role === 'admin' && <button onClick={() => setShowImport(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a' }}>📤 Импорт</button>}
-          {role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт Excel</button>}
+          {role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт</button>}
           {role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
           <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
         </div>
@@ -94,10 +92,7 @@ export default function App() {
 
           {(role === 'manager' || role === 'admin') && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
-              <ClientForm
-                mode="Новый клиент"
-                disabled={false}
-                submitLabel="Добавить"
+              <ClientForm mode="Новый клиент" disabled={false} submitLabel="Добавить"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
@@ -115,49 +110,43 @@ export default function App() {
           {!loadingClients && view === 'students' && (
             <TeacherView clients={clients} onClientSelect={setSelectedId} />
           )}
+
           {!loadingClients && view === 'kanban' && role !== 'teacher' && (
-            <KanbanBoard
-              clients={clients}
-              role={role}
-              onClientSelect={setSelectedId}
+            <KanbanBoard clients={clients} role={role} onClientSelect={setSelectedId}
               onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => setSelectedId(id), 50); }}
               onAddClient={() => setView('list')}
             />
           )}
 
           {!loadingClients && view === 'list' && role !== 'teacher' && (
-            <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee' }}>
-              <input
-                value={listSearch}
-                onChange={e => setListSearch(e.target.value)}
-                placeholder="Поиск по имени или последним цифрам номера..."
-                style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-              />
-            </div>
-          )}
-          {!loadingClients && view === 'list' && role !== 'teacher' && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
-                  {[
-                    { key: 'name', label: 'Имя' },
-                    { key: 'stage', label: 'Стадия' },
-                    { key: 'subscription_type', label: 'Абонемент' },
-                    { key: 'lessons_left', label: 'Занятий осталось' },
-                    { key: 'freeze_left', label: 'Заморозка' },
-                    { key: 'subscription_end', label: 'До' },
-                    { key: 'last_visit', label: 'Последнее занятие' },
-                  ].map(col => (
-                    <th key={col.key}
-                      onClick={() => { if (sortField === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(col.key); setSortDir('asc'); } }}
-                      style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
-                      {col.label} {sortField === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {clients.filter(c => {
+            <>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee' }}>
+                <input value={listSearch} onChange={e => setListSearch(e.target.value)}
+                  placeholder="Поиск по имени или последним цифрам номера..."
+                  style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
+                    {[
+                      { key: 'name', label: 'Имя' },
+                      { key: 'stage', label: 'Стадия' },
+                      { key: 'subscription_type', label: 'Абонемент' },
+                      { key: 'lessons_left', label: 'Занятий осталось' },
+                      { key: 'freeze_left', label: 'Заморозка' },
+                      { key: 'subscription_end', label: 'До' },
+                      { key: 'last_visit', label: 'Последнее занятие' },
+                    ].map(col => (
+                      <th key={col.key}
+                        onClick={() => { if (sortField === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(col.key); setSortDir('asc'); } }}
+                        style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                        {col.label} {sortField === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.filter(c => {
                     if (!listSearch) return true;
                     const q = listSearch.toLowerCase();
                     const digits = q.replace(/\D/g, '');
@@ -178,19 +167,21 @@ export default function App() {
                     const freezeLeft = (c.freeze_days_total||0)-(c.freeze_days_used||0);
                     const endDate = c.subscription_end_with_freeze || c.subscription_end;
                     return (
-                    <tr key={c.id} onClick={() => setSelectedId(c.id)}
-                      style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
-                      <td style={{ padding: '8px 12px', color: '#888' }}>{c.stage || '—'}</td>
-                      <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
-                      <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
-                      <td style={{ padding: '8px 12px', color: '#888' }}>{c.freeze_days_total ? freezeLeft + ' дн' : '—'}</td>
-                      <td style={{ padding: '8px 12px', color: '#888' }}>{endDate ? new Date(endDate).toLocaleDateString('ru-RU') : '—'}</td>
-                      <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>
-                    </tr>
-                  )})}
-              </tbody>
-            </table>
+                      <tr key={c.id} onClick={() => setSelectedId(c.id)}
+                        style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
+                        <td style={{ padding: '8px 12px', color: '#888' }}>{c.stage || '—'}</td>
+                        <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
+                        <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
+                        <td style={{ padding: '8px 12px', color: '#888' }}>{c.freeze_days_total ? freezeLeft + ' дн' : '—'}</td>
+                        <td style={{ padding: '8px 12px', color: '#888' }}>{endDate ? new Date(endDate).toLocaleDateString('ru-RU') : '—'}</td>
+                        <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
 
@@ -209,11 +200,7 @@ export default function App() {
             </div>
 
             {(role === 'manager' || role === 'admin') && (
-              <ClientForm
-                mode="Edit client"
-                initialValue={selectedClient}
-                disabled={false}
-                submitLabel="Сохранить"
+              <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
@@ -224,7 +211,7 @@ export default function App() {
               />
             )}
 
-            <div style={{ marginTop: 16 }}>
+            <div style={{ marginTop: 16, height: 'calc(100vh - 300px)', display: 'flex', flexDirection: 'column' }}>
               {loadingComments && <div style={{ color: '#888', fontSize: 13 }}>Загрузка комментариев...</div>}
               <CommentsWall
                 role={role}
@@ -247,7 +234,8 @@ export default function App() {
           </div>
         )}
       </div>
-          {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
+
+      {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
     </div>
   );
