@@ -26,6 +26,8 @@ const SUBSCRIPTIONS = {
   'Тест-драйв': { lessons: 3, freeze: 0, days: 7, unlimited: false },
   'Пробный месяц': { lessons: 4, freeze: 0, days: 30, unlimited: false },
   '8 занятий': { lessons: 8, freeze: 0, days: 30, unlimited: false },
+  'Изучай старый с бонусами': { lessons: 170, freeze: 30, months: 9, unlimited: false },
+  'Изучай старый': { lessons: 156, freeze: 30, months: 9, unlimited: false },
 }
 
 function parseDate(str) {
