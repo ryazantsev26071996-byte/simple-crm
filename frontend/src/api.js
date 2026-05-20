@@ -38,7 +38,7 @@ export async function getComments(user, clientId) {
     .eq('client_id', clientId)
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return data
+  return data.map(c => ({ ...c, message: c.text }))
 }
 
 export async function createComment(user, clientId, payload) {
@@ -53,5 +53,5 @@ export async function createComment(user, clientId, payload) {
     .select()
     .single()
   if (error) throw new Error(error.message)
-  return data
+  return { ...data, message: data.text }
 }
