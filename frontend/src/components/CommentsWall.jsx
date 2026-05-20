@@ -25,13 +25,9 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
     e.preventDefault();
     setError("");
     try {
-      // Списываем занятия если не безлимит
       if (!client?.is_unlimited && lessons > 0) {
         const newUsed = (client?.lessons_used || 0) + lessons;
-        const { error: updateError } = await supabase
-          .from('clients')
-          .update({ lessons_used: newUsed })
-          .eq('id', client.id);
+        const { error: updateError } = await supabase.from('clients').update({ lessons_used: newUsed }).eq('id', client.id);
         if (updateError) throw new Error(updateError.message);
         if (onClientUpdate) onClientUpdate({ ...client, lessons_used: newUsed });
       }
@@ -51,28 +47,17 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
       const days = Number(freezeDays);
       if (days < 3) { setError("Минимум 3 дня заморозки"); return; }
       if (days > freezeLeft) { setError(`Осталось только ${freezeLeft} дней заморозки`); return; }
-
       const newUsed = (client?.freeze_days_used || 0) + days;
-
-      // Сдвигаем дату окончания абонемента
-      let newEnd = client?.subscription_end || null;
-      let newEndWithFreeze = client?.subscription_end_with_freeze || null;
+      let newEndWithFreeze = client?.subscription_end_with_freeze || client?.subscription_end || null;
       if (newEndWithFreeze) {
         const d = new Date(newEndWithFreeze);
         d.setDate(d.getDate() + days);
         newEndWithFreeze = d.toISOString().split('T')[0];
       }
-
-      const { error: updateError } = await supabase
-        .from('clients')
-        .update({ freeze_days_used: newUsed, subscription_end_with_freeze: newEndWithFreeze })
-        .eq('id', client.id);
+      const { error: updateError } = await supabase.from('clients').update({ freeze_days_used: newUsed, subscription_end_with_freeze: newEndWithFreeze }).eq('id', client.id);
       if (updateError) throw new Error(updateError.message);
-
       if (onClientUpdate) onClientUpdate({ ...client, freeze_days_used: newUsed, subscription_end_with_freeze: newEndWithFreeze });
-
-      const freezeText = `[ЗАМОРОЗКА: ${days} дн с ${new Date(freezeStart).toLocaleDateString('ru-RU')}]`;
-      await onCreate(freezeText);
+      await onCreate(`[ЗАМОРОЗКА: ${days} дн с ${new Date(freezeStart).toLocaleDateString('ru-RU')}]`);
       setShowFreeze(false);
       setFreezeDays(3);
     } catch (err) {
@@ -81,26 +66,84 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
   }
 
   return (
-    <div>
-      <div className="panelHeader" style={{ marginTop: 8 }}>
-        <div className="panelTitle">Комментарии</div>
-        {client && !client.is_unlimited && (
-          <div style={{ fontSize: 13, color: lessonsLeft <= 3 ? '#e55' : '#888' }}>
-            Занятий осталось: <strong>{Math.max(0, lessonsLeft)}</strong>
-            {freezeLeft > 0 && <span> · Заморозка: <strong>{freezeLeft} дн</strong></span>}
-          </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+
+      {/* Форма ввода — закреплена сверху */}
+      <div style={{ flexShrink: 0, borderBottom: '1px solid #eee', paddingBottom: 12, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ fontWeight: 500, fontSize: 14 }}>Комментарии</div>
+          {client && !client.is_unlimited && (
+            <div style={{ fontSize: 12, color: lessonsLeft <= 3 ? '#e55' : '#888' }}>
+              Занятий: <strong>{Math.max(0, lessonsLeft)}</strong>
+              {freezeLeft > 0 && <span> · Заморозка: <strong>{freezeLeft} дн</strong></span>}
+            </div>
+          )}
+          {client?.is_unlimited && freezeLeft > 0 && (
+            <div style={{ fontSize: 12, color: '#888' }}>Заморозка: <strong>{freezeLeft} дн</strong></div>
+          )}
+        </div>
+
+        {error && <div style={{ color: "red", fontSize: 12, marginBottom: 6 }}>{error}</div>}
+
+        {canComment && (
+          <form onSubmit={handleSubmit}>
+            <textarea
+              className="textarea"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Заметка о занятии..."
+              required
+              style={{ width: '100%', marginBottom: 8 }}
+            />
+            {!client?.is_unlimited && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: '#888' }}>Списать:</span>
+                {[1,2,3,4,5].map(n => (
+                  <button key={n} type="button" onClick={() => setLessons(n)}
+                    style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #ddd', background: lessons === n ? '#4a90e2' : 'white', color: lessons === n ? 'white' : '#333', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button className="btn btnPrimary" type="submit" disabled={!message.trim()}>Добавить</button>
+              {canFreeze && freezeLeft > 0 && (
+                <button type="button" onClick={() => setShowFreeze(!showFreeze)}
+                  style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: showFreeze ? '#e8f4ff' : 'white', cursor: 'pointer', color: '#4a90e2' }}>
+                  🧊 Заморозка
+                </button>
+              )}
+            </div>
+          </form>
         )}
-        {client?.is_unlimited && (
-          <div style={{ fontSize: 13, color: '#888' }}>
-            Безлимит
-            {freezeLeft > 0 && <span> · Заморозка: <strong>{freezeLeft} дн</strong></span>}
-          </div>
+
+        {!canComment && (
+          <div style={{ fontSize: 13, color: '#aaa' }}>Только педагоги могут добавлять комментарии.</div>
+        )}
+
+        {showFreeze && (
+          <form onSubmit={handleFreeze} style={{ marginTop: 10, padding: 10, background: '#f0f8ff', borderRadius: 8, border: '1px solid #cce' }}>
+            <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>🧊 Поставить заморозку</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div>
+                <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Дата начала</div>
+                <input className="input" type="date" value={freezeStart} onChange={e => setFreezeStart(e.target.value)} style={{ width: 140 }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Дней (мин. 3)</div>
+                <input className="input" type="number" min="3" max={freezeLeft} value={freezeDays} onChange={e => setFreezeDays(e.target.value)} style={{ width: 70 }} />
+              </div>
+              <button className="btn btnPrimary" type="submit">Применить</button>
+              <button type="button" onClick={() => setShowFreeze(false)}
+                style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>Отмена</button>
+            </div>
+          </form>
         )}
       </div>
 
-      {error && <div style={{ color: "red", fontSize: 13, marginTop: 4 }}>{error}</div>}
-
-      <div className="commentList" style={{ marginTop: 10 }}>
+      {/* Список комментариев — скроллится */}
+      <div style={{ overflowY: 'auto', flex: 1 }}>
         {comments.length === 0 ? (
           <div className="hint">Комментариев пока нет.</div>
         ) : (
@@ -117,70 +160,6 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
           ))
         )}
       </div>
-
-      {canComment && (
-        <form onSubmit={handleSubmit} style={{ marginTop: 12 }}>
-          <div className="formGroup">
-            <div className="fieldLabel">Заметка о занятии</div>
-            <textarea
-              className="textarea"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Что делали на занятии..."
-              required
-            />
-          </div>
-          {!client?.is_unlimited && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-              <div className="fieldLabel" style={{ margin: 0 }}>Списать занятий:</div>
-              {[1,2,3,4,5].map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setLessons(n)}
-                  style={{
-                    width: 32, height: 32, borderRadius: '50%', border: '1px solid #ddd',
-                    background: lessons === n ? '#4a90e2' : 'white',
-                    color: lessons === n ? 'white' : '#333',
-                    cursor: 'pointer', fontSize: 13, fontWeight: 500
-                  }}
-                >{n}</button>
-              ))}
-            </div>
-          )}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: 'center', marginTop: 10 }}>
-            {canFreeze && freezeLeft > 0 && (
-              <button type="button" onClick={() => setShowFreeze(!showFreeze)}
-                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#4a90e2' }}>
-                🧊 Заморозка
-              </button>
-            )}
-            <button className="btn btnPrimary" type="submit" disabled={!message.trim()}>
-              Добавить
-            </button>
-          </div>
-        </form>
-      )}
-
-      {showFreeze && (
-        <form onSubmit={handleFreeze} style={{ marginTop: 12, padding: 12, background: '#f0f8ff', borderRadius: 8, border: '1px solid #cce' }}>
-          <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>🧊 Поставить заморозку</div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div className="formGroup" style={{ margin: 0 }}>
-              <div className="fieldLabel">Дата начала</div>
-              <input className="input" type="date" value={freezeStart} onChange={e => setFreezeStart(e.target.value)} style={{ width: 150 }} />
-            </div>
-            <div className="formGroup" style={{ margin: 0 }}>
-              <div className="fieldLabel">Дней (мин. 3, макс. {freezeLeft})</div>
-              <input className="input" type="number" min="3" max={freezeLeft} value={freezeDays}
-                onChange={e => setFreezeDays(e.target.value)} style={{ width: 80 }} />
-            </div>
-            <button className="btn btnPrimary" type="submit" style={{ marginBottom: 0 }}>Применить</button>
-            <button type="button" onClick={() => setShowFreeze(false)}
-              style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>Отмена</button>
-          </div>
-        </form>
-      )}
     </div>
   );
 }

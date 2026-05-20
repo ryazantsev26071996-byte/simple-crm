@@ -18,6 +18,7 @@ export default function App() {
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
   const [view, setView] = React.useState("kanban");
+  const [listSearch, setListSearch] = React.useState("");
 
   const role = profile?.role || "teacher";
   const authorName = profile?.full_name || user?.email || "";
@@ -105,6 +106,16 @@ export default function App() {
           )}
 
           {!loadingClients && view === 'list' && role !== 'teacher' && (
+            <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee' }}>
+              <input
+                value={listSearch}
+                onChange={e => setListSearch(e.target.value)}
+                placeholder="Поиск по имени или последним цифрам номера..."
+                style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+          )}
+          {!loadingClients && view === 'list' && role !== 'teacher' && (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
@@ -114,7 +125,14 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {clients.map(c => (
+                {clients.filter(c => {
+                    if (!listSearch) return true;
+                    const q = listSearch.toLowerCase();
+                    const digits = q.replace(/\D/g, '');
+                    if (c.name?.toLowerCase().includes(q)) return true;
+                    if (digits && (c.phone||'').replace(/\D/g,'').endsWith(digits)) return true;
+                    return false;
+                  }).map(c => (
                   <tr key={c.id} onClick={() => setSelectedId(c.id)}
                     style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
                     <td style={{ padding: '8px 16px' }}>{c.name}</td>
