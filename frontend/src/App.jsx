@@ -21,7 +21,12 @@ export default function App() {
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [view, setView] = React.useState(role === 'teacher' ? 'students' : 'kanban');
+  const [view, setView] = React.useState('kanban');
+
+  // Переключаем на ученики если педагог
+  React.useEffect(() => {
+    if (role === 'teacher') setView('students');
+  }, [role]);
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [listSearch, setListSearch] = React.useState("");
