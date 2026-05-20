@@ -213,6 +213,7 @@ export default function App() {
                 authorName={authorName}
                 comments={comments}
                 client={selectedClient}
+                currentUserId={user?.id}
                 onClientUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))}
                 onCreate={async (message) => {
                   await createComment({ role, name: authorName }, selectedClient.id, { message });

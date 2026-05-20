@@ -8,13 +8,15 @@ function formatTime(iso) {
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function CommentsWall({ role, authorName, comments, onCreate, client, onClientUpdate }) {
+export default function CommentsWall({ role, authorName, comments, onCreate, client, onClientUpdate, currentUserId }) {
   const [message, setMessage] = React.useState("");
   const [lessons, setLessons] = React.useState(1);
   const [error, setError] = React.useState("");
   const [showFreeze, setShowFreeze] = React.useState(false);
   const [freezeDays, setFreezeDays] = React.useState(3);
   const [freezeStart, setFreezeStart] = React.useState(new Date().toISOString().split('T')[0]);
+  const [editingId, setEditingId] = React.useState(null);
+  const [editText, setEditText] = React.useState("");
   const canComment = role === "teacher" || role === "admin";
   const canFreeze = role === "manager" || role === "admin" || role === "teacher";
 
@@ -26,8 +28,9 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
     setError("");
     try {
       if (!client?.is_unlimited && lessons > 0) {
+        const today = new Date().toISOString().split('T')[0];
         const newUsed = (client?.lessons_used || 0) + lessons;
-        const { error: updateError } = await supabase.from('clients').update({ lessons_used: newUsed }).eq('id', client.id);
+        const { error: updateError } = await supabase.from('clients').update({ lessons_used: newUsed, last_visit: today }).eq('id', client.id);
         if (updateError) throw new Error(updateError.message);
         if (onClientUpdate) onClientUpdate({ ...client, lessons_used: newUsed, last_visit: today });
       }
@@ -65,6 +68,25 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
     }
   }
 
+  async function handleDelete(commentId) {
+    if (!window.confirm('Удалить комментарий?')) return;
+    const { error } = await supabase.from('comments').delete().eq('id', commentId);
+    if (error) { setError(error.message); return; }
+    window.location.reload();
+  }
+
+  async function handleEdit(commentId) {
+    if (!editText.trim()) return;
+    const { error } = await supabase.from('comments').update({ text: editText }).eq('id', commentId);
+    if (error) { setError(error.message); return; }
+    setEditingId(null);
+    window.location.reload();
+  }
+
+  function canEditComment(comment) {
+    return role === 'admin' || comment.author_id === currentUserId;
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
@@ -87,14 +109,8 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
 
         {canComment && (
           <form onSubmit={handleSubmit}>
-            <textarea
-              className="textarea"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Заметка о занятии..."
-              required
-              style={{ width: '100%', marginBottom: 8 }}
-            />
+            <textarea className="textarea" value={message} onChange={(e) => setMessage(e.target.value)}
+              placeholder="Заметка о занятии..." required style={{ width: '100%', marginBottom: 8 }} />
             {!client?.is_unlimited && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: '#888' }}>Списать:</span>
@@ -142,20 +158,46 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
         )}
       </div>
 
-      {/* Список комментариев — скроллится */}
+      {/* Список комментариев */}
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {comments.length === 0 ? (
           <div className="hint">Комментариев пока нет.</div>
         ) : (
           comments.map((c) => (
             <div className="commentCard" key={c.id} style={{
-              background: (c.message||c.text||'').includes('ЗАМОРОЗКА') ? '#fff8e1' : 'white'
+              background: (c.message||c.text||'').includes('ЗАМОРОЗКА') ? '#fff8e1' : 'white',
+              position: 'relative'
             }}>
               <div className="commentMeta">
                 <div className="commentAuthor">{c.full_name || c.author || authorName}</div>
-                <div className="commentTime">{formatTime(c.created_at || c.createdAt)}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="commentTime">{formatTime(c.created_at || c.createdAt)}</div>
+                  {canEditComment(c) && (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => { setEditingId(c.id); setEditText(c.text || c.message || ''); }}
+                        style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#888' }}>
+                        ✏️
+                      </button>
+                      <button onClick={() => handleDelete(c.id)}
+                        style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, border: '1px solid #fcc', background: 'white', cursor: 'pointer', color: '#e55' }}>
+                        🗑️
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="commentMessage">{c.message || c.text}</div>
+              {editingId === c.id ? (
+                <div style={{ marginTop: 6 }}>
+                  <textarea value={editText} onChange={e => setEditText(e.target.value)}
+                    style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid #ddd', fontSize: 13, minHeight: 60 }} />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                    <button onClick={() => handleEdit(c.id)} className="btn btnPrimary" style={{ fontSize: 12, padding: '3px 10px' }}>Сохранить</button>
+                    <button onClick={() => setEditingId(null)} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>Отмена</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="commentMessage">{c.message || c.text}</div>
+              )}
             </div>
           ))
         )}
