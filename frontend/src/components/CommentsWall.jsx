@@ -29,7 +29,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
         const newUsed = (client?.lessons_used || 0) + lessons;
         const { error: updateError } = await supabase.from('clients').update({ lessons_used: newUsed }).eq('id', client.id);
         if (updateError) throw new Error(updateError.message);
-        if (onClientUpdate) onClientUpdate({ ...client, lessons_used: newUsed });
+        if (onClientUpdate) onClientUpdate({ ...client, lessons_used: newUsed, last_visit: today });
       }
       const lessonText = client?.is_unlimited ? '' : ` [списано занятий: ${lessons}]`;
       await onCreate(message + lessonText);
