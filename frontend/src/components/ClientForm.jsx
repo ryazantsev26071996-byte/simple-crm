@@ -186,6 +186,28 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
           <input className="input" type="date" value={form.subscription_start} disabled={disabled} onChange={handleStartChange} />
         </div>
       </div>
+      {form.subscription_type && !form.is_unlimited && (
+        <div style={{ height: 8 }} />
+      )}
+      {form.subscription_type && !form.is_unlimited && (
+        <div className="formGroup">
+          <div className="fieldLabel">Уже использовано занятий</div>
+          <input
+            className="input"
+            type="number"
+            min="0"
+            max={form.lessons_total}
+            value={form.lessons_used}
+            disabled={disabled}
+            onChange={e => setForm(f => ({ ...f, lessons_used: Number(e.target.value) }))}
+            placeholder="0"
+            style={{ width: 120 }}
+          />
+          <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>
+            Заполните если клиент уже посещал занятия до добавления в CRM
+          </div>
+        </div>
+      )}
 
       {form.subscription_type && (
         <div style={{ marginTop: 8, padding: '10px 12px', background: '#f8f9ff', borderRadius: 8, fontSize: 13, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
