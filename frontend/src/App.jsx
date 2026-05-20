@@ -4,56 +4,32 @@ import ClientTable from "./components/ClientTable.jsx";
 import ClientForm from "./components/ClientForm.jsx";
 import CommentsWall from "./components/CommentsWall.jsx";
 import { createClient, createComment, getClients, getComments, updateClient } from "./api.js";
-
-function loadFromStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function saveToStorage(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore
-  }
-}
+import { useAuth } from "./AuthContext";
+import { LoginPage } from "./LoginPage";
+import { supabase } from "./supabase";
 
 export default function App() {
-  const [role, setRole] = React.useState(loadFromStorage("crm.role", "Manager"));
-  const [authorName, setAuthorName] = React.useState(loadFromStorage("crm.authorName", "Ivan"));
+  const { user, profile, loading } = useAuth();
 
   const [clients, setClients] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
   const [comments, setComments] = React.useState([]);
-
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  const user = React.useMemo(() => ({ role, name: authorName }), [role, authorName]);
+  const role = profile?.role || "teacher";
+  const authorName = profile?.full_name || user?.email || "";
+  const apiUser = { role, name: authorName };
+  const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
-  React.useEffect(() => {
-    saveToStorage("crm.role", role);
-  }, [role]);
-
-  React.useEffect(() => {
-    saveToStorage("crm.authorName", authorName);
-  }, [authorName]);
-
-  // Загружаем список клиентов
   const reloadClients = React.useCallback(async () => {
     setError("");
     setLoadingClients(true);
     try {
-      const list = await getClients(user);
+      const list = await getClients(apiUser);
       setClients(list);
-      // Если выбранный клиент отсутствует или null, выбираем первый
-      if (!list.find(c => c.id === selectedId)) {
+      if (!list.find((c) => c.id === selectedId)) {
         setSelectedId(list.length > 0 ? list[0].id : null);
       }
     } catch (err) {
@@ -61,86 +37,65 @@ export default function App() {
     } finally {
       setLoadingClients(false);
     }
-  }, [user, selectedId]);
+  }, [role, selectedId]);
 
-  // Загружаем комментарии для выбранного клиента
-  const reloadComments = React.useCallback(
-    async (clientId) => {
-      if (!clientId) return;
-      setLoadingComments(true);
-      setError("");
-      try {
-        const list = await getComments(user, clientId);
-        setComments(list);
-      } catch (err) {
-        setError(err.message || String(err));
-      } finally {
-        setLoadingComments(false);
-      }
-    },
-    [user]
-  );
+  const reloadComments = React.useCallback(async (clientId) => {
+    if (!clientId) return;
+    setLoadingComments(true);
+    setError("");
+    try {
+      const list = await getComments(apiUser, clientId);
+      setComments(list);
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [role]);
 
   React.useEffect(() => {
-    reloadClients();
-  }, []);
+    if (user) reloadClients();
+  }, [role, user]);
 
   React.useEffect(() => {
-    reloadComments(selectedId);
-  }, [selectedId, reloadComments]);
+    if (selectedId) reloadComments(selectedId);
+    else setComments([]);
+  }, [selectedId]);
 
-  const selectedClient = clients.find((c) => c.id === selectedId) || null;
-  const [addKey, setAddKey] = React.useState(0);
+  if (loading) return <div style={{ padding: 40 }}>Загрузка...</div>;
+  if (!user) return <LoginPage />;
 
   return (
-    <div className="appShell">
-      <RoleBar
-        role={role}
-        authorName={authorName}
-        onChange={({ role: nextRole, authorName: nextName }) => {
-          if (typeof nextRole === "string") setRole(nextRole);
-          if (typeof nextName === "string") setAuthorName(nextName);
-        }}
-      />
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #eee" }}>
+        <RoleBar role={role} authorName={authorName} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 13, color: "#666" }}>{user.email} ({role})</span>
+          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12 }}>Выйти</button>
+        </div>
+      </div>
 
-      <div className="page">
-        <div className="panel">
-          <div className="panelHeader">
-            <div className="panelTitle">Clients</div>
-            <div className="muted" style={{ fontSize: 13 }}>
-              {role === "Manager" ? "Add/edit is enabled." : "Switch to Manager to add clients."}
-            </div>
-          </div>
+      {error && <div style={{ color: "red", padding: "8px 16px" }}>{error}</div>}
 
-          {error && (
-            <div className="hint" style={{ color: "var(--danger)" }}>
-              {error}
-            </div>
-          )}
-
+      <div style={{ display: "flex" }}>
+        <div style={{ width: 300, borderRight: "1px solid #eee" }}>
           <ClientForm
-            key={addKey}
             mode="Add client"
-            initialValue={{ name: "", phone: "", source: "", stage: "" }}
-            disabled={role !== "Manager"}
+            disabled={role !== "manager" && role !== "admin"}
             submitLabel="Add"
             onSubmit={async (payload) => {
               setError("");
               try {
-                const newClient = await createClient(user, payload);
-                setAddKey((k) => k + 1); // очистка формы
-                await reloadClients();   // обновляем список
-                setSelectedId(newClient.id); // сразу выбираем нового клиента
+                const newClient = await createClient(apiUser, payload);
+                setClients((prev) => [...prev, newClient]);
+                setSelectedId(newClient.id);
               } catch (err) {
                 setError(err.message || String(err));
               }
             }}
           />
-
           <div style={{ height: 12 }} />
-
           {loadingClients ? <div className="hint">Loading clients...</div> : null}
-
           <ClientTable
             clients={clients}
             selectedId={selectedId}
@@ -157,24 +112,23 @@ export default function App() {
                 <div>
                   <div className="detailsName">{selectedClient.name}</div>
                   <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-                    Phone: {selectedClient.phone || "-"} • Source: {selectedClient.source || "-"} • Stage:{" "}
-                    {selectedClient.stage || "-"}
+                    Phone: {selectedClient.phone || "−"} • Source: {selectedClient.source || "−"} • Stage: {selectedClient.stage || "−"}
                   </div>
                 </div>
                 <div className="muted" style={{ fontSize: 13 }}>
-                  {role === "Manager" ? "Client editing enabled" : "Client editing disabled"}
+                  {role === "manager" || role === "admin" ? "Client editing enabled" : "Client editing disabled"}
                 </div>
               </div>
 
               <ClientForm
                 mode="Edit client"
                 initialValue={selectedClient}
-                disabled={role !== "Manager"}
+                disabled={role !== "manager" && role !== "admin"}
                 submitLabel="Save"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
-                    const updated = await updateClient(user, selectedClient.id, payload);
+                    const updated = await updateClient(apiUser, selectedClient.id, payload);
                     setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
                   } catch (err) {
                     setError(err.message || String(err));
@@ -183,7 +137,6 @@ export default function App() {
               />
 
               <div style={{ height: 12 }} />
-
               {loadingComments ? <div className="hint">Loading comments...</div> : null}
 
               <CommentsWall
@@ -191,7 +144,7 @@ export default function App() {
                 authorName={authorName}
                 comments={comments}
                 onCreate={async (message) => {
-                  await createComment(user, selectedClient.id, { message });
+                  await createComment(apiUser, selectedClient.id, { message });
                   await reloadComments(selectedClient.id);
                 }}
               />

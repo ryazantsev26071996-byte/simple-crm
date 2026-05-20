@@ -1,11 +1,13 @@
+import { supabase } from './supabase'
+
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:4000";
 
-function toHeaders({ role, name }) {
+async function toHeaders() {
+  const { data: { session } } = await supabase.auth.getSession()
   return {
     "Content-Type": "application/json",
-    "x-user-role": role,
-    "x-user-name": name,
-  };
+    "Authorization": `Bearer ${session?.access_token || ''}`,
+  }
 }
 
 async function handleJson(res) {
@@ -23,10 +25,10 @@ async function handleJson(res) {
   return res.json();
 }
 
-export async function getClients(user) {
+export async function getClients() {
   const res = await fetch(`${API_BASE}/api/clients`, {
     method: "GET",
-    headers: toHeaders(user),
+    headers: await toHeaders(),
   });
   const json = await handleJson(res);
   return json.clients;
@@ -35,7 +37,7 @@ export async function getClients(user) {
 export async function createClient(user, payload) {
   const res = await fetch(`${API_BASE}/api/clients`, {
     method: "POST",
-    headers: toHeaders(user),
+    headers: await toHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleJson(res);
@@ -45,7 +47,7 @@ export async function createClient(user, payload) {
 export async function updateClient(user, id, payload) {
   const res = await fetch(`${API_BASE}/api/clients/${id}`, {
     method: "PUT",
-    headers: toHeaders(user),
+    headers: await toHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleJson(res);
@@ -55,7 +57,7 @@ export async function updateClient(user, id, payload) {
 export async function getComments(user, clientId) {
   const res = await fetch(`${API_BASE}/api/clients/${clientId}/comments`, {
     method: "GET",
-    headers: toHeaders(user),
+    headers: await toHeaders(),
   });
   const json = await handleJson(res);
   return json.comments;
@@ -64,10 +66,9 @@ export async function getComments(user, clientId) {
 export async function createComment(user, clientId, payload) {
   const res = await fetch(`${API_BASE}/api/clients/${clientId}/comments`, {
     method: "POST",
-    headers: toHeaders(user),
+    headers: await toHeaders(),
     body: JSON.stringify(payload),
   });
   const json = await handleJson(res);
   return json.comment;
 }
-

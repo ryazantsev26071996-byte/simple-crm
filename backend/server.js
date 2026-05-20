@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
+require('dotenv').config()
 
 const clientsRouter = require("./routes/clients");
 const commentsRouter = require("./routes/comments");
+const { requireAuth } = require("./middleware/auth");
 
 const app = express();
 
@@ -18,10 +20,9 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
-app.use("/api/clients", clientsRouter);
-app.use("/api/clients", commentsRouter);
+app.use("/api/clients", requireAuth, clientsRouter);
+app.use("/api/clients", requireAuth, commentsRouter);
 
-// Basic error handler (routes should return explicit JSON errors).
 app.use((err, req, res, next) => {
   // eslint-disable-next-line no-console
   console.error(err);
@@ -33,4 +34,3 @@ app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`CRM backend listening on http://localhost:${PORT}`);
 });
-
