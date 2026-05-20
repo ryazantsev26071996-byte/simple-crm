@@ -1,8 +1,8 @@
 import React from "react";
 import RoleBar from "./components/RoleBar.jsx";
-import ClientTable from "./components/ClientTable.jsx";
 import ClientForm from "./components/ClientForm.jsx";
 import CommentsWall from "./components/CommentsWall.jsx";
+import { KanbanBoard } from "./KanbanBoard.jsx";
 import { createClient, createComment, getClients, getComments, updateClient } from "./api.js";
 import { useAuth } from "./AuthContext";
 import { LoginPage } from "./LoginPage";
@@ -17,6 +17,7 @@ export default function App() {
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [view, setView] = React.useState("kanban");
 
   const role = profile?.role || "teacher";
   const authorName = profile?.full_name || user?.email || "";
@@ -30,7 +31,7 @@ export default function App() {
       const list = await getClients(apiUser);
       setClients(list);
       if (!list.find((c) => c.id === selectedId)) {
-        setSelectedId(list.length > 0 ? list[0].id : null);
+        setSelectedId(null);
       }
     } catch (err) {
       setError(err.message || String(err));
@@ -66,65 +67,123 @@ export default function App() {
   if (!user) return <LoginPage />;
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #eee" }}>
-        <RoleBar role={role} authorName={authorName} />
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* Шапка */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #eee", flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <strong style={{ fontSize: 15 }}>Simple CRM</strong>
+          {(role === 'manager' || role === 'admin') && (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                onClick={() => setView('kanban')}
+                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}
+              >Канбан</button>
+              <button
+                onClick={() => setView('list')}
+                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}
+              >Список</button>
+            </div>
+          )}
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "#666" }}>{user.email} ({role})</span>
-          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12 }}>Выйти</button>
+          <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>
+          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
         </div>
       </div>
 
-      {error && <div style={{ color: "red", padding: "8px 16px" }}>{error}</div>}
+      {error && <div style={{ color: "red", padding: "8px 16px", flexShrink: 0 }}>{error}</div>}
 
-      <div style={{ display: "flex" }}>
-        <div style={{ width: 300, borderRight: "1px solid #eee" }}>
-          <ClientForm
-            mode="Add client"
-            disabled={role !== "manager" && role !== "admin"}
-            submitLabel="Add"
-            onSubmit={async (payload) => {
-              setError("");
-              try {
-                const newClient = await createClient(apiUser, payload);
-                setClients((prev) => [...prev, newClient]);
-                setSelectedId(newClient.id);
-              } catch (err) {
-                setError(err.message || String(err));
-              }
-            }}
-          />
-          <div style={{ height: 12 }} />
-          {loadingClients ? <div className="hint">Loading clients...</div> : null}
-          <ClientTable
-            clients={clients}
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId(id)}
-          />
+      {/* Основной контент */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+
+        {/* Левая панель — канбан или список */}
+        <div style={{ flex: selectedId ? '0 0 60%' : '1', overflow: 'auto', borderRight: selectedId ? '1px solid #eee' : 'none', transition: 'flex 0.2s' }}>
+
+          {/* Форма добавления клиента — только для менеджеров и админов */}
+          {(role === 'manager' || role === 'admin') && view === 'list' && (
+            <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
+              <ClientForm
+                mode="Add client"
+                disabled={false}
+                submitLabel="Add"
+                onSubmit={async (payload) => {
+                  setError("");
+                  try {
+                    const newClient = await createClient(apiUser, payload);
+                    setClients((prev) => [newClient, ...prev]);
+                    setSelectedId(newClient.id);
+                  } catch (err) {
+                    setError(err.message || String(err));
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {loadingClients && <div style={{ padding: 16, color: '#888', fontSize: 13 }}>Загрузка клиентов...</div>}
+
+          {/* Канбан */}
+          {(view === 'kanban' || role === 'teacher') && (
+            <KanbanBoard
+              clients={clients}
+              role={role}
+              onClientSelect={setSelectedId}
+              onStageChange={(id, stage) => {
+                setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c));
+              }}
+            />
+          )}
+
+          {/* Список */}
+          {view === 'list' && role !== 'teacher' && (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
+                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500 }}>Имя</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500 }}>Телефон</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'left', fontWeight: 500 }}>Стадия</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clients.map(c => (
+                  <tr
+                    key={c.id}
+                    onClick={() => setSelectedId(c.id)}
+                    style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}
+                    onMouseEnter={e => { if (c.id !== selectedId) e.currentTarget.style.background = '#fafafa' }}
+                    onMouseLeave={e => { if (c.id !== selectedId) e.currentTarget.style.background = 'white' }}
+                  >
+                    <td style={{ padding: '8px 16px' }}>{c.name}</td>
+                    <td style={{ padding: '8px 16px', color: '#888' }}>{c.phone || '—'}</td>
+                    <td style={{ padding: '8px 16px', color: '#888' }}>{c.stage || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        <div className="panel">
-          {!selectedClient ? (
-            <div className="hint">Select a client to view details.</div>
-          ) : (
-            <>
-              <div className="detailsTop">
-                <div>
-                  <div className="detailsName">{selectedClient.name}</div>
-                  <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-                    Phone: {selectedClient.phone || "−"} • Source: {selectedClient.source || "−"} • Stage: {selectedClient.stage || "−"}
-                  </div>
-                </div>
-                <div className="muted" style={{ fontSize: 13 }}>
-                  {role === "manager" || role === "admin" ? "Client editing enabled" : "Client editing disabled"}
+        {/* Правая панель — детали клиента */}
+        {selectedId && selectedClient && (
+          <div style={{ flex: '0 0 40%', overflow: 'auto', padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{selectedClient.name}</div>
+                <div style={{ fontSize: 13, color: '#888' }}>
+                  {selectedClient.phone && <span>{selectedClient.phone} · </span>}
+                  {selectedClient.source && <span>{selectedClient.source} · </span>}
+                  <span>{selectedClient.stage || '—'}</span>
                 </div>
               </div>
+              <button onClick={() => setSelectedId(null)} style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', color: '#888', lineHeight: 1 }}>×</button>
+            </div>
 
+            {(role === 'manager' || role === 'admin') && (
               <ClientForm
                 mode="Edit client"
                 initialValue={selectedClient}
-                disabled={role !== "manager" && role !== "admin"}
-                submitLabel="Save"
+                disabled={false}
+                submitLabel="Сохранить"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
@@ -135,10 +194,10 @@ export default function App() {
                   }
                 }}
               />
+            )}
 
-              <div style={{ height: 12 }} />
-              {loadingComments ? <div className="hint">Loading comments...</div> : null}
-
+            <div style={{ marginTop: 16 }}>
+              {loadingComments && <div style={{ color: '#888', fontSize: 13 }}>Загрузка комментариев...</div>}
               <CommentsWall
                 role={role}
                 authorName={authorName}
@@ -148,9 +207,9 @@ export default function App() {
                   await reloadComments(selectedClient.id);
                 }}
               />
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
