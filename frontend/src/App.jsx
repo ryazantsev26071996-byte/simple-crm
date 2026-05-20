@@ -163,6 +163,8 @@ export default function App() {
                 role={role}
                 authorName={authorName}
                 comments={comments}
+                client={selectedClient}
+                onClientUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))}
                 onCreate={async (message) => {
                   await createComment({ role, name: authorName }, selectedClient.id, { message });
                   const list = await getComments({ role, name: authorName }, selectedClient.id);
