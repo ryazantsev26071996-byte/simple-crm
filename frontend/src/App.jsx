@@ -99,7 +99,7 @@ export default function App() {
               clients={clients}
               role={role}
               onClientSelect={setSelectedId}
-              onStageChange={(id, stage) => setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c))}
+              onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => setSelectedId(id), 50); }}
               onAddClient={() => setView('list')}
             />
           )}
