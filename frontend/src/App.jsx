@@ -8,6 +8,7 @@ import { useAuth } from "./AuthContext";
 import { LoginPage } from "./LoginPage";
 import { supabase } from "./supabase";
 import { AuditLog } from "./AuditLog.jsx";
+import { ImportClients } from "./ImportClients.jsx";
 import { exportToExcel } from "./ExportExcel.jsx";
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
   const [error, setError] = React.useState("");
   const [view, setView] = React.useState("kanban");
   const [showAudit, setShowAudit] = React.useState(false);
+  const [showImport, setShowImport] = React.useState(false);
   const [listSearch, setListSearch] = React.useState("");
   const [sortField, setSortField] = React.useState("name");
   const [sortDir, setSortDir] = React.useState("asc");
@@ -71,6 +73,7 @@ export default function App() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>
+          {role === 'admin' && <button onClick={() => setShowImport(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a' }}>📤 Импорт</button>}
           {role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт Excel</button>}
           {role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
           <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
@@ -235,6 +238,7 @@ export default function App() {
         )}
       </div>
           {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
+      {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
     </div>
   );
 }
