@@ -8,7 +8,15 @@ function formatTime(iso) {
   return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function CommentsWall({ role, authorName, comments, onCreate, client, onClientUpdate, currentUserId }) {
+async function logAudit(action, entity, entityId, oldValue, newValue, userId, userName) {
+  await supabase.from('audit_log').insert({
+    action, entity, entity_id: entityId,
+    old_value: oldValue, new_value: newValue,
+    performed_by: userId, performed_by_name: userName
+  });
+}
+
+export default function CommentsWall({ role, authorName, comments, onCreate, onCommentsChange, client, onClientUpdate, currentUserId }) {
   const [message, setMessage] = React.useState("");
   const [lessons, setLessons] = React.useState(1);
   const [error, setError] = React.useState("");
@@ -68,19 +76,23 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
     }
   }
 
-  async function handleDelete(commentId) {
+  async function handleDelete(comment) {
     if (!window.confirm('Удалить комментарий?')) return;
-    const { error } = await supabase.from('comments').delete().eq('id', commentId);
+    const oldText = comment.text || comment.message || '';
+    const { error } = await supabase.from('comments').delete().eq('id', comment.id);
     if (error) { setError(error.message); return; }
-    window.location.reload();
+    await logAudit('comment_deleted', 'comment', comment.id, oldText, null, currentUserId, authorName);
+    if (onCommentsChange) onCommentsChange();
   }
 
-  async function handleEdit(commentId) {
+  async function handleEdit(comment) {
     if (!editText.trim()) return;
-    const { error } = await supabase.from('comments').update({ text: editText }).eq('id', commentId);
+    const oldText = comment.text || comment.message || '';
+    const { error } = await supabase.from('comments').update({ text: editText }).eq('id', comment.id);
     if (error) { setError(error.message); return; }
+    await logAudit('comment_edited', 'comment', comment.id, oldText, editText, currentUserId, authorName);
     setEditingId(null);
-    window.location.reload();
+    if (onCommentsChange) onCommentsChange();
   }
 
   function canEditComment(comment) {
@@ -89,8 +101,6 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-      {/* Форма ввода — закреплена сверху */}
       <div style={{ flexShrink: 0, borderBottom: '1px solid #eee', paddingBottom: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontWeight: 500, fontSize: 14 }}>Комментарии</div>
@@ -134,9 +144,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
           </form>
         )}
 
-        {!canComment && (
-          <div style={{ fontSize: 13, color: '#aaa' }}>Только педагоги могут добавлять комментарии.</div>
-        )}
+        {!canComment && <div style={{ fontSize: 13, color: '#aaa' }}>Только педагоги могут добавлять комментарии.</div>}
 
         {showFreeze && (
           <form onSubmit={handleFreeze} style={{ marginTop: 10, padding: 10, background: '#f0f8ff', borderRadius: 8, border: '1px solid #cce' }}>
@@ -158,30 +166,24 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
         )}
       </div>
 
-      {/* Список комментариев */}
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {comments.length === 0 ? (
           <div className="hint">Комментариев пока нет.</div>
         ) : (
           comments.map((c) => (
             <div className="commentCard" key={c.id} style={{
-              background: (c.message||c.text||'').includes('ЗАМОРОЗКА') ? '#fff8e1' : 'white',
-              position: 'relative'
+              background: (c.message||c.text||'').includes('ЗАМОРОЗКА') ? '#fff8e1' : 'white'
             }}>
               <div className="commentMeta">
                 <div className="commentAuthor">{c.full_name || c.author || authorName}</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <div className="commentTime">{formatTime(c.created_at || c.createdAt)}</div>
                   {canEditComment(c) && (
-                    <div style={{ display: 'flex', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 3 }}>
                       <button onClick={() => { setEditingId(c.id); setEditText(c.text || c.message || ''); }}
-                        style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#888' }}>
-                        ✏️
-                      </button>
-                      <button onClick={() => handleDelete(c.id)}
-                        style={{ fontSize: 11, padding: '1px 6px', borderRadius: 4, border: '1px solid #fcc', background: 'white', cursor: 'pointer', color: '#e55' }}>
-                        🗑️
-                      </button>
+                        style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#888' }}>✏️</button>
+                      <button onClick={() => handleDelete(c)}
+                        style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, border: '1px solid #fcc', background: 'white', cursor: 'pointer', color: '#e55' }}>🗑️</button>
                     </div>
                   )}
                 </div>
@@ -191,7 +193,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, cli
                   <textarea value={editText} onChange={e => setEditText(e.target.value)}
                     style={{ width: '100%', padding: 6, borderRadius: 6, border: '1px solid #ddd', fontSize: 13, minHeight: 60 }} />
                   <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                    <button onClick={() => handleEdit(c.id)} className="btn btnPrimary" style={{ fontSize: 12, padding: '3px 10px' }}>Сохранить</button>
+                    <button onClick={() => handleEdit(c)} className="btn btnPrimary" style={{ fontSize: 12, padding: '3px 10px' }}>Сохранить</button>
                     <button onClick={() => setEditingId(null)} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>Отмена</button>
                   </div>
                 </div>
