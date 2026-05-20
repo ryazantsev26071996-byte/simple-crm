@@ -229,6 +229,34 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
               <strong>{new Date(form.subscription_end).toLocaleDateString('ru-RU')}</strong>
             </div>
           )}
+          {form.subscription_start && form.subscription_end && (() => {
+            const today = new Date()
+            const end = new Date(form.subscription_end)
+            const freezeUsed = form.freeze_days_used || 0
+            const endWithFreeze = new Date(end)
+            endWithFreeze.setDate(endWithFreeze.getDate() + freezeUsed)
+            const daysLeft = Math.ceil((end - today) / 86400000)
+            const daysLeftWithFreeze = Math.ceil((endWithFreeze - today) / 86400000)
+            const monthsLeft = Math.floor(daysLeft / 30)
+            const monthsLeftWithFreeze = Math.floor(daysLeftWithFreeze / 30)
+            const color = daysLeft < 14 ? '#e55' : daysLeft < 30 ? '#f90' : '#2a9'
+            return (
+              <>
+                <div>
+                  <span style={{ color: '#888' }}>Осталось (без заморозки): </span>
+                  <strong style={{ color }}>{daysLeft} дн</strong>
+                  {monthsLeft > 0 && <span style={{ color: '#aaa' }}> ({monthsLeft} мес)</span>}
+                </div>
+                {freezeUsed > 0 && (
+                  <div>
+                    <span style={{ color: '#888' }}>Осталось (с заморозкой): </span>
+                    <strong style={{ color: '#4a90e2' }}>{daysLeftWithFreeze} дн</strong>
+                    {monthsLeftWithFreeze > 0 && <span style={{ color: '#aaa' }}> ({monthsLeftWithFreeze} мес)</span>}
+                  </div>
+                )}
+              </>
+            )
+          })()}
         </div>
       )}
 
