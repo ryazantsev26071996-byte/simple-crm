@@ -63,7 +63,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       is_unlimited: initialValue?.is_unlimited || false,
     })
     setPhoneError("")
-  }, [initialValue?.id])
+  }, [initialValue?.id, JSON.stringify(initialValue)])
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }))
 
