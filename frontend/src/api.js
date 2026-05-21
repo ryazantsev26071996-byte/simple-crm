@@ -1,60 +1,64 @@
 import { supabase } from './supabase'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+async function getToken() {
+  const raw = localStorage.getItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`)
+  if (raw) return JSON.parse(raw).access_token
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token
+}
+
+async function apiFetch(path, options = {}) {
+  const token = await getToken()
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+      ...options.headers
+    }
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || JSON.stringify(data))
+  return data
+}
+
 export async function getClients() {
-  const { data, error } = await supabase
-    .from('clients')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
+  const data = await apiFetch('clients?order=created_at.desc')
   return data
 }
 
 export async function createClient(user, payload) {
-  const { data, error } = await supabase
-    .from('clients')
-    .insert({ ...payload })
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  return data
+  const data = await apiFetch('clients', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+  return Array.isArray(data) ? data[0] : data
 }
 
 export async function updateClient(user, id, payload) {
-  const { data, error } = await supabase
-    .from('clients')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  return data
+  const data = await apiFetch(`clients?id=eq.${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  })
+  return Array.isArray(data) ? data[0] : data
 }
 
 export async function getComments(user, clientId) {
-  const { data, error } = await supabase
-    .from('comments')
-    .select('*, profiles(full_name)')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(error.message)
-  return data.map(c => ({
-    ...c,
-    message: c.text,
-    full_name: c.profiles?.full_name || null
-  }))
+  const data = await apiFetch(`comments?client_id=eq.${clientId}&order=created_at.desc&select=*,profiles(full_name)`)
+  return data.map(c => ({ ...c, message: c.text, full_name: c.profiles?.full_name || null }))
 }
 
 export async function createComment(user, clientId, payload) {
   const { data: { user: authUser } } = await supabase.auth.getUser()
-  const { data, error } = await supabase
-    .from('comments')
-    .insert({
-      client_id: clientId,
-      author_id: authUser.id,
-      text: payload.message
-    })
-    .select('*, profiles(full_name)')
-    .single()
-  if (error) throw new Error(error.message)
-  return { ...data, message: data.text, full_name: data.profiles?.full_name || null }
+  const data = await apiFetch('comments?select=*,profiles(full_name)', {
+    method: 'POST',
+    body: JSON.stringify({ client_id: clientId, author_id: authUser?.id, text: payload.message })
+  })
+  const c = Array.isArray(data) ? data[0] : data
+  return { ...c, message: c.text, full_name: c.profiles?.full_name || null }
 }
