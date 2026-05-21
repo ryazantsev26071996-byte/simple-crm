@@ -97,10 +97,12 @@ export default function App() {
                 onSubmit={async (payload) => {
                   setError("");
                   try {
+                    console.log('Creating client:', payload);
                     const newClient = await createClient({ role, name: authorName }, payload);
+                    console.log('Created:', newClient);
                     setClients((prev) => [newClient, ...prev]);
                     setSelectedId(newClient.id);
-                  } catch (err) { setError(err.message); }
+                  } catch (err) { console.error('Error:', err); setError(err.message); alert(err.message); }
                 }}
               />
             </div>
