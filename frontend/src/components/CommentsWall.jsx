@@ -32,8 +32,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   const lessonsLeft = client?.is_unlimited ? Infinity : (client?.lessons_total || 0) - (client?.lessons_used || 0);
   const freezeLeft = (client?.freeze_days_total || 0) - (client?.freeze_days_used || 0);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit() {
     setError("");
     try {
       if (!client?.is_unlimited && lessons > 0) {
@@ -52,8 +51,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
     }
   }
 
-  async function handleFreeze(e) {
-    e.preventDefault();
+  async function handleFreeze() {
     setError("");
     try {
       const days = Number(freezeDays);
