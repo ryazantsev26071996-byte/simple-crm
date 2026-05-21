@@ -34,6 +34,7 @@ export default function App() {
 
   React.useEffect(() => {
     if (role === 'teacher') setView('students');
+    else if (role === 'manager') setView('kanban');
   }, [role]);
 
   React.useEffect(() => {
