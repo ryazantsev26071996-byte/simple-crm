@@ -118,7 +118,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
         {error && <div style={{ color: "red", fontSize: 12, marginBottom: 6 }}>{error}</div>}
 
         {canComment && (
-          <form onSubmit={handleSubmit}>
+          <div>
             <textarea className="textarea" value={message} onChange={(e) => setMessage(e.target.value)}
               placeholder="Заметка о занятии..." required style={{ width: '100%', marginBottom: 8 }} />
             {!client?.is_unlimited && (
@@ -133,7 +133,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button className="btn btnPrimary" type="submit" disabled={!message.trim()}>Добавить</button>
+              <button className="btn btnPrimary" type="button" onClick={handleSubmit} disabled={!message.trim()}>Добавить</button>
               {canFreeze && freezeLeft > 0 && (
                 <button type="button" onClick={() => setShowFreeze(!showFreeze)}
                   style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: showFreeze ? '#e8f4ff' : 'white', cursor: 'pointer', color: '#4a90e2' }}>
@@ -141,13 +141,13 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
                 </button>
               )}
             </div>
-          </form>
+          </div>
         )}
 
         {!canComment && <div style={{ fontSize: 13, color: '#aaa' }}>Только педагоги могут добавлять комментарии.</div>}
 
         {showFreeze && (
-          <form onSubmit={handleFreeze} style={{ marginTop: 10, padding: 10, background: '#f0f8ff', borderRadius: 8, border: '1px solid #cce' }}>
+          <div style={{ marginTop: 10, padding: 10, background: '#f0f8ff', borderRadius: 8, border: '1px solid #cce' }}>
             <div style={{ fontWeight: 500, marginBottom: 8, fontSize: 13 }}>🧊 Поставить заморозку</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
               <div>
@@ -158,11 +158,11 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
                 <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Дней (мин. 3)</div>
                 <input className="input" type="number" min="3" max={freezeLeft} value={freezeDays} onChange={e => setFreezeDays(e.target.value)} style={{ width: 70 }} />
               </div>
-              <button className="btn btnPrimary" type="submit">Применить</button>
+              <button className="btn btnPrimary" type="button" onClick={handleFreeze}>Применить</button>
               <button type="button" onClick={() => setShowFreeze(false)}
                 style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>Отмена</button>
             </div>
-          </form>
+          </div>
         )}
       </div>
 
