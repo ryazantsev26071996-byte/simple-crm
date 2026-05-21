@@ -10,10 +10,9 @@ export async function getClients() {
 }
 
 export async function createClient(user, payload) {
-  const { data: { user: authUser } } = await supabase.auth.getUser()
   const { data, error } = await supabase
     .from('clients')
-    .insert({ ...payload, assigned_manager_id: authUser.id })
+    .insert({ ...payload })
     .select()
     .single()
   if (error) throw new Error(error.message)
