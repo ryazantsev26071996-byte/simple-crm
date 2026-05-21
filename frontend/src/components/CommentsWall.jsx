@@ -35,14 +35,14 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   async function handleSubmit() {
     setError("");
     try {
-      if (!client?.is_unlimited && lessons > 0) {
+      if (!client?.is_unlimited && lessons > 0 && isActiveStudent) {
         const today = new Date().toISOString().split('T')[0];
         const newUsed = (client?.lessons_used || 0) + lessons;
         const { error: updateError } = await supabase.from('clients').update({ lessons_used: newUsed, last_visit: today }).eq('id', client.id);
         if (updateError) throw new Error(updateError.message);
         if (onClientUpdate) onClientUpdate({ ...client, lessons_used: newUsed, last_visit: today });
       }
-      const lessonText = client?.is_unlimited ? '' : ` [списано занятий: ${lessons}]`;
+      const lessonText = (client?.is_unlimited || !isActiveStudent) ? '' : ` [списано занятий: ${lessons}]`;
       await onCreate(message + lessonText);
       setMessage("");
       setLessons(1);
