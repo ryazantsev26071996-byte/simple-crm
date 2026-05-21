@@ -142,7 +142,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
   const freezeLeft = form.freeze_days_total - form.freeze_days_used
 
   return (
-    <form onSubmit={handleSubmit}>
+    <div>
       <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Имя</div>
@@ -263,9 +263,9 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       )}
 
       <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
-        <button className="btn btnPrimary" type="submit" disabled={disabled}>{submitLabel}</button>
+        <button className="btn btnPrimary" type="button" disabled={disabled} onClick={handleSubmit}>{submitLabel}</button>
         <div className="muted" style={{ fontSize: 13 }}>{mode}</div>
       </div>
-    </form>
+    </div>
   )
 }
