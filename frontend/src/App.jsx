@@ -199,7 +199,20 @@ export default function App() {
                   <span>{selectedClient.stage || '—'}</span>
                 </div>
               </div>
-              <button onClick={() => setSelectedId(null)} style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
+<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {(role === 'admin' || role === 'manager') && (
+                  <button onClick={async () => {
+                    if (!window.confirm('Удалить клиента ' + selectedClient.name + '?')) return;
+                    const { error } = await (await import('./supabase.js')).supabase.from('clients').delete().eq('id', selectedClient.id);
+                    if (error) { alert(error.message); return; }
+                    setClients(prev => prev.filter(c => c.id !== selectedClient.id));
+                    setSelectedId(null);
+                  }} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #fcc', background: 'white', cursor: 'pointer', color: '#e55' }}>
+                    🗑️ Удалить
+                  </button>
+                )}
+                <button onClick={() => setSelectedId(null)} style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
+              </div>
             </div>
 
             {(role === 'manager' || role === 'admin') && (
