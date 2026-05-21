@@ -26,6 +26,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   const [editingId, setEditingId] = React.useState(null);
   const [editText, setEditText] = React.useState("");
   const canComment = role === "teacher" || role === "admin";
+  const isActiveStudent = ["ученик", "пробный месяц", "тест-драйв"].includes(client?.stage);
   const canFreeze = role === "manager" || role === "admin" || role === "teacher";
 
   const lessonsLeft = client?.is_unlimited ? Infinity : (client?.lessons_total || 0) - (client?.lessons_used || 0);
@@ -121,7 +122,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
           <div>
             <textarea className="textarea" value={message} onChange={(e) => setMessage(e.target.value)}
               placeholder="Заметка о занятии..." required style={{ width: '100%', marginBottom: 8 }} />
-            {!client?.is_unlimited && (
+            {!client?.is_unlimited && isActiveStudent && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: '#888' }}>Списать:</span>
                 {[1,2,3,4,5].map(n => (
@@ -134,7 +135,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
             )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button className="btn btnPrimary" type="button" onClick={handleSubmit} disabled={!message.trim()}>Добавить</button>
-              {canFreeze && freezeLeft > 0 && (
+              {canFreeze && freezeLeft > 0 && isActiveStudent && (
                 <button type="button" onClick={() => setShowFreeze(!showFreeze)}
                   style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: showFreeze ? '#e8f4ff' : 'white', cursor: 'pointer', color: '#4a90e2' }}>
                   🧊 Заморозка
