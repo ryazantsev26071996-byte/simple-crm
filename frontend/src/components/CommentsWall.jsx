@@ -25,7 +25,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   const [freezeStart, setFreezeStart] = React.useState(new Date().toISOString().split('T')[0]);
   const [editingId, setEditingId] = React.useState(null);
   const [editText, setEditText] = React.useState("");
-  const canComment = role === "teacher" || role === "admin";
+  const canComment = role === "teacher" || role === "admin" || role === "manager";
   const isActiveStudent = ["ученик", "пробный месяц", "тест-драйв"].includes(client?.stage);
   const canFreeze = role === "manager" || role === "admin" || role === "teacher";
 
