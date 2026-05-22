@@ -18,7 +18,7 @@ async function logAudit(action, entity, entityId, oldValue, newValue, userId, us
 
 export default function CommentsWall({ role, authorName, comments, onCreate, onCommentsChange, client, onClientUpdate, currentUserId }) {
   const [message, setMessage] = React.useState("");
-  const [lessons, setLessons] = React.useState(1);
+  const [lessons, setLessons] = React.useState(0);
   const [error, setError] = React.useState("");
   const [showFreeze, setShowFreeze] = React.useState(false);
   const [freezeDays, setFreezeDays] = React.useState(3);
@@ -123,7 +123,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
             {!client?.is_unlimited && isActiveStudent && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: '#888' }}>Списать:</span>
-                {[1,2,3,4,5].map(n => (
+                {[0,1,2,3,4,5].map(n => (
                   <button key={n} type="button" onClick={() => setLessons(n)}
                     style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #ddd', background: lessons === n ? '#4a90e2' : 'white', color: lessons === n ? 'white' : '#333', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
                     {n}
