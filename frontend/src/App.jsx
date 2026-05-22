@@ -10,6 +10,7 @@ import { AuditLog } from "./AuditLog.jsx";
 import { ImportClients } from "./ImportClients.jsx";
 import { TeacherView } from "./TeacherView.jsx";
 import { exportToExcel } from "./ExportExcel.jsx";
+import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -225,6 +226,9 @@ export default function App() {
                   } catch (err) { setError(err.message); }
                 }}
               />
+            )}
+            {selectedClient?.stage === 'ученик' && (role === 'manager' || role === 'admin') && (
+              <StudentInfoBlock client={selectedClient} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
 
             <div style={{ marginTop: 16, height: 'calc(100vh - 300px)', display: 'flex', flexDirection: 'column' }}>
