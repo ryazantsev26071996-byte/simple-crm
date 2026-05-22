@@ -45,6 +45,9 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     freeze_days_used: initialValue?.freeze_days_used || 0,
     subscription_start: initialValue?.subscription_start || "",
     is_unlimited: initialValue?.is_unlimited || false,
+    student_info: initialValue?.student_info || "",
+    trial_comment: initialValue?.trial_comment || "",
+    zero_lesson_comment: initialValue?.zero_lesson_comment || "",
   })
   const [phoneError, setPhoneError] = React.useState("")
 
@@ -61,6 +64,9 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       freeze_days_used: initialValue?.freeze_days_used || 0,
       subscription_start: initialValue?.subscription_start || "",
       is_unlimited: initialValue?.is_unlimited || false,
+      student_info: initialValue?.student_info || "",
+      trial_comment: initialValue?.trial_comment || "",
+      zero_lesson_comment: initialValue?.zero_lesson_comment || "",
     })
     setPhoneError("")
   }, [initialValue?.id, JSON.stringify(initialValue)])
@@ -134,6 +140,9 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       subscription_end: form.subscription_end || null,
       subscription_end_with_freeze: form.subscription_end_with_freeze || null,
       is_unlimited: form.is_unlimited,
+      student_info: form.student_info || null,
+      trial_comment: form.trial_comment || null,
+      zero_lesson_comment: form.zero_lesson_comment || null,
     })
   }
 
@@ -262,6 +271,31 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         </div>
       )}
 
+      {form.stage === 'ученик' && (
+        <div style={{ marginTop: 8 }}>
+          <div className="formGroup" style={{ marginBottom: 8 }}>
+            <div className="fieldLabel">Кто такой ученик (кратко)</div>
+            <textarea className="textarea" value={form.student_info} disabled={disabled}
+              onChange={e => setForm(f => ({ ...f, student_info: e.target.value }))}
+              placeholder="Кто это, чем занимается, что хочет от занятий..."
+              style={{ width: '100%', minHeight: 60 }} />
+          </div>
+          <div className="formGroup" style={{ marginBottom: 8 }}>
+            <div className="fieldLabel">Комментарий после пробного занятия</div>
+            <textarea className="textarea" value={form.trial_comment} disabled={disabled}
+              onChange={e => setForm(f => ({ ...f, trial_comment: e.target.value }))}
+              placeholder="Впечатления, интересы, что понравилось..."
+              style={{ width: '100%', minHeight: 60 }} />
+          </div>
+          <div className="formGroup" style={{ marginBottom: 8 }}>
+            <div className="fieldLabel">Комментарий после нулевого урока</div>
+            <textarea className="textarea" value={form.zero_lesson_comment} disabled={disabled}
+              onChange={e => setForm(f => ({ ...f, zero_lesson_comment: e.target.value }))}
+              placeholder="Первые впечатления, прогресс, пожелания..."
+              style={{ width: '100%', minHeight: 60 }} />
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "center" }}>
         <button className="btn btnPrimary" type="button" disabled={disabled} onClick={handleSubmit}>{submitLabel}</button>
         <div className="muted" style={{ fontSize: 13 }}>{mode}</div>
