@@ -49,11 +49,12 @@ export default function App() {
 
   React.useEffect(() => {
     if (!selectedId) { setComments([]); return; }
+    if (!user) return;
     setLoadingComments(true);
     getComments({ role, name: authorName }, selectedId)
       .then(list => { setComments(list); setLoadingComments(false); })
       .catch(err => { setError(err.message); setLoadingComments(false); });
-  }, [selectedId]);
+  }, [selectedId, user?.id]);
 
   async function reloadClients() {
     setLoadingClients(true);
