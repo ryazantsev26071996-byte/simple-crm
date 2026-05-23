@@ -4,8 +4,6 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 async function getToken() {
-  const raw = localStorage.getItem(`sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`)
-  if (raw) return JSON.parse(raw).access_token
   const { data } = await supabase.auth.getSession()
   return data.session?.access_token
 }
