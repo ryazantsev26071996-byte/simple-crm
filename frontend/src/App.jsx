@@ -14,6 +14,7 @@ import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
 import ContractBlock from "./components/ContractBlock.jsx";
 import LearningStrategy from "./components/LearningStrategy.jsx";
 import Schedule from "./Schedule.jsx";
+import TrialSchedule from "./TrialSchedule.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -77,6 +78,7 @@ export default function App() {
             {(role === 'manager' || role === 'admin') && <>
               <button onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
               <button onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
+              {(role === 'manager' || role === 'admin') && <button onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Запись на пробные</button>}
               {(role === 'manager' || role === 'admin') && <button onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Запись на занятия</button>}
             </>}
             <button onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
@@ -270,6 +272,7 @@ export default function App() {
         )}
       </div>
 
+      {view === 'trial' && (role === 'manager' || role === 'admin') && <TrialSchedule clients={clients} role={role} onClientsChange={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? {...c, ...updated} : c))} />}
       {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
       {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}

@@ -1,0 +1,338 @@
+import React from "react";
+import { supabase } from "./supabase";
+
+const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
+const MAX_PER_SLOT = 4;
+const LESSON_TYPES = ["Акварель", "Акрил", "Цифровой", "Портрет", "2-ое пробное", "Open Day", "К педагогу", "Графика", "Пастель"];
+const MANAGERS = ["Арина", "Вероника", "Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья", "Администратор-VIP"];
+const ACCOUNT_MANAGERS = ["Арина", "Вероника"];
+const SOURCES = ["Квизы", "Сайт", "Авито", "Соц сети", "Рекомендация", "Оффлайн", "Партнерка", "Звонок", "Другое"];
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
+    const raw = localStorage.getItem(key);
+    if (raw) { const p = JSON.parse(raw); if (p?.access_token) return p.access_token; }
+  } catch {}
+  return null;
+}
+
+async function apiFetch(path, options = {}) {
+  const token = await getToken();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=representation", ...options.headers },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+  return data;
+}
+
+function getWeekDays(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setDate(diff));
+  return Array.from({ length: 7 }, (_, i) => { const dd = new Date(monday); dd.setDate(monday.getDate() + i); return dd; });
+}
+
+function fmt(date) { return date.toISOString().split("T")[0]; }
+function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
+
+export default function TrialSchedule({ clients, role, onClientsChange }) {
+  const [weekStart, setWeekStart] = React.useState(new Date());
+  const [slots, setSlots] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [modal, setModal] = React.useState(null);
+  const [form, setForm] = React.useState({});
+  const [clientSearch, setClientSearch] = React.useState("");
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  const days = getWeekDays(weekStart);
+  const leadClients = clients.filter(c => !['ученик'].includes(c.stage)).sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const filteredClients = leadClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
+
+  async function loadSlots() {
+    setLoading(true);
+    try {
+      const data = await apiFetch(`trial_schedule?date=gte.${fmt(days[0])}&date=lte.${fmt(days[6])}&order=date.asc,time.asc`);
+      setSlots(data);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  }
+
+  React.useEffect(() => { loadSlots(); }, [weekStart]);
+
+  function openModal(date, time, entry = null) {
+    setModal({ date, time, entry });
+    setClientSearch(entry?.client_name || "");
+    setShowSuggestions(false);
+    if (entry) {
+      setForm({ ...entry });
+    } else {
+      setForm({ client_id: "", client_name: "", phone: "", source: "", lesson_type: "", manager: "", account_manager: "", recorded_by: "", comment: "",
+        reminder_call_day: false, reminder_sms_day: false, confirmed_day: false,
+        reminder_call_2h: false, reminder_sms_2h: false, confirmed_2h: false,
+        attended: null, bought: null, short_presentation: false, call_3days: false,
+        bought_testdrive: null, feedback: "" });
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload = {
+        date: modal.date, time: modal.time,
+        client_id: form.client_id || null, client_name: form.client_name || null,
+        phone: form.phone || null, source: form.source || null,
+        lesson_type: form.lesson_type || null, manager: form.manager || null,
+        account_manager: form.account_manager || null, recorded_by: form.recorded_by || null,
+        comment: form.comment || null,
+        reminder_call_day: form.reminder_call_day || false,
+        reminder_sms_day: form.reminder_sms_day || false,
+        confirmed_day: form.confirmed_day || false,
+        reminder_call_2h: form.reminder_call_2h || false,
+        reminder_sms_2h: form.reminder_sms_2h || false,
+        confirmed_2h: form.confirmed_2h || false,
+        attended: form.attended,
+        bought: form.bought,
+        short_presentation: form.short_presentation || false,
+        call_3days: form.call_3days || false,
+        bought_testdrive: form.bought_testdrive,
+        feedback: form.feedback || null,
+      };
+
+      if (modal.entry) {
+        await apiFetch(`trial_schedule?id=eq.${modal.entry.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+      } else {
+        await apiFetch("trial_schedule", { method: "POST", body: JSON.stringify(payload) });
+      }
+
+      // При купил/не купил — менять стадию клиента
+      if (form.client_id && form.bought !== null && form.bought !== modal.entry?.bought) {
+        const newStage = form.bought === true ? 'ученик' : 'был не купил';
+        await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ stage: newStage }) });
+        if (onClientsChange) onClientsChange({ id: Number(form.client_id), stage: newStage });
+      }
+
+      setModal(null);
+      loadSlots();
+    } catch(e) { alert(e.message); }
+    setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (!modal.entry || !window.confirm("Удалить запись?")) return;
+    await apiFetch(`trial_schedule?id=eq.${modal.entry.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    setModal(null);
+    loadSlots();
+  }
+
+  function slotEntries(date, time) { return slots.filter(s => s.date === fmt(date) && s.time === time); }
+
+  const inp = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 6, fontFamily: "inherit" };
+  const chk = (label, field) => (
+    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer", marginBottom: 4 }}>
+      <input type="checkbox" checked={!!form[field]} onChange={e => setForm(f => ({ ...f, [field]: e.target.checked }))} />
+      {label}
+    </label>
+  );
+
+  return (
+    <div style={{ padding: "0 16px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 16 }}>
+        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
+        <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
+        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
+        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
+      </div>
+
+      {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
+        <div style={{overflowX:"auto"}}>
+          <table style={{borderCollapse:"collapse",width:"100%",minWidth:900}}>
+            <thead>
+              <tr>
+                <th style={{width:60,padding:"6px 8px",background:"#fff3e0",border:"1px solid #ddd",fontSize:12}}>Время</th>
+                {days.map(d => (
+                  <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#fff8e1":"#fff3e0",border:"1px solid #ddd",fontSize:12,minWidth:130}}>
+                    {fmtDisplay(d)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {TIMES.map(time => (
+                <tr key={time}>
+                  <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",background:"#fafafa"}}>{time}</td>
+                  {days.map(d => {
+                    const entries = slotEntries(d, time);
+                    const isFull = entries.length >= MAX_PER_SLOT;
+                    return (
+                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:fmt(d)===fmt(new Date())?"#fffdf5":"white"}}>
+                        {entries.map(e => (
+                          <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
+                            style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
+                              background: e.bought===true?"#e8f5e9":e.bought===false?"#ffebee":e.attended===true?"#e3f2fd":e.attended===false?"#fff3e0":"#fff8e1",
+                              border:`1px solid ${e.bought===true?"#a5d6a7":e.bought===false?"#ef9a9a":e.attended===true?"#90caf9":e.attended===false?"#ffcc80":"#ffe082"}`}}>
+                            <div style={{fontWeight:500}}>{e.client_name||"—"}</div>
+                            {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
+                            {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
+                            {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
+                            <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
+                              {e.attended===true&&<span style={{color:"#2e7d32",fontSize:10}}>✓пришёл</span>}
+                              {e.attended===false&&<span style={{color:"#c62828",fontSize:10}}>✗не пришёл</span>}
+                              {e.bought===true&&<span style={{color:"#1b5e20",fontSize:10,fontWeight:600}}>💰купил</span>}
+                              {e.bought===false&&<span style={{color:"#b71c1c",fontSize:10}}>✗не купил</span>}
+                              {e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв</span>}
+                            </div>
+                          </div>
+                        ))}
+                        {!isFull&&(role==="manager"||role==="admin")&&(
+                          <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ffcc02",background:"transparent",cursor:"pointer",borderRadius:4,color:"#e67e22"}}>
+                            + {MAX_PER_SLOT-entries.length} мест
+                          </button>
+                        )}
+                        {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {modal && (
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"white",borderRadius:12,width:"95%",maxWidth:560,maxHeight:"92vh",overflowY:"auto",padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <strong style={{fontSize:15}}>🎨 Пробное — {modal.date} в {modal.time}</strong>
+              <button onClick={()=>setModal(null)} style={{fontSize:20,background:"none",border:"none",cursor:"pointer"}}>×</button>
+            </div>
+
+            {/* Клиент */}
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Клиент (лид)</div>
+            <div style={{position:"relative",marginBottom:6}}>
+              <input style={{...inp,marginBottom:0}} placeholder="Введите имя..." value={clientSearch}
+                onChange={e=>{setClientSearch(e.target.value);setShowSuggestions(true);setForm(f=>({...f,client_id:"",client_name:e.target.value}));}}
+                onFocus={()=>setShowSuggestions(true)} />
+              {showSuggestions&&clientSearch&&filteredClients.length>0&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1px solid #ddd",borderRadius:6,zIndex:100,maxHeight:160,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}}>
+                  {filteredClients.map(c=>(
+                    <div key={c.id} onClick={()=>{setClientSearch(c.name);setForm(f=>({...f,client_id:c.id,client_name:c.name,phone:c.phone||f.phone,source:c.source||f.source}));setShowSuggestions(false);}}
+                      style={{padding:"6px 12px",cursor:"pointer",fontSize:13,borderBottom:"1px solid #f0f0f0"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="#fff8e1"}
+                      onMouseLeave={e=>e.currentTarget.style.background="white"}>
+                      <div>{c.name}</div>
+                      <div style={{fontSize:11,color:"#888"}}>{c.stage||"—"} · {c.phone||""}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:6}}>
+              <div>
+                <div style={{fontSize:12,color:"#888",marginBottom:4}}>Телефон</div>
+                <input style={inp} value={form.phone||""} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="+7..." />
+              </div>
+              <div>
+                <div style={{fontSize:12,color:"#888",marginBottom:4}}>Источник</div>
+                <select style={inp} value={form.source||""} onChange={e=>setForm(f=>({...f,source:e.target.value}))}>
+                  <option value="">— выбрать —</option>
+                  {SOURCES.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:12,color:"#888",marginBottom:4}}>Вид урока</div>
+                <select style={inp} value={form.lesson_type||""} onChange={e=>setForm(f=>({...f,lesson_type:e.target.value}))}>
+                  <option value="">— выбрать —</option>
+                  {LESSON_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:12,color:"#888",marginBottom:4}}>Менеджер</div>
+                <select style={inp} value={form.manager||""} onChange={e=>setForm(f=>({...f,manager:e.target.value}))}>
+                  <option value="">— выбрать —</option>
+                  {MANAGERS.map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:12,color:"#888",marginBottom:4}}>Аккаунт-менеджер</div>
+                <select style={inp} value={form.account_manager||""} onChange={e=>setForm(f=>({...f,account_manager:e.target.value}))}>
+                  <option value="">— выбрать —</option>
+                  {ACCOUNT_MANAGERS.map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <div style={{fontSize:12,color:"#888",marginBottom:4}}>Кто записал</div>
+                <select style={inp} value={form.recorded_by||""} onChange={e=>setForm(f=>({...f,recorded_by:e.target.value}))}>
+                  <option value="">— выбрать —</option>
+                  {MANAGERS.map(m=><option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Комментарий</div>
+            <textarea style={{...inp,minHeight:50,resize:"vertical"}} value={form.comment||""} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Заметки о клиенте..." />
+
+            {/* Напоминания */}
+            <div style={{background:"#f8f9ff",borderRadius:8,padding:10,marginBottom:10}}>
+              <div style={{fontWeight:600,fontSize:12,marginBottom:8,color:"#4a90e2"}}>📞 Напоминания</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                {chk("📞 Звонок за ДЕНЬ", "reminder_call_day")}
+                {chk("💬 СМС за ДЕНЬ", "reminder_sms_day")}
+                {chk("✅ Подтвердил (день)", "confirmed_day")}
+                {chk("📞 Звонок за 2 часа", "reminder_call_2h")}
+                {chk("💬 СМС за 2 часа", "reminder_sms_2h")}
+                {chk("✅ Подтвердил (2ч)", "confirmed_2h")}
+              </div>
+            </div>
+
+            {/* Результат */}
+            <div style={{background:"#f0fff4",borderRadius:8,padding:10,marginBottom:10}}>
+              <div style={{fontWeight:600,fontSize:12,marginBottom:8,color:"#2e7d32"}}>📊 Результат</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="checkbox" checked={form.attended===true} onChange={e=>setForm(f=>({...f,attended:e.target.checked?true:null}))} />✓ Пришёл
+                </label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="checkbox" checked={form.attended===false} onChange={e=>setForm(f=>({...f,attended:e.target.checked?false:null}))} />✗ Не пришёл
+                </label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer",color:"#1b5e20",fontWeight:500}}>
+                  <input type="checkbox" checked={form.bought===true} onChange={e=>setForm(f=>({...f,bought:e.target.checked?true:null}))} />💰 Купил
+                </label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer",color:"#b71c1c"}}>
+                  <input type="checkbox" checked={form.bought===false} onChange={e=>setForm(f=>({...f,bought:e.target.checked?false:null}))} />✗ Не купил
+                </label>
+                {chk("📋 Скинули презентацию", "short_presentation")}
+                {chk("📞 Звонок через 3 дня", "call_3days")}
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="checkbox" checked={form.bought_testdrive===true} onChange={e=>setForm(f=>({...f,bought_testdrive:e.target.checked?true:null}))} />✓ Купил тест-драйв
+                </label>
+                <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                  <input type="checkbox" checked={form.bought_testdrive===false} onChange={e=>setForm(f=>({...f,bought_testdrive:e.target.checked?false:null}))} />✗ Не купил ТД
+                </label>
+              </div>
+            </div>
+
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Обратная связь после звонка</div>
+            <textarea style={{...inp,minHeight:60,resize:"vertical"}} value={form.feedback||""} onChange={e=>setForm(f=>({...f,feedback:e.target.value}))} placeholder="Что сказал клиент, причины..." />
+
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#e67e22",color:"white",cursor:"pointer",fontWeight:500}}>
+                {saving?"Сохранение...":(modal.entry?"Сохранить":"Записать на пробное")}
+              </button>
+              {modal.entry&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
