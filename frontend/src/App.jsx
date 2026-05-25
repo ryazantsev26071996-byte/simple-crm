@@ -11,6 +11,7 @@ import { ImportClients } from "./ImportClients.jsx";
 import { TeacherView } from "./TeacherView.jsx";
 import { exportToExcel } from "./ExportExcel.jsx";
 import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
+import ContractBlock from "./components/ContractBlock.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -230,6 +231,9 @@ export default function App() {
             )}
             {selectedClient?.stage === 'ученик' && (role === 'manager' || role === 'admin') && (
               <StudentInfoBlock client={selectedClient} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
+            )}
+            {(role === 'manager' || role === 'admin') && (
+              <ContractBlock client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
 
             <div style={{ marginTop: 16, height: 'calc(100vh - 300px)', display: 'flex', flexDirection: 'column' }}>
