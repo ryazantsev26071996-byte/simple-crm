@@ -144,7 +144,7 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
 
   return (
     <div style={{ padding: "0 16px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 0 }}>
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
         <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
