@@ -225,8 +225,8 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                         {entries.map(e => (
                           <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
                             style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
-                              background: e.bought===true?"#e8f5e9":e.bought===false?"#ffebee":e.attended===true?"#e3f2fd":e.attended===false?"#fff3e0":"#fff8e1",
-                              border:`1px solid ${e.bought===true?"#a5d6a7":e.bought===false?"#ef9a9a":e.attended===true?"#90caf9":e.attended===false?"#ffcc80":"#ffe082"}`}}>
+                              background: e.bought===true?"#e8f5e9":e.bought===false?"#fff3e0":e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",
+                              border:`1px solid ${e.bought===true?"#a5d6a7":e.bought===false?"#ffcc80":e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
                             <div style={{fontWeight:500,color:e.client_id?"#e67e22":"#333",cursor:e.client_id?"pointer":"default"}}
                               onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
                               {e.client_name||"—"}
