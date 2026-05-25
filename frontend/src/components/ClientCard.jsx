@@ -102,7 +102,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'white', borderRadius: 12, width: '90%', maxWidth: 640, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 20 }}>
+      <div style={{ background: 'white', borderRadius: 12, width: '90%', maxWidth: 640, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: 20 }}>
         {card}
       </div>
     </div>
