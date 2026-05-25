@@ -264,37 +264,18 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
         </div>
       )}
 
-      {clientModal&&(
-        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <div style={{background:"white",borderRadius:12,width:"90%",maxWidth:560,maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-            <div style={{padding:"16px 20px",borderBottom:"1px solid #eee",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:16}}>{clientModal.name}</div>
-                <div style={{fontSize:12,color:"#888"}}>
-                  {clientModal.subscription_type||"без абонемента"} · осталось {clientModal.is_unlimited?"∞":Math.max(0,(clientModal.lessons_total||0)-(clientModal.lessons_used||0))} зан.
-                  {clientModal.subscription_end&&` · до ${new Date(clientModal.subscription_end).toLocaleDateString("ru-RU")}`}
-                </div>
-              </div>
-              <button onClick={()=>setClientModal(null)} style={{fontSize:22,background:"none",border:"none",cursor:"pointer",color:"#888"}}>×</button>
-            </div>
-            <div style={{overflowY:"auto",flex:1,padding:20}}>
-              {clientModal.student_info&&<div style={{marginBottom:12,padding:10,background:"#f8f9ff",borderRadius:8}}><div style={{fontSize:11,color:"#888",marginBottom:4}}>Кто такой</div><div style={{fontSize:13}}>{clientModal.student_info}</div></div>}
-              {clientModal.learning_strategy&&<div style={{marginBottom:12,padding:10,background:"#f0fff4",borderRadius:8}}><div style={{fontSize:11,color:"#888",marginBottom:4}}>📚 Стратегия</div><div style={{fontSize:13,whiteSpace:"pre-wrap"}}>{clientModal.learning_strategy}</div></div>}
-              <div style={{fontWeight:600,fontSize:14,marginBottom:8}}>Комментарии</div>
-              {loadingClient?<div style={{color:"#888"}}>Загрузка...</div>:clientComments.length===0?<div style={{color:"#aaa",fontSize:13}}>Нет комментариев</div>:
-                clientComments.map(c=>(
-                  <div key={c.id} style={{padding:"8px 10px",background:"#f8f9ff",borderRadius:8,marginBottom:8}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
-                      <span style={{fontSize:12,fontWeight:500,color:"#4a90e2"}}>{c.profiles?.full_name||"—"}</span>
-                      <span style={{fontSize:11,color:"#aaa"}}>{new Date(c.created_at).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
-                    </div>
-                    <div style={{fontSize:13,color:"#333"}}>{c.text}</div>
-                  </div>
-                ))
-              }
-            </div>
-          </div>
-        </div>
+      {clientModal && (
+        <ClientCard
+          client={clientModal}
+          clients={clients}
+          role={role}
+          authorName={authorName}
+          userId={userId}
+          asModal={true}
+          onClose={() => setClientModal(null)}
+          onUpdate={(updated) => { setClientModal(updated); if (onClientsChange) onClientsChange(updated); }}
+          onDelete={(id) => { setClientModal(null); if (onClientsChange) onClientsChange(null, id); }}
+        />
       )}
     </div>
   );
