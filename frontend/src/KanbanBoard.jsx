@@ -2,7 +2,6 @@ import { useState } from 'react'
 import React from 'react'
 import { supabase } from './supabase'
 import ClientForm from './components/ClientForm.jsx'
-import { createClient } from './api.js'
 
 const STAGES = [
   'новая заявка','записан на пробное','на следующий месяц','был не купил',
@@ -32,10 +31,8 @@ function ClientFormInline({ onSubmit }) {
       {error && <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{error}</div>}
       <ClientForm mode="Новый клиент" disabled={false} submitLabel="Добавить"
         onSubmit={async (payload) => {
-          try {
-            setError('');
-            await onSubmit(payload);
-          } catch(err) { setError(err.message); }
+          try { setError(''); await onSubmit(payload); }
+          catch(err) { setError(err.message); }
         }}
       />
     </div>
@@ -43,23 +40,15 @@ function ClientFormInline({ onSubmit }) {
 }
 
 export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated }) {
-  const [showAddModal, setShowAddModal] = React.useState(false);
   const [search, setSearch] = useState('')
+  const [showAddModal, setShowAddModal] = React.useState(false)
 
   const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
-  const baseClients = role === 'teacher'
-    ? clients.filter(c => TEACHER_STAGES.includes(c.stage))
-    : clients
-  const filteredClients = baseClients.filter(c => matchesSearch(c, search))
-
-  async function handleDrop(clientId, newStage) {
-    const { error } = await supabase.from('clients').update({ stage: newStage }).eq('id', clientId)
-    if (!error) onStageChange(clientId, newStage)
-  }
+  const filteredClients = clients.filter(c => matchesSearch(c, search))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', flexShrink: 0, display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, padding: '10px 16px', borderBottom: '1px solid #eee', alignItems: 'center' }}>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -85,18 +74,32 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
               stage={stage}
               clients={filteredClients.filter(c => c.stage === stage)}
               onClientSelect={onClientSelect}
-              onDrop={handleDrop}
+              onDrop={(id, newStage) => onStageChange(id, newStage)}
             />
           ))}
         </div>
       </div>
+
+      {showAddModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 12, width: '90%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <strong style={{ fontSize: 16 }}>Новый клиент</strong>
+              <button onClick={() => setShowAddModal(false)} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+            <ClientFormInline onSubmit={async (payload) => {
+              if (onClientCreated) await onClientCreated(payload);
+              setShowAddModal(false);
+            }} />
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
 
 function Column({ stage, clients, onClientSelect, onDrop }) {
   const [over, setOver] = useState(false)
-
   return (
     <div
       onDragOver={e => { e.preventDefault(); setOver(true) }}
