@@ -266,7 +266,7 @@ export default function App() {
         )}
       </div>
 
-      {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} onClientOpen={(id) => { setSelectedId(id); setView('list'); }} />}
+      {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
       {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
     </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import ClientCard from "./components/ClientCard.jsx";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
@@ -40,7 +41,7 @@ function getWeekDays(date) {
 function fmt(date) { return date.toISOString().split("T")[0]; }
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 
-export default function Schedule({ clients, role }) {
+export default function Schedule({ clients, role, authorName, userId, onClientsChange }) {
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -49,8 +50,6 @@ export default function Schedule({ clients, role }) {
   const [clientSearch, setClientSearch] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
-  const [clientComments, setClientComments] = React.useState([]);
-  const [loadingClient, setLoadingClient] = React.useState(false);
 
   const days = getWeekDays(weekStart);
   const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -67,16 +66,9 @@ export default function Schedule({ clients, role }) {
 
   React.useEffect(() => { loadSlots(); }, [weekStart]);
 
-  async function openClientModal(clientId) {
+  function openClientModal(clientId) {
     const cl = clients.find(c => c.id === clientId);
-    if (!cl) return;
-    setClientModal(cl);
-    setLoadingClient(true);
-    try {
-      const data = await apiFetch(`comments?client_id=eq.${clientId}&order=created_at.desc&select=*,profiles(full_name)`);
-      setClientComments(data);
-    } catch(e) { console.error(e); }
-    setLoadingClient(false);
+    if (cl) setClientModal(cl);
   }
 
   function openModal(date, time, entry = null) {
