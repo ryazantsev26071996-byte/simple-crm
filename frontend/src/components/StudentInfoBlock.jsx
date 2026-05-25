@@ -1,5 +1,20 @@
 import React from "react";
 import { supabase } from "../supabase";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`
+    const raw = localStorage.getItem(key)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.access_token) return parsed.access_token
+    }
+  } catch {}
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token
+}
 
 export default function StudentInfoBlock({ client, onUpdate }) {
   const [editing, setEditing] = React.useState(false);
@@ -20,19 +35,26 @@ export default function StudentInfoBlock({ client, onUpdate }) {
 
   async function handleSave() {
     setSaving(true);
-    const { data, error } = await supabase
-      .from('clients')
-      .update({
+    const token = await getToken()
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client.id}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      },
+      body: JSON.stringify({
         student_info: form.student_info || null,
         trial_comment: form.trial_comment || null,
         zero_lesson_comment: form.zero_lesson_comment || null,
       })
-      .eq('id', client.id)
-      .select()
-      .single();
+    })
+    const result = await res.json()
     setSaving(false);
-    if (error) { alert(error.message); return; }
-    if (onUpdate) onUpdate(data);
+    if (!res.ok) { alert(JSON.stringify(result)); return; }
+    const updated = Array.isArray(result) ? result[0] : result
+    if (onUpdate) onUpdate(updated);
     setEditing(false);
   }
 
