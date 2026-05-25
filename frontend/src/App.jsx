@@ -238,7 +238,7 @@ export default function App() {
             {(role === 'manager' || role === 'admin') && (
               <ContractBlock client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
-            {selectedClient?.stage === 'ученик' && (
+            {['ученик', 'пробный месяц', 'тест-драйв'].includes(selectedClient?.stage) && (
               <LearningStrategy client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
 
