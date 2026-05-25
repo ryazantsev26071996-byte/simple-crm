@@ -39,7 +39,7 @@ function getWeekDays(date) {
   return Array.from({ length: 7 }, (_, i) => { const dd = new Date(monday); dd.setDate(monday.getDate() + i); return dd; });
 }
 
-function fmt(date) { return date.toISOString().split("T")[0]; }
+function fmt(date) { const d = new Date(date); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 
 export default function Schedule({ clients, role, authorName, userId, onClientsChange }) {
