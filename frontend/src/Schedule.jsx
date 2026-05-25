@@ -59,7 +59,7 @@ function fmtDisplay(date) {
   return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" });
 }
 
-export default function Schedule({ clients, role }) {
+export default function Schedule({ clients, role, onClientOpen }) {
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -185,7 +185,10 @@ export default function Schedule({ clients, role }) {
                             style={{ marginBottom: 3, padding: "3px 6px", borderRadius: 4, fontSize: 11, cursor: "pointer",
                               background: e.attended === true ? "#e8f5e9" : e.attended === false ? "#fff3e0" : "#f3f0ff",
                               border: `1px solid ${e.attended === true ? "#a5d6a7" : e.attended === false ? "#ffcc80" : "#d1c4e9"}` }}>
-                            <div style={{ fontWeight: 500 }}>{e.client_name || "—"}</div>
+                            <div style={{ fontWeight: 500, cursor: e.client_id ? 'pointer' : 'default', color: e.client_id ? '#4a90e2' : '#333' }}
+              onClick={(ev) => { if (e.client_id) { ev.stopPropagation(); setModal(null); onClientOpen(e.client_id); } }}>
+              {e.client_name || "—"}
+            </div>
                             {e.lesson_type && <div style={{ color: "#888" }}>{e.lesson_type}</div>}
                             {e.teacher && <div style={{ color: "#4a90e2" }}>{e.teacher}</div>}
                             {e.attended === true && <span style={{ color: "#2e7d32" }}>✓ пришёл</span>}
@@ -232,8 +235,12 @@ export default function Schedule({ clients, role }) {
               {activeClients.map(c => <option key={c.id} value={c.name} />)}
             </datalist>
             {form.client_id && (
-              <div style={{ fontSize: 12, color: "#4a90e2", marginBottom: 6, marginTop: -4 }}>
-                Абонемент: {activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || "—"}
+              <div style={{ fontSize: 12, marginBottom: 6, marginTop: -4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: "#4a90e2" }}>Абонемент: {activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || "—"}</span>
+                <button onClick={() => { setModal(null); onClientOpen(Number(form.client_id)); }}
+                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '1px solid #4a90e2', background: 'white', color: '#4a90e2', cursor: 'pointer' }}>
+                  Открыть карточку →
+                </button>
               </div>
             )}
 

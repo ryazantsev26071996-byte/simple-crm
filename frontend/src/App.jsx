@@ -262,7 +262,7 @@ export default function App() {
         )}
       </div>
 
-      {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} />}
+      {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} onClientOpen={(id) => { setSelectedId(id); setView('list'); }} />}
       {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
     </div>
