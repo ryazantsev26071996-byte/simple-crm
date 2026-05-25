@@ -65,9 +65,10 @@ export default function Schedule({ clients, role }) {
   const [loading, setLoading] = React.useState(false);
   const [modal, setModal] = React.useState(null); // {date, time, entry?}
   const [form, setForm] = React.useState({});
+  const [clientSearch, setClientSearch] = React.useState('');
 
   const days = getWeekDays(weekStart);
-  const activeClients = clients.filter(c => c.stage === "ученик");
+  const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 
   async function loadSlots() {
     setLoading(true);
@@ -86,6 +87,7 @@ export default function Schedule({ clients, role }) {
 
   function openModal(date, time, entry = null) {
     setModal({ date, time, entry });
+    setClientSearch(entry?.client_name || '');
     setForm(entry ? {
       client_id: entry.client_id || "",
       client_name: entry.client_name || "",
@@ -218,14 +220,17 @@ export default function Schedule({ clients, role }) {
             </div>
 
             <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Ученик</div>
-            <select style={inputStyle} value={form.client_id}
+            <input style={inputStyle} list="clients-list" placeholder="Начните вводить имя..."
+              value={clientSearch}
               onChange={e => {
-                const cl = activeClients.find(c => c.id === Number(e.target.value));
-                setForm(f => ({ ...f, client_id: e.target.value, client_name: cl?.name || "", subscription_type: cl?.subscription_type || "" }));
-              }}>
-              <option value="">— выбрать из учеников —</option>
-              {activeClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+                setClientSearch(e.target.value);
+                const cl = activeClients.find(c => c.name === e.target.value);
+                if (cl) setForm(f => ({ ...f, client_id: cl.id, client_name: cl.name, subscription_type: cl.subscription_type || "" }));
+                else setForm(f => ({ ...f, client_id: "", client_name: e.target.value }));
+              }} />
+            <datalist id="clients-list">
+              {activeClients.map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
             {form.client_id && (
               <div style={{ fontSize: 12, color: "#4a90e2", marginBottom: 6, marginTop: -4 }}>
                 Абонемент: {activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || "—"}
