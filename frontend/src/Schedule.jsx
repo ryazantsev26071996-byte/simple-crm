@@ -1,5 +1,6 @@
 import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
+import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
@@ -42,6 +43,7 @@ function fmt(date) { return date.toISOString().split("T")[0]; }
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 
 export default function Schedule({ clients, role, authorName, userId, onClientsChange }) {
+  const [showBlocks, setShowBlocks] = React.useState(false);
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -55,6 +57,15 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
   const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, "ru"));
   const filteredClients = activeClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
+  const [blocks, setBlocks] = React.useState([]);
+
+  async function loadBlocks() {
+    try {
+      const data = await apiFetch(`schedule_blocks?date=gte.${fmt(days[0])}&date=lte.${fmt(days[6])}`);
+      setBlocks(data.filter(b => b.schedule_type === "lessons" || b.schedule_type === "both"));
+    } catch(e) {}
+  }
+
   async function loadSlots() {
     setLoading(true);
     try {
@@ -64,7 +75,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
     setLoading(false);
   }
 
-  React.useEffect(() => { loadSlots(); }, [weekStart]);
+  React.useEffect(() => { loadSlots(); loadBlocks(); }, [weekStart]);
 
   function openClientModal(clientId) {
     const cl = clients.find(c => c.id === clientId);
@@ -123,6 +134,9 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
   }
 
   function slotEntries(date, time) { return slots.filter(s => s.date === fmt(date) && s.time === time); }
+  function isBlocked(date, time) { return blocks.some(b => b.date === fmt(date) && (b.block_type === 'day' || (b.block_type === 'slot' && b.time === time))); }
+  function extraSlots(date) { return blocks.filter(b => b.date === fmt(date) && b.block_type === 'extra').map(b => b.time); }
+  function allTimes(date) { const extras = extraSlots(date); return [...TIMES, ...extras.filter(t => !TIMES.includes(t))].sort(); }
 
   const inp = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 6, fontFamily: "inherit" };
 
@@ -133,6 +147,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
         <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
         <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
+        {role === "admin" && <button onClick={() => setShowBlocks(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
       </div>
 
       {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
@@ -264,6 +279,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
         </div>
       )}
 
+      {showBlocks && <ScheduleBlocksModal onClose={() => setShowBlocks(false)} scheduleType="lessons" days={days} />}
       {clientModal && (
         <ClientCard
           client={clientModal}
