@@ -1,0 +1,106 @@
+import React from "react";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.access_token) return parsed.access_token;
+    }
+  } catch {}
+  return null;
+}
+
+export default function LearningStrategy({ client, onUpdate, role }) {
+  const [open, setOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
+  const [text, setText] = React.useState(client?.learning_strategy || "");
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    setText(client?.learning_strategy || "");
+  }, [client?.id]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client.id}`, {
+        method: "PATCH",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify({ learning_strategy: text || null }),
+      });
+      const result = await res.json();
+      if (!res.ok) { alert(JSON.stringify(result)); return; }
+      const updated = Array.isArray(result) ? result[0] : result;
+      if (onUpdate) onUpdate(updated);
+      setEditing(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const hasStrategy = !!client?.learning_strategy;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <button onClick={() => setOpen(!open)}
+        style={{ width: "100%", padding: "8px 14px", borderRadius: 8, border: "1px solid #e0e0e0",
+          background: hasStrategy ? "#f0fff4" : "#f8f9ff", cursor: "pointer", textAlign: "left",
+          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: hasStrategy ? "#2e7d32" : "#4a90e2" }}>
+          📚 Стратегия обучения {hasStrategy ? "✓" : ""}
+        </span>
+        <span style={{ fontSize: 12, color: "#888" }}>{open ? "▲ скрыть" : "▼ показать"}</span>
+      </button>
+
+      {open && (
+        <div style={{ padding: "12px 14px", background: hasStrategy ? "#f0fff4" : "#f8f9ff",
+          borderRadius: "0 0 8px 8px", border: "1px solid #e0e0e0", borderTop: "none" }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8, gap: 6 }}>
+            {!editing ? (
+              <button onClick={() => setEditing(true)}
+                style={{ fontSize: 12, padding: "3px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "white", color: "#4a90e2", cursor: "pointer" }}>
+                ✏️ Редактировать
+              </button>
+            ) : (
+              <>
+                <button onClick={handleSave} disabled={saving}
+                  style={{ fontSize: 12, padding: "3px 12px", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", cursor: "pointer" }}>
+                  {saving ? "Сохранение..." : "💾 Сохранить"}
+                </button>
+                <button onClick={() => { setEditing(false); setText(client?.learning_strategy || ""); }}
+                  style={{ fontSize: 12, padding: "3px 10px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>
+                  Отмена
+                </button>
+              </>
+            )}
+          </div>
+
+          {editing ? (
+            <textarea value={text} onChange={e => setText(e.target.value)}
+              style={{ width: "100%", minHeight: 200, padding: "8px 10px", borderRadius: 6,
+                border: "1px solid #ddd", fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
+              placeholder="Введите стратегию обучения..." />
+          ) : (
+            <div style={{ fontSize: 13, color: "#333", whiteSpace: "pre-wrap", lineHeight: 1.6,
+              minHeight: 40, color: hasStrategy ? "#333" : "#aaa" }}>
+              {client?.learning_strategy || "Стратегия обучения не заполнена"}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

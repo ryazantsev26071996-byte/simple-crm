@@ -12,6 +12,7 @@ import { TeacherView } from "./TeacherView.jsx";
 import { exportToExcel } from "./ExportExcel.jsx";
 import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
 import ContractBlock from "./components/ContractBlock.jsx";
+import LearningStrategy from "./components/LearningStrategy.jsx";
 import Schedule from "./Schedule.jsx";
 
 export default function App() {
@@ -236,6 +237,9 @@ export default function App() {
             )}
             {(role === 'manager' || role === 'admin') && (
               <ContractBlock client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
+            )}
+            {selectedClient?.stage === 'ученик' && (
+              <LearningStrategy client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
 
             <div style={{ marginTop: 16, height: 'calc(100vh - 300px)', display: 'flex', flexDirection: 'column' }}>
