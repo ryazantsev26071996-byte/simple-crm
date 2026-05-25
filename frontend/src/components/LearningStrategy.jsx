@@ -23,6 +23,7 @@ export default function LearningStrategy({ client, onUpdate, role }) {
 
   React.useEffect(() => {
     setText(client?.learning_strategy || "");
+    setEditing(false);
   }, [client?.id]);
 
   async function handleSave() {
@@ -54,53 +55,67 @@ export default function LearningStrategy({ client, onUpdate, role }) {
   const hasStrategy = !!client?.learning_strategy;
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <button onClick={() => setOpen(!open)}
-        style={{ width: "100%", padding: "8px 14px", borderRadius: 8, border: "1px solid #e0e0e0",
-          background: hasStrategy ? "#f0fff4" : "#f8f9ff", cursor: "pointer", textAlign: "left",
+    <>
+      <button onClick={() => setOpen(true)}
+        style={{ width: "100%", marginTop: 12, padding: "8px 14px", borderRadius: 8,
+          border: `1px solid ${hasStrategy ? "#a5d6a7" : "#e0e0e0"}`,
+          background: hasStrategy ? "#f0fff4" : "#f8f9ff",
+          cursor: "pointer", textAlign: "left",
           display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontWeight: 600, fontSize: 13, color: hasStrategy ? "#2e7d32" : "#4a90e2" }}>
           📚 Стратегия обучения {hasStrategy ? "✓" : ""}
         </span>
-        <span style={{ fontSize: 12, color: "#888" }}>{open ? "▲ скрыть" : "▼ показать"}</span>
+        <span style={{ fontSize: 12, color: "#888" }}>открыть →</span>
       </button>
 
       {open && (
-        <div style={{ padding: "12px 14px", background: hasStrategy ? "#f0fff4" : "#f8f9ff",
-          borderRadius: "0 0 8px 8px", border: "1px solid #e0e0e0", borderTop: "none" }}>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8, gap: 6 }}>
-            {!editing ? (
-              <button onClick={() => setEditing(true)}
-                style={{ fontSize: 12, padding: "3px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "white", color: "#4a90e2", cursor: "pointer" }}>
-                ✏️ Редактировать
-              </button>
-            ) : (
-              <>
-                <button onClick={handleSave} disabled={saving}
-                  style={{ fontSize: 12, padding: "3px 12px", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", cursor: "pointer" }}>
-                  {saving ? "Сохранение..." : "💾 Сохранить"}
-                </button>
-                <button onClick={() => { setEditing(false); setText(client?.learning_strategy || ""); }}
-                  style={{ fontSize: 12, padding: "3px 10px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>
-                  Отмена
-                </button>
-              </>
-            )}
-          </div>
-
-          {editing ? (
-            <textarea value={text} onChange={e => setText(e.target.value)}
-              style={{ width: "100%", minHeight: 200, padding: "8px 10px", borderRadius: 6,
-                border: "1px solid #ddd", fontSize: 13, fontFamily: "inherit", resize: "vertical" }}
-              placeholder="Введите стратегию обучения..." />
-          ) : (
-            <div style={{ fontSize: 13, color: "#333", whiteSpace: "pre-wrap", lineHeight: 1.6,
-              minHeight: 40, color: hasStrategy ? "#333" : "#aaa" }}>
-              {client?.learning_strategy || "Стратегия обучения не заполнена"}
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, width: "90%", maxWidth: 700, maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            
+            <div style={{ padding: "16px 20px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 16 }}>📚 Стратегия обучения</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{client?.name}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                {!editing ? (
+                  <button onClick={() => setEditing(true)}
+                    style={{ fontSize: 12, padding: "4px 14px", borderRadius: 6, border: "1px solid #4a90e2", background: "white", color: "#4a90e2", cursor: "pointer" }}>
+                    ✏️ Редактировать
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={handleSave} disabled={saving}
+                      style={{ fontSize: 12, padding: "4px 14px", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", cursor: "pointer" }}>
+                      {saving ? "Сохранение..." : "💾 Сохранить"}
+                    </button>
+                    <button onClick={() => { setEditing(false); setText(client?.learning_strategy || ""); }}
+                      style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>
+                      Отмена
+                    </button>
+                  </>
+                )}
+                <button onClick={() => { setOpen(false); setEditing(false); }}
+                  style={{ fontSize: 22, background: "none", border: "none", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
+              </div>
             </div>
-          )}
+
+            <div style={{ padding: 20, overflowY: "auto", flex: 1 }}>
+              {editing ? (
+                <textarea value={text} onChange={e => setText(e.target.value)}
+                  style={{ width: "100%", minHeight: 400, padding: "10px 12px", borderRadius: 8,
+                    border: "1px solid #ddd", fontSize: 14, fontFamily: "inherit",
+                    lineHeight: 1.7, resize: "vertical" }}
+                  placeholder="Введите стратегию обучения..." />
+              ) : (
+                <div style={{ fontSize: 14, color: "#333", whiteSpace: "pre-wrap", lineHeight: 1.8 }}>
+                  {client?.learning_strategy || <span style={{ color: "#aaa" }}>Стратегия обучения не заполнена. Нажмите "Редактировать" чтобы добавить.</span>}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
