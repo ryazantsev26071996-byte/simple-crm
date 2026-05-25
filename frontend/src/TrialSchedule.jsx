@@ -1,12 +1,14 @@
 import React from "react";
-import { supabase } from "./supabase";
+import ClientCard from "./components/ClientCard.jsx";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 4;
 const LESSON_TYPES = ["Акварель", "Акрил", "Цифровой", "Портрет", "2-ое пробное", "Open Day", "К педагогу", "Графика", "Пастель"];
-const MANAGERS = ["Арина", "Вероника", "Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья", "Администратор-VIP"];
+const MANAGERS = ["Салампи", "Татьяна"];
 const ACCOUNT_MANAGERS = ["Арина", "Вероника"];
+const RECORDERS = ["Арина", "Вероника", "Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья", "Администратор-VIP"];
 const SOURCES = ["Квизы", "Сайт", "Авито", "Соц сети", "Рекомендация", "Оффлайн", "Партнерка", "Звонок", "Другое"];
+const STAGES = ['новая заявка','записан на пробное','на следующий месяц','был не купил','не пришел','дожимать','продажа','ученик','бронь','тест-драйв','пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение'];
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -42,7 +44,7 @@ function getWeekDays(date) {
 function fmt(date) { return date.toISOString().split("T")[0]; }
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 
-export default function TrialSchedule({ clients, role, onClientsChange }) {
+export default function TrialSchedule({ clients, role, authorName, userId, onClientsChange }) {
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -51,9 +53,13 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
   const [clientSearch, setClientSearch] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [clientModal, setClientModal] = React.useState(null);
+  const [allClients, setAllClients] = React.useState(clients);
+
+  React.useEffect(() => { setAllClients(clients); }, [clients]);
 
   const days = getWeekDays(weekStart);
-  const leadClients = clients.filter(c => !['ученик'].includes(c.stage)).sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const leadClients = allClients.filter(c => c.stage !== 'ученик').sort((a, b) => a.name.localeCompare(b.name, "ru"));
   const filteredClients = leadClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
   async function loadSlots() {
@@ -72,22 +78,44 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
     if (entry) {
-      setForm({ ...entry });
+      setForm({ ...entry, newStage: 'записан на пробное' });
     } else {
-      setForm({ client_id: "", client_name: "", phone: "", source: "", lesson_type: "", manager: "", account_manager: "", recorded_by: "", comment: "",
+      setForm({ client_id: "", client_name: "", phone: "", source: "", stage: "записан на пробное",
+        lesson_type: "", manager: "", account_manager: "", recorded_by: "", comment: "",
         reminder_call_day: false, reminder_sms_day: false, confirmed_day: false,
         reminder_call_2h: false, reminder_sms_2h: false, confirmed_2h: false,
         attended: null, bought: null, short_presentation: false, call_3days: false,
-        bought_testdrive: null, feedback: "" });
+        bought_testdrive: null, feedback: "", newStage: 'записан на пробное' });
     }
   }
 
   async function handleSave() {
     setSaving(true);
     try {
+      let clientId = form.client_id;
+      let clientName = form.client_name;
+
+      // Если клиент не выбран из списка — создаём нового лида
+      if (!clientId && clientName.trim()) {
+        const newClient = await apiFetch("clients", {
+          method: "POST",
+          body: JSON.stringify({
+            name: clientName.trim(),
+            phone: form.phone || null,
+            source: form.source || null,
+            stage: form.newStage || 'записан на пробное',
+          })
+        });
+        const created = Array.isArray(newClient) ? newClient[0] : newClient;
+        clientId = created.id;
+        clientName = created.name;
+        setAllClients(prev => [created, ...prev]);
+        if (onClientsChange) onClientsChange(created);
+      }
+
       const payload = {
         date: modal.date, time: modal.time,
-        client_id: form.client_id || null, client_name: form.client_name || null,
+        client_id: clientId || null, client_name: clientName || null,
         phone: form.phone || null, source: form.source || null,
         lesson_type: form.lesson_type || null, manager: form.manager || null,
         account_manager: form.account_manager || null, recorded_by: form.recorded_by || null,
@@ -112,11 +140,11 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
         await apiFetch("trial_schedule", { method: "POST", body: JSON.stringify(payload) });
       }
 
-      // При купил/не купил — менять стадию клиента
-      if (form.client_id && form.bought !== null && form.bought !== modal.entry?.bought) {
+      // Купил/не купил — менять стадию
+      if (clientId && form.bought !== null && form.bought !== modal.entry?.bought) {
         const newStage = form.bought === true ? 'ученик' : 'был не купил';
-        await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ stage: newStage }) });
-        if (onClientsChange) onClientsChange({ id: Number(form.client_id), stage: newStage });
+        await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ stage: newStage }) });
+        if (onClientsChange) onClientsChange({ id: Number(clientId), stage: newStage });
       }
 
       setModal(null);
@@ -132,6 +160,11 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
     loadSlots();
   }
 
+  function openClientModal(clientId) {
+    const cl = allClients.find(c => c.id === clientId);
+    if (cl) setClientModal(cl);
+  }
+
   function slotEntries(date, time) { return slots.filter(s => s.date === fmt(date) && s.time === time); }
 
   const inp = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 6, fontFamily: "inherit" };
@@ -144,11 +177,11 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
 
   return (
     <div style={{ padding: "0 16px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 8 }}>
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
         <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
-        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
+        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #e67e22", background: "#e67e22", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
       </div>
 
       {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
@@ -178,16 +211,20 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
                             style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
                               background: e.bought===true?"#e8f5e9":e.bought===false?"#ffebee":e.attended===true?"#e3f2fd":e.attended===false?"#fff3e0":"#fff8e1",
                               border:`1px solid ${e.bought===true?"#a5d6a7":e.bought===false?"#ef9a9a":e.attended===true?"#90caf9":e.attended===false?"#ffcc80":"#ffe082"}`}}>
-                            <div style={{fontWeight:500}}>{e.client_name||"—"}</div>
+                            <div style={{fontWeight:500,color:e.client_id?"#e67e22":"#333",cursor:e.client_id?"pointer":"default"}}
+                              onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
+                              {e.client_name||"—"}
+                            </div>
                             {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
                             {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
                             {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
                             <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
+                              {e.confirmed_2h&&<span style={{color:"#1565c0",fontSize:10,fontWeight:600}}>✓подтв за 2ч</span>}
+                              {!e.confirmed_2h&&e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв за день</span>}
                               {e.attended===true&&<span style={{color:"#2e7d32",fontSize:10}}>✓пришёл</span>}
                               {e.attended===false&&<span style={{color:"#c62828",fontSize:10}}>✗не пришёл</span>}
                               {e.bought===true&&<span style={{color:"#1b5e20",fontSize:10,fontWeight:600}}>💰купил</span>}
                               {e.bought===false&&<span style={{color:"#b71c1c",fontSize:10}}>✗не купил</span>}
-                              {e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв</span>}
                             </div>
                           </div>
                         ))}
@@ -215,10 +252,9 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
               <button onClick={()=>setModal(null)} style={{fontSize:20,background:"none",border:"none",cursor:"pointer"}}>×</button>
             </div>
 
-            {/* Клиент */}
-            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Клиент (лид)</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Клиент</div>
             <div style={{position:"relative",marginBottom:6}}>
-              <input style={{...inp,marginBottom:0}} placeholder="Введите имя..." value={clientSearch}
+              <input style={{...inp,marginBottom:0}} placeholder="Введите имя (из списка или новый)..." value={clientSearch}
                 onChange={e=>{setClientSearch(e.target.value);setShowSuggestions(true);setForm(f=>({...f,client_id:"",client_name:e.target.value}));}}
                 onFocus={()=>setShowSuggestions(true)} />
               {showSuggestions&&clientSearch&&filteredClients.length>0&&(
@@ -235,6 +271,14 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
                 </div>
               )}
             </div>
+            {!form.client_id && clientSearch && (
+              <div style={{fontSize:11,color:"#e67e22",marginBottom:6}}>
+                ⚠️ Нового лида создать в стадии:
+                <select style={{...inp,marginBottom:0,marginLeft:6,width:"auto",display:"inline"}} value={form.newStage||'записан на пробное'} onChange={e=>setForm(f=>({...f,newStage:e.target.value}))}>
+                  {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
 
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:6}}>
               <div>
@@ -273,7 +317,7 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
                 <div style={{fontSize:12,color:"#888",marginBottom:4}}>Кто записал</div>
                 <select style={inp} value={form.recorded_by||""} onChange={e=>setForm(f=>({...f,recorded_by:e.target.value}))}>
                   <option value="">— выбрать —</option>
-                  {MANAGERS.map(m=><option key={m} value={m}>{m}</option>)}
+                  {RECORDERS.map(m=><option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
             </div>
@@ -281,16 +325,23 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
             <div style={{fontSize:12,color:"#888",marginBottom:4}}>Комментарий</div>
             <textarea style={{...inp,minHeight:50,resize:"vertical"}} value={form.comment||""} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Заметки о клиенте..." />
 
-            {/* Напоминания */}
-            <div style={{background:"#f8f9ff",borderRadius:8,padding:10,marginBottom:10}}>
-              <div style={{fontWeight:600,fontSize:12,marginBottom:8,color:"#4a90e2"}}>📞 Напоминания</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-                {chk("📞 Звонок за ДЕНЬ", "reminder_call_day")}
-                {chk("💬 СМС за ДЕНЬ", "reminder_sms_day")}
-                {chk("✅ Подтвердил (день)", "confirmed_day")}
-                {chk("📞 Звонок за 2 часа", "reminder_call_2h")}
-                {chk("💬 СМС за 2 часа", "reminder_sms_2h")}
-                {chk("✅ Подтвердил (2ч)", "confirmed_2h")}
+            {/* Напоминания за ДЕНЬ */}
+            <div style={{background:"#e3f2fd",borderRadius:8,padding:10,marginBottom:8}}>
+              <div style={{fontWeight:600,fontSize:12,marginBottom:8,color:"#1565c0"}}>📅 Напоминание за ДЕНЬ</div>
+              <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+                {chk("📞 Звонок", "reminder_call_day")}
+                {chk("💬 СМС", "reminder_sms_day")}
+                {chk("✅ Подтвердил «буду»", "confirmed_day")}
+              </div>
+            </div>
+
+            {/* Напоминания за 2 ЧАСА */}
+            <div style={{background:"#f3e5f5",borderRadius:8,padding:10,marginBottom:10}}>
+              <div style={{fontWeight:600,fontSize:12,marginBottom:8,color:"#6a1b9a"}}>⏰ Напоминание за 2 ЧАСА</div>
+              <div style={{display:"flex",gap:16,flexWrap:"wrap"}}>
+                {chk("📞 Звонок", "reminder_call_2h")}
+                {chk("💬 СМС", "reminder_sms_2h")}
+                {chk("✅ Подтвердил «буду»", "confirmed_2h")}
               </div>
             </div>
 
@@ -332,6 +383,20 @@ export default function TrialSchedule({ clients, role, onClientsChange }) {
             </div>
           </div>
         </div>
+      )}
+
+      {clientModal && (
+        <ClientCard
+          client={clientModal}
+          clients={allClients}
+          role={role}
+          authorName={authorName}
+          userId={userId}
+          asModal={true}
+          onClose={() => setClientModal(null)}
+          onUpdate={(updated) => { setClientModal(updated); setAllClients(prev => prev.map(c => c.id === updated.id ? updated : c)); if (onClientsChange) onClientsChange(updated); }}
+          onDelete={(id) => { setClientModal(null); setAllClients(prev => prev.filter(c => c.id !== id)); }}
+        />
       )}
     </div>
   );
