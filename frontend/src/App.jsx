@@ -27,7 +27,9 @@ export default function App() {
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [view, setView] = React.useState('kanban');
+  const [view, setView] = React.useState(() => localStorage.getItem('crm_view') || 'kanban');
+
+  React.useEffect(() => { localStorage.setItem('crm_view', view); }, [view]);
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [listSearch, setListSearch] = React.useState("");
