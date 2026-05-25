@@ -123,6 +123,11 @@ export default function App() {
             <KanbanBoard clients={clients} role={role} onClientSelect={setSelectedId}
               onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => setSelectedId(id), 50); }}
               onAddClient={() => setView('list')}
+              onClientCreated={async (payload) => {
+                const newClient = await createClient({ role, name: authorName }, payload);
+                setClients(prev => [newClient, ...prev]);
+                setSelectedId(newClient.id);
+              }}
             />
           )}
 

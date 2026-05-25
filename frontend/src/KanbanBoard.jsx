@@ -1,5 +1,8 @@
 import { useState } from 'react'
+import React from 'react'
 import { supabase } from './supabase'
+import ClientForm from './components/ClientForm.jsx'
+import { createClient } from './api.js'
 
 const STAGES = [
   'новая заявка','записан на пробное','на следующий месяц','был не купил',
@@ -22,7 +25,25 @@ function matchesSearch(client, query) {
   return false
 }
 
-export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient }) {
+function ClientFormInline({ onSubmit }) {
+  const [error, setError] = React.useState('');
+  return (
+    <div>
+      {error && <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{error}</div>}
+      <ClientForm mode="Новый клиент" disabled={false} submitLabel="Добавить"
+        onSubmit={async (payload) => {
+          try {
+            setError('');
+            await onSubmit(payload);
+          } catch(err) { setError(err.message); }
+        }}
+      />
+    </div>
+  );
+}
+
+export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated }) {
+  const [showAddModal, setShowAddModal] = React.useState(false);
   const [search, setSearch] = useState('')
 
   const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
@@ -47,7 +68,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
         />
         {(role === 'manager' || role === 'admin') && (
           <button
-            onClick={onAddClient}
+            onClick={() => setShowAddModal(true)}
             style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#4a90e2', color: 'white', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}
           >
             + Добавить клиента
