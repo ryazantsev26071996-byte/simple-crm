@@ -39,8 +39,9 @@ export default function App() {
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
   React.useEffect(() => {
+    const saved = localStorage.getItem('crm_view');
     if (role === 'teacher') setView('students');
-    else if (role === 'manager') setView('kanban');
+    else if (!saved) setView('kanban');
   }, [role]);
 
   React.useEffect(() => {
