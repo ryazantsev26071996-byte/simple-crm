@@ -196,7 +196,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
         <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
-        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #e67e22", background: "#e67e22", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
+        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
         {role === "admin" && <button onClick={() => setShowBlocks(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
       </div>
 
@@ -205,9 +205,9 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:900}}>
             <thead>
               <tr>
-                <th style={{width:60,padding:"6px 8px",background:"#fff3e0",border:"1px solid #ddd",fontSize:12}}>Время</th>
+                <th style={{width:60,padding:"6px 8px",background:"#f0f0f0",border:"1px solid #ddd",fontSize:12}}>Время</th>
                 {days.map(d => (
-                  <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#fff8e1":"#fff3e0",border:"1px solid #ddd",fontSize:12,minWidth:130}}>
+                  <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:130}}>
                     {fmtDisplay(d)}
                   </th>
                 ))}
@@ -221,7 +221,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                     const entries = slotEntries(d, time);
                     const isFull = entries.length >= MAX_PER_SLOT;
                     return (
-                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:fmt(d)===fmt(new Date())?"#fffdf5":"white"}}>
+                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
                           <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
                             style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
@@ -245,7 +245,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                           </div>
                         ))}
                         {!isFull&&(role==="manager"||role==="admin")&&(
-                          <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ffcc02",background:"transparent",cursor:"pointer",borderRadius:4,color:"#e67e22"}}>
+                          <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>
                             + {MAX_PER_SLOT-entries.length} мест
                           </button>
                         )}
@@ -392,7 +392,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
             <textarea style={{...inp,minHeight:60,resize:"vertical"}} value={form.feedback||""} onChange={e=>setForm(f=>({...f,feedback:e.target.value}))} placeholder="Что сказал клиент, причины..." />
 
             <div style={{display:"flex",gap:8,marginTop:4}}>
-              <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#e67e22",color:"white",cursor:"pointer",fontWeight:500}}>
+              <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
                 {saving?"Сохранение...":(modal.entry?"Сохранить":"Записать на пробное")}
               </button>
               {modal.entry&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
