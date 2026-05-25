@@ -27,7 +27,7 @@ export default function App() {
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
-  const [view, setView] = React.useState(() => localStorage.getItem('crm_view') || 'kanban');
+  const [view, setView] = React.useState(() => { const saved = localStorage.getItem('crm_view'); return saved || 'kanban'; });
 
   React.useEffect(() => { localStorage.setItem('crm_view', view); }, [view]);
   const [showAudit, setShowAudit] = React.useState(false);
@@ -38,11 +38,7 @@ export default function App() {
 
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
-  React.useEffect(() => {
-    const saved = localStorage.getItem('crm_view');
-    if (role === 'teacher') setView('students');
-    else if (!saved) setView('kanban');
-  }, [role]);
+
 
   React.useEffect(() => {
     if (!user) return;
