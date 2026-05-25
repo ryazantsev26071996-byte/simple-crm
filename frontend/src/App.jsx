@@ -12,6 +12,7 @@ import { TeacherView } from "./TeacherView.jsx";
 import { exportToExcel } from "./ExportExcel.jsx";
 import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
 import ContractBlock from "./components/ContractBlock.jsx";
+import Schedule from "./Schedule.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -260,6 +261,7 @@ export default function App() {
         )}
       </div>
 
+      {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} />}
       {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
     </div>
