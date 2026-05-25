@@ -2,7 +2,6 @@ import React from "react";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
-
 const TEACHERS = ["Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья"];
 const RECORDERS = ["Арина", "Вероника", "Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья", "Администратор-VIP"];
 const LESSON_TYPES = ["занятие с педагогом", "свободное посещение", "нулевой урок", "ПРОБНОЕ", "МК", "ЛП", "СМОТР", "АРТ сквиз", "мероприятие", "тест-драйв 1", "тест-драйв 2", "тест-драйв 3"];
@@ -14,10 +13,7 @@ async function getToken() {
   try {
     const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
     const raw = localStorage.getItem(key);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.access_token) return parsed.access_token;
-    }
+    if (raw) { const parsed = JSON.parse(raw); if (parsed?.access_token) return parsed.access_token; }
   } catch {}
   return null;
 }
@@ -26,13 +22,7 @@ async function apiFetch(path, options = {}) {
   const token = await getToken();
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...options.headers,
-    },
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=representation", ...options.headers },
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || JSON.stringify(data));
@@ -44,77 +34,74 @@ function getWeekDays(date) {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   const monday = new Date(d.setDate(diff));
-  return Array.from({ length: 7 }, (_, i) => {
-    const dd = new Date(monday);
-    dd.setDate(monday.getDate() + i);
-    return dd;
-  });
+  return Array.from({ length: 7 }, (_, i) => { const dd = new Date(monday); dd.setDate(monday.getDate() + i); return dd; });
 }
 
-function fmt(date) {
-  return date.toISOString().split("T")[0];
-}
+function fmt(date) { return date.toISOString().split("T")[0]; }
+function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 
-function fmtDisplay(date) {
-  return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" });
-}
-
-export default function Schedule({ clients, role, onClientOpen }) {
+export default function Schedule({ clients, role }) {
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [modal, setModal] = React.useState(null); // {date, time, entry?}
+  const [modal, setModal] = React.useState(null);
   const [form, setForm] = React.useState({});
-  const [clientSearch, setClientSearch] = React.useState('');
+  const [clientSearch, setClientSearch] = React.useState("");
+  const [showSuggestions, setShowSuggestions] = React.useState(false);
+  const [clientModal, setClientModal] = React.useState(null);
+  const [clientComments, setClientComments] = React.useState([]);
+  const [loadingClient, setLoadingClient] = React.useState(false);
 
   const days = getWeekDays(weekStart);
-  const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+  const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const filteredClients = activeClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
   async function loadSlots() {
     setLoading(true);
     try {
-      const from = fmt(days[0]);
-      const to = fmt(days[6]);
-      const data = await apiFetch(`schedule?date=gte.${from}&date=lte.${to}&order=date.asc,time.asc`);
+      const data = await apiFetch(`schedule?date=gte.${fmt(days[0])}&date=lte.${fmt(days[6])}&order=date.asc,time.asc`);
       setSlots(data);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch(e) { console.error(e); }
     setLoading(false);
   }
 
   React.useEffect(() => { loadSlots(); }, [weekStart]);
 
+  async function openClientModal(clientId) {
+    const cl = clients.find(c => c.id === clientId);
+    if (!cl) return;
+    setClientModal(cl);
+    setLoadingClient(true);
+    try {
+      const data = await apiFetch(`comments?client_id=eq.${clientId}&order=created_at.desc&select=*,profiles(full_name)`);
+      setClientComments(data);
+    } catch(e) { console.error(e); }
+    setLoadingClient(false);
+  }
+
   function openModal(date, time, entry = null) {
     setModal({ date, time, entry });
-    setClientSearch(entry?.client_name || '');
+    setClientSearch(entry?.client_name || "");
+    setShowSuggestions(false);
     setForm(entry ? {
-      client_id: entry.client_id || "",
-      client_name: entry.client_name || "",
-      teacher: entry.teacher || "",
-      recorded_by: entry.recorded_by || "",
-      lesson_type: entry.lesson_type || "",
-      comment: entry.comment || "",
-      attended: entry.attended,
-      walk_in: entry.walk_in || false,
-    } : {
-      client_id: "", client_name: "", teacher: "", recorded_by: "",
-      lesson_type: "", comment: "", attended: null, walk_in: false,
-    });
+      client_id: entry.client_id || "", client_name: entry.client_name || "",
+      teacher: entry.teacher || "", recorded_by: entry.recorded_by || "",
+      lesson_type: entry.lesson_type || "", comment: entry.comment || "",
+      lesson_comment: "", attended: entry.attended, walk_in: entry.walk_in || false,
+    } : { client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false });
   }
 
   async function handleSave() {
+    if (form.attended === true && !form.lesson_comment.trim()) {
+      alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
+      return;
+    }
     const payload = {
-      date: modal.date,
-      time: modal.time,
-      client_id: form.client_id || null,
-      client_name: form.client_name || null,
-      teacher: form.teacher || null,
-      recorded_by: form.recorded_by || null,
-      lesson_type: form.lesson_type || null,
-      comment: form.comment || null,
-      attended: form.attended,
-      walk_in: form.walk_in || false,
+      date: modal.date, time: modal.time,
+      client_id: form.client_id || null, client_name: form.client_name || null,
+      teacher: form.teacher || null, recorded_by: form.recorded_by || null,
+      lesson_type: form.lesson_type || null, comment: form.comment || null,
+      attended: form.attended, walk_in: form.walk_in || false,
       subscription_type: form.client_id ? (activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || null) : null,
     };
     try {
@@ -123,86 +110,71 @@ export default function Schedule({ clients, role, onClientOpen }) {
       } else {
         await apiFetch("schedule", { method: "POST", body: JSON.stringify(payload) });
       }
+      if (form.attended === true && form.client_id) {
+        const cl = activeClients.find(c => c.id === Number(form.client_id));
+        if (cl && !cl.is_unlimited) {
+          await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ lessons_used: (cl.lessons_used||0)+1, last_visit: new Date().toISOString().split("T")[0] }) });
+        }
+        const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ");
+        await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText }) });
+      }
       setModal(null);
       loadSlots();
-    } catch (e) { alert(e.message); }
+    } catch(e) { alert(e.message); }
   }
 
   async function handleDelete() {
-    if (!modal.entry) return;
-    if (!window.confirm("Удалить запись?")) return;
+    if (!modal.entry || !window.confirm("Удалить запись?")) return;
     await apiFetch(`schedule?id=eq.${modal.entry.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     setModal(null);
     loadSlots();
   }
 
-  function slotEntries(date, time) {
-    return slots.filter(s => s.date === fmt(date) && s.time === time);
-  }
+  function slotEntries(date, time) { return slots.filter(s => s.date === fmt(date) && s.time === time); }
 
-  const inputStyle = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 6, fontFamily: "inherit" };
+  const inp = { width: "100%", padding: "6px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, marginBottom: 6, fontFamily: "inherit" };
 
   return (
     <div style={{ padding: "0 16px 16px" }}>
-      {/* Навигация по неделям */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 16 }}>
-        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); }}
-          style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
-        <strong style={{ fontSize: 14 }}>
-          {days[0].toLocaleDateString("ru-RU", { day: "numeric", month: "long" })} — {days[6].toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-        </strong>
-        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); }}
-          style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
-        <button onClick={() => setWeekStart(new Date())}
-          style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
+        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
+        <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
+        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
+        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
       </div>
 
-      {/* Сетка */}
-      {loading ? <div style={{ color: "#888" }}>Загрузка...</div> : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 800 }}>
+      {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
+        <div style={{overflowX:"auto"}}>
+          <table style={{borderCollapse:"collapse",width:"100%",minWidth:800}}>
             <thead>
               <tr>
-                <th style={{ width: 60, padding: "6px 8px", background: "#f0f0f0", border: "1px solid #ddd", fontSize: 12 }}>Время</th>
-                {days.map(d => (
-                  <th key={d} style={{ padding: "6px 8px", background: fmt(d) === fmt(new Date()) ? "#e8f4ff" : "#f0f0f0", border: "1px solid #ddd", fontSize: 12, minWidth: 120 }}>
-                    {fmtDisplay(d)}
-                  </th>
-                ))}
+                <th style={{width:60,padding:"6px 8px",background:"#f0f0f0",border:"1px solid #ddd",fontSize:12}}>Время</th>
+                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:120}}>{fmtDisplay(d)}</th>)}
               </tr>
             </thead>
             <tbody>
               {TIMES.map(time => (
                 <tr key={time}>
-                  <td style={{ padding: "6px 8px", border: "1px solid #ddd", fontWeight: 600, fontSize: 13, textAlign: "center", background: "#fafafa" }}>{time}</td>
+                  <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",background:"#fafafa"}}>{time}</td>
                   {days.map(d => {
                     const entries = slotEntries(d, time);
                     const isFull = entries.length >= MAX_PER_SLOT;
                     return (
-                      <td key={d} style={{ padding: 4, border: "1px solid #ddd", verticalAlign: "top", background: fmt(d) === fmt(new Date()) ? "#f8fbff" : "white", minHeight: 60 }}>
+                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
-                          <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
-                            style={{ marginBottom: 3, padding: "3px 6px", borderRadius: 4, fontSize: 11, cursor: "pointer",
-                              background: e.attended === true ? "#e8f5e9" : e.attended === false ? "#fff3e0" : "#f3f0ff",
-                              border: `1px solid ${e.attended === true ? "#a5d6a7" : e.attended === false ? "#ffcc80" : "#d1c4e9"}` }}>
-                            <div style={{ fontWeight: 500, cursor: e.client_id ? 'pointer' : 'default', color: e.client_id ? '#4a90e2' : '#333' }}
-              onClick={(ev) => { if (e.client_id) { ev.stopPropagation(); setModal(null); onClientOpen(e.client_id); } }}>
-              {e.client_name || "—"}
-            </div>
-                            {e.lesson_type && <div style={{ color: "#888" }}>{e.lesson_type}</div>}
-                            {e.teacher && <div style={{ color: "#4a90e2" }}>{e.teacher}</div>}
-                            {e.attended === true && <span style={{ color: "#2e7d32" }}>✓ пришёл</span>}
-                            {e.attended === false && <span style={{ color: "#e65100" }}>✗ не пришёл</span>}
-                            {e.walk_in && <span style={{ color: "#7b1fa2" }}> 🚶</span>}
+                          <div key={e.id} onClick={() => openModal(fmt(d),time,e)} style={{marginBottom:3,padding:"3px 6px",borderRadius:4,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
+                            <div style={{fontWeight:500,color:e.client_id?"#4a90e2":"#333",cursor:e.client_id?"pointer":"default"}} onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
+                              {e.client_name||"—"}
+                            </div>
+                            {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
+                            {e.teacher&&<div style={{color:"#4a90e2"}}>{e.teacher}</div>}
+                            {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
+                            {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
+                            {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
                           </div>
                         ))}
-                        {!isFull && (role === "manager" || role === "admin") && (
-                          <button onClick={() => openModal(fmt(d), time)}
-                            style={{ width: "100%", padding: "2px 0", fontSize: 11, border: "1px dashed #ccc", background: "transparent", cursor: "pointer", borderRadius: 4, color: "#aaa" }}>
-                            + {MAX_PER_SLOT - entries.length} мест
-                          </button>
-                        )}
-                        {isFull && <div style={{ fontSize: 10, color: "#e55", textAlign: "center" }}>Мест нет</div>}
+                        {!isFull&&(role==="manager"||role==="admin")&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
+                        {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
                       </td>
                     );
                   })}
@@ -213,88 +185,121 @@ export default function Schedule({ clients, role, onClientOpen }) {
         </div>
       )}
 
-      {/* Модальное окно */}
       {modal && (
-        <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "white", borderRadius: 12, width: "90%", maxWidth: 480, maxHeight: "90vh", overflowY: "auto", padding: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"white",borderRadius:12,width:"90%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",padding:20}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
               <strong>{modal.date} в {modal.time}</strong>
-              <button onClick={() => setModal(null)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer" }}>×</button>
+              <button onClick={()=>setModal(null)} style={{fontSize:20,background:"none",border:"none",cursor:"pointer"}}>×</button>
             </div>
 
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Ученик</div>
-            <input style={inputStyle} list="clients-list" placeholder="Начните вводить имя..."
-              value={clientSearch}
-              onChange={e => {
-                setClientSearch(e.target.value);
-                const cl = activeClients.find(c => c.name === e.target.value);
-                if (cl) setForm(f => ({ ...f, client_id: cl.id, client_name: cl.name, subscription_type: cl.subscription_type || "" }));
-                else setForm(f => ({ ...f, client_id: "", client_name: e.target.value }));
-              }} />
-            <datalist id="clients-list">
-              {activeClients.map(c => <option key={c.id} value={c.name} />)}
-            </datalist>
-            {form.client_id && (
-              <div style={{ fontSize: 12, marginBottom: 6, marginTop: -4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: "#4a90e2" }}>Абонемент: {activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || "—"}</span>
-                <button onClick={() => { setModal(null); onClientOpen(Number(form.client_id)); }}
-                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '1px solid #4a90e2', background: 'white', color: '#4a90e2', cursor: 'pointer' }}>
-                  Открыть карточку →
-                </button>
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Ученик</div>
+            <div style={{position:"relative",marginBottom:6}}>
+              <input style={{...inp,marginBottom:0}} placeholder="Любой регистр..." value={clientSearch}
+                onChange={e=>{setClientSearch(e.target.value);setShowSuggestions(true);setForm(f=>({...f,client_id:"",client_name:e.target.value}));}}
+                onFocus={()=>setShowSuggestions(true)} />
+              {showSuggestions&&clientSearch&&filteredClients.length>0&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1px solid #ddd",borderRadius:6,zIndex:100,maxHeight:200,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}}>
+                  {filteredClients.map(c=>(
+                    <div key={c.id} onClick={()=>{setClientSearch(c.name);setForm(f=>({...f,client_id:c.id,client_name:c.name}));setShowSuggestions(false);}}
+                      style={{padding:"8px 12px",cursor:"pointer",fontSize:13,borderBottom:"1px solid #f0f0f0"}}
+                      onMouseEnter={e=>e.currentTarget.style.background="#f0f7ff"}
+                      onMouseLeave={e=>e.currentTarget.style.background="white"}>
+                      <div>{c.name}</div>
+                      <div style={{fontSize:11,color:"#888"}}>{c.subscription_type||"без абонемента"} · осталось {c.is_unlimited?"∞":Math.max(0,(c.lessons_total||0)-(c.lessons_used||0))} зан.</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {form.client_id&&(
+              <div style={{fontSize:12,color:"#4a90e2",marginBottom:8}}>
+                {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));return cl?`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0))} зан.`:"";})()}
               </div>
             )}
 
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Вид урока</div>
-            <select style={inputStyle} value={form.lesson_type} onChange={e => setForm(f => ({ ...f, lesson_type: e.target.value }))}>
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Вид урока</div>
+            <select style={inp} value={form.lesson_type} onChange={e=>setForm(f=>({...f,lesson_type:e.target.value}))}>
               <option value="">— выбрать —</option>
-              {LESSON_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              {LESSON_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
             </select>
 
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Педагог</div>
-            <select style={inputStyle} value={form.teacher} onChange={e => setForm(f => ({ ...f, teacher: e.target.value }))}>
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Педагог</div>
+            <select style={inp} value={form.teacher} onChange={e=>setForm(f=>({...f,teacher:e.target.value}))}>
               <option value="">— выбрать —</option>
-              {TEACHERS.map(t => <option key={t} value={t}>{t}</option>)}
+              {TEACHERS.map(t=><option key={t} value={t}>{t}</option>)}
             </select>
 
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Кто записал</div>
-            <select style={inputStyle} value={form.recorded_by} onChange={e => setForm(f => ({ ...f, recorded_by: e.target.value }))}>
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Кто записал</div>
+            <select style={inp} value={form.recorded_by} onChange={e=>setForm(f=>({...f,recorded_by:e.target.value}))}>
               <option value="">— выбрать —</option>
-              {RECORDERS.map(r => <option key={r} value={r}>{r}</option>)}
+              {RECORDERS.map(r=><option key={r} value={r}>{r}</option>)}
             </select>
 
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>Комментарий</div>
-            <textarea style={{ ...inputStyle, minHeight: 60, resize: "vertical" }} value={form.comment}
-              onChange={e => setForm(f => ({ ...f, comment: e.target.value }))} placeholder="Заметка к занятию..." />
+            <div style={{fontSize:12,color:"#888",marginBottom:4}}>Заметка к записи (опционально)</div>
+            <textarea style={{...inp,minHeight:50,resize:"vertical"}} value={form.comment} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Пожелания, уточнения..." />
 
-            <div style={{ display: "flex", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
-                <input type="checkbox" checked={form.attended === true}
-                  onChange={e => setForm(f => ({ ...f, attended: e.target.checked ? true : null }))} />
-                ✓ Пришёл
+            <div style={{display:"flex",gap:12,marginBottom:10,flexWrap:"wrap"}}>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                <input type="checkbox" checked={form.attended===true} onChange={e=>setForm(f=>({...f,attended:e.target.checked?true:null}))} /> ✓ Пришёл
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
-                <input type="checkbox" checked={form.attended === false}
-                  onChange={e => setForm(f => ({ ...f, attended: e.target.checked ? false : null }))} />
-                ✗ Не пришёл
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                <input type="checkbox" checked={form.attended===false} onChange={e=>setForm(f=>({...f,attended:e.target.checked?false:null}))} /> ✗ Не пришёл
               </label>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
-                <input type="checkbox" checked={form.walk_in}
-                  onChange={e => setForm(f => ({ ...f, walk_in: e.target.checked }))} />
-                🚶 Пришёл без записи
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                <input type="checkbox" checked={form.walk_in} onChange={e=>setForm(f=>({...f,walk_in:e.target.checked}))} /> 🚶 Без записи
               </label>
             </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={handleSave}
-                style={{ flex: 1, padding: "8px 0", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", cursor: "pointer", fontWeight: 500 }}>
-                {modal.entry ? "Сохранить" : "Записать"}
+            {(form.attended===true||form.attended===false)&&(
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:12,marginBottom:4,color:form.attended===true?"#e55":"#888",fontWeight:form.attended===true?600:400}}>
+                  Комментарий после занятия {form.attended===true?"* (обязательно)":"(опционально)"}
+                </div>
+                <textarea style={{...inp,minHeight:80,resize:"vertical",borderColor:form.attended===true&&!form.lesson_comment.trim()?"#e55":"#ddd",marginBottom:4}}
+                  value={form.lesson_comment} onChange={e=>setForm(f=>({...f,lesson_comment:e.target.value}))} placeholder="Что делали, прогресс, пожелания..." />
+                {form.attended===true&&form.client_id&&<div style={{fontSize:11,color:"#888"}}>Спишется 1 занятие и комментарий добавится в карточку ученика</div>}
+              </div>
+            )}
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={handleSave} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
+                {modal.entry?"Сохранить":"Записать"}
               </button>
-              {modal.entry && (
-                <button onClick={handleDelete}
-                  style={{ padding: "8px 16px", borderRadius: 6, border: "1px solid #fcc", background: "white", color: "#e55", cursor: "pointer" }}>
-                  Удалить
-                </button>
-              )}
+              {modal.entry&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {clientModal&&(
+        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:2000,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{background:"white",borderRadius:12,width:"90%",maxWidth:560,maxHeight:"85vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"16px 20px",borderBottom:"1px solid #eee",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:16}}>{clientModal.name}</div>
+                <div style={{fontSize:12,color:"#888"}}>
+                  {clientModal.subscription_type||"без абонемента"} · осталось {clientModal.is_unlimited?"∞":Math.max(0,(clientModal.lessons_total||0)-(clientModal.lessons_used||0))} зан.
+                  {clientModal.subscription_end&&` · до ${new Date(clientModal.subscription_end).toLocaleDateString("ru-RU")}`}
+                </div>
+              </div>
+              <button onClick={()=>setClientModal(null)} style={{fontSize:22,background:"none",border:"none",cursor:"pointer",color:"#888"}}>×</button>
+            </div>
+            <div style={{overflowY:"auto",flex:1,padding:20}}>
+              {clientModal.student_info&&<div style={{marginBottom:12,padding:10,background:"#f8f9ff",borderRadius:8}}><div style={{fontSize:11,color:"#888",marginBottom:4}}>Кто такой</div><div style={{fontSize:13}}>{clientModal.student_info}</div></div>}
+              {clientModal.learning_strategy&&<div style={{marginBottom:12,padding:10,background:"#f0fff4",borderRadius:8}}><div style={{fontSize:11,color:"#888",marginBottom:4}}>📚 Стратегия</div><div style={{fontSize:13,whiteSpace:"pre-wrap"}}>{clientModal.learning_strategy}</div></div>}
+              <div style={{fontWeight:600,fontSize:14,marginBottom:8}}>Комментарии</div>
+              {loadingClient?<div style={{color:"#888"}}>Загрузка...</div>:clientComments.length===0?<div style={{color:"#aaa",fontSize:13}}>Нет комментариев</div>:
+                clientComments.map(c=>(
+                  <div key={c.id} style={{padding:"8px 10px",background:"#f8f9ff",borderRadius:8,marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{fontSize:12,fontWeight:500,color:"#4a90e2"}}>{c.profiles?.full_name||"—"}</span>
+                      <span style={{fontSize:11,color:"#aaa"}}>{new Date(c.created_at).toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}</span>
+                    </div>
+                    <div style={{fontSize:13,color:"#333"}}>{c.text}</div>
+                  </div>
+                ))
+              }
             </div>
           </div>
         </div>
