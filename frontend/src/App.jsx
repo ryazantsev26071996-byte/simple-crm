@@ -321,8 +321,6 @@ export default function App() {
                 }}
                 onCreate={async (message) => {
                   await createComment({ role, name: authorName }, selectedClient.id, { message });
-                  const list = await getComments({ role, name: authorName }, selectedClient.id);
-                  setComments(list);
                 }}
               />
             </div>
