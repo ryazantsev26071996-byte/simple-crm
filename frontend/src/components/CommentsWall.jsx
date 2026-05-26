@@ -50,6 +50,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
         }
         console.log('handleSubmit: await supabase.update', updates);
         const { error: updateError } = await supabase.from('clients').update(updates).eq('id', client.id);
+        console.log('supabase.update result:', { updateError, updates });
         if (updateError) throw new Error(updateError.message);
         if (onClientUpdate) onClientUpdate({ ...client, ...updates });
       }
