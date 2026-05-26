@@ -80,7 +80,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
 
       const lessonText = (client?.is_unlimited || !isActiveStudent) ? '' : ` [списано занятий: ${lessons}]`;
       await onCreate(datePrefix + message + lessonText);
-      if (onCommentsChange) await onCommentsChange();
+      if (onCommentsChange) try { await onCommentsChange(); } catch {}
       setMessage("");
       setLessons(0);
       setLessonDate(new Date().toISOString().split('T')[0]);
