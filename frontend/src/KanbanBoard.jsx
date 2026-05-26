@@ -59,8 +59,8 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
     if (role !== 'manager' && role !== 'admin') return null
     const [y, m] = filterMonth.split('-').map(Number)
     return clients
-      .filter(c => c.stage === stage && c.subscription_start)
-      .filter(c => { const d = new Date(c.subscription_start); return d.getFullYear() === y && d.getMonth()+1 === m })
+      .filter(c => c.stage === stage && c.created_at)
+      .filter(c => { const d = new Date(c.created_at); return d.getFullYear() === y && d.getMonth()+1 === m })
       .reduce((sum, c) => sum + (c.amount_paid || 0), 0)
   }
 
