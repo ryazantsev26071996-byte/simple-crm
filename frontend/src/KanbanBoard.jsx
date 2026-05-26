@@ -44,23 +44,27 @@ const MONTHS_RU = ['Январь','Февраль','Март','Апрель','М
 export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated }) {
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = React.useState(false)
-  const [filterMonth, setFilterMonth] = useState(() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-  })
+  const [filterMonth, setFilterMonth] = useState('all')
 
   const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
-  const filteredClients = clients.filter(c => matchesSearch(c, search))
-
   const currentYear = new Date().getFullYear()
+
+  function matchesMonth(client) {
+    if (filterMonth === 'all') return true
+    if (!client.created_at) return false
+    const [y, m] = filterMonth.split('-').map(Number)
+    const d = new Date(client.created_at)
+    return d.getFullYear() === y && d.getMonth()+1 === m
+  }
+
+  const filteredClients = clients.filter(c => matchesSearch(c, search) && matchesMonth(c))
 
   function getStageTotalAmount(stage) {
     if (stage !== 'ученик' && stage !== 'продажа') return null
     if (role !== 'manager' && role !== 'admin') return null
-    const [y, m] = filterMonth.split('-').map(Number)
-    return clients
-      .filter(c => c.stage === stage && c.created_at)
-      .filter(c => { const d = new Date(c.created_at); return d.getFullYear() === y && d.getMonth()+1 === m })
+    if (filterMonth === 'all') return null
+    return filteredClients
+      .filter(c => c.stage === stage)
       .reduce((sum, c) => sum + (c.amount_paid || 0), 0)
   }
 
@@ -76,6 +80,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
         {(role === 'manager' || role === 'admin') && (
           <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
             style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', cursor: 'pointer' }}>
+            <option value="all">Все месяцы</option>
             {MONTHS_RU.map((name, i) => {
               const value = `${currentYear}-${String(i+1).padStart(2,'0')}`
               return <option key={value} value={value}>{name} {currentYear}</option>
