@@ -1,5 +1,20 @@
 import React from "react";
 import { supabase } from "../supabase";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`
+    const raw = localStorage.getItem(key)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.access_token) return parsed.access_token
+    }
+  } catch {}
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token
+}
 
 function formatTime(iso) {
   if (!iso) return '';
@@ -49,9 +64,20 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
           updates.lessons_used = (client?.lessons_used || 0) + lessons;
         }
         console.log('handleSubmit: await supabase.update', updates);
-        const { error: updateError } = await supabase.from('clients').update(updates).eq('id', client.id);
-        console.log('supabase.update result:', { updateError, updates });
-        if (updateError) throw new Error(updateError.message);
+        const token = await getToken();
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify(updates),
+        });
+        const result = await res.json();
+        console.log('supabase.update result:', { ok: res.ok, result, updates });
+        if (!res.ok) throw new Error(result.message || JSON.stringify(result));
         if (onClientUpdate) onClientUpdate({ ...client, ...updates });
       }
 
