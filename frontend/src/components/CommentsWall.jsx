@@ -19,6 +19,7 @@ async function logAudit(action, entity, entityId, oldValue, newValue, userId, us
 export default function CommentsWall({ role, authorName, comments, onCreate, onCommentsChange, client, onClientUpdate, currentUserId }) {
   const [message, setMessage] = React.useState("");
   const [lessons, setLessons] = React.useState(0);
+  const [lessonDate, setLessonDate] = React.useState(new Date().toISOString().split('T')[0]);
   const [error, setError] = React.useState("");
   const [showFreeze, setShowFreeze] = React.useState(false);
   const [freezeDays, setFreezeDays] = React.useState(3);
@@ -35,17 +36,24 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   async function handleSubmit() {
     setError("");
     try {
-      if (!client?.is_unlimited && lessons > 0 && isActiveStudent) {
-        const today = new Date().toISOString().split('T')[0];
-        const newUsed = (client?.lessons_used || 0) + lessons;
-        const { error: updateError } = await supabase.from('clients').update({ lessons_used: newUsed, last_visit: today }).eq('id', client.id);
+      const [y, m, d] = lessonDate.split('-');
+      const datePrefix = `[${d}.${m}.${y}] `;
+
+      if (isActiveStudent) {
+        const updates = { last_visit: lessonDate };
+        if (!client?.is_unlimited && lessons > 0) {
+          updates.lessons_used = (client?.lessons_used || 0) + lessons;
+        }
+        const { error: updateError } = await supabase.from('clients').update(updates).eq('id', client.id);
         if (updateError) throw new Error(updateError.message);
-        if (onClientUpdate) onClientUpdate({ ...client, lessons_used: newUsed, last_visit: today });
+        if (onClientUpdate) onClientUpdate({ ...client, ...updates });
       }
+
       const lessonText = (client?.is_unlimited || !isActiveStudent) ? '' : ` [списано занятий: ${lessons}]`;
-      await onCreate(message + lessonText);
+      await onCreate(datePrefix + message + lessonText);
       setMessage("");
-      setLessons(1);
+      setLessons(0);
+      setLessonDate(new Date().toISOString().split('T')[0]);
     } catch (err) {
       setError(err.message || String(err));
     }
@@ -120,6 +128,10 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
           <div>
             <textarea className="textarea" value={message} onChange={(e) => setMessage(e.target.value)}
               placeholder="Заметка о занятии..." required style={{ width: '100%', marginBottom: 8 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: '#888' }}>Дата занятия:</span>
+              <input className="input" type="date" value={lessonDate} onChange={e => setLessonDate(e.target.value)} style={{ width: 145 }} />
+            </div>
             {!client?.is_unlimited && isActiveStudent && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: '#888' }}>Списать:</span>
