@@ -39,6 +39,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
     setSubmitting(true);
     setError("");
     try {
+      console.log('handleSubmit: start', { message, lessons, lessonDate, isActiveStudent });
       const [y, m, d] = lessonDate.split('-');
       const datePrefix = `[${d}.${m}.${y}] `;
 
@@ -47,19 +48,24 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
         if (!client?.is_unlimited && lessons > 0) {
           updates.lessons_used = (client?.lessons_used || 0) + lessons;
         }
+        console.log('handleSubmit: await supabase.update', updates);
         const { error: updateError } = await supabase.from('clients').update(updates).eq('id', client.id);
         if (updateError) throw new Error(updateError.message);
         if (onClientUpdate) onClientUpdate({ ...client, ...updates });
       }
 
       const lessonText = (client?.is_unlimited || !isActiveStudent) ? '' : ` [списано занятий: ${lessons}]`;
+      console.log('handleSubmit: await onCreate', datePrefix + message + lessonText);
       await onCreate(datePrefix + message + lessonText);
+      console.log('handleSubmit: onCreate done, await onCommentsChange');
       if (onCommentsChange) await onCommentsChange();
+      console.log('handleSubmit: onCommentsChange done, resetting state');
       setMessage("");
       setLessons(0);
       setLessonDate(new Date().toISOString().split('T')[0]);
       setError("");
     } catch (err) {
+      console.error('handleSubmit error:', err);
       setError(err.message || String(err));
     } finally {
       setSubmitting(false);
