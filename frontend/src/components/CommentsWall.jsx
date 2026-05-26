@@ -54,6 +54,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
       setMessage("");
       setLessons(0);
       setLessonDate(new Date().toISOString().split('T')[0]);
+      setError("");
     } catch (err) {
       setError(err.message || String(err));
     }
