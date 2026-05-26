@@ -24,6 +24,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   const [showFreeze, setShowFreeze] = React.useState(false);
   const [freezeDays, setFreezeDays] = React.useState(3);
   const [freezeStart, setFreezeStart] = React.useState(new Date().toISOString().split('T')[0]);
+  const [submitting, setSubmitting] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
   const [editText, setEditText] = React.useState("");
   const canComment = role === "teacher" || role === "admin" || role === "manager";
@@ -34,6 +35,8 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   const freezeLeft = (client?.freeze_days_total || 0) - (client?.freeze_days_used || 0);
 
   async function handleSubmit() {
+    if (submitting) return;
+    setSubmitting(true);
     setError("");
     try {
       const [y, m, d] = lessonDate.split('-');
@@ -58,6 +61,8 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
       setError("");
     } catch (err) {
       setError(err.message || String(err));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -146,7 +151,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
               </div>
             )}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button className="btn btnPrimary" type="button" onClick={handleSubmit} disabled={!message.trim()}>Добавить</button>
+              <button className="btn btnPrimary" type="button" onClick={handleSubmit} disabled={!message.trim() || submitting}>Добавить</button>
               {canFreeze && freezeLeft > 0 && isActiveStudent && (
                 <button type="button" onClick={() => setShowFreeze(!showFreeze)}
                   style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: showFreeze ? '#e8f4ff' : 'white', cursor: 'pointer', color: '#4a90e2' }}>
