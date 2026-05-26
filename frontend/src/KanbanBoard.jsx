@@ -39,12 +39,30 @@ function ClientFormInline({ onSubmit }) {
   );
 }
 
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+
 export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated }) {
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = React.useState(false)
+  const [filterMonth, setFilterMonth] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+  })
 
   const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
   const filteredClients = clients.filter(c => matchesSearch(c, search))
+
+  const currentYear = new Date().getFullYear()
+
+  function getStageTotalAmount(stage) {
+    if (stage !== 'ученик' && stage !== 'продажа') return null
+    if (role !== 'manager' && role !== 'admin') return null
+    const [y, m] = filterMonth.split('-').map(Number)
+    return clients
+      .filter(c => c.stage === stage && c.subscription_start)
+      .filter(c => { const d = new Date(c.subscription_start); return d.getFullYear() === y && d.getMonth()+1 === m })
+      .reduce((sum, c) => sum + (c.amount_paid || 0), 0)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -55,6 +73,15 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
           placeholder="Поиск по имени или последним цифрам номера..."
           style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
         />
+        {(role === 'manager' || role === 'admin') && (
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+            style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', cursor: 'pointer' }}>
+            {MONTHS_RU.map((name, i) => {
+              const value = `${currentYear}-${String(i+1).padStart(2,'0')}`
+              return <option key={value} value={value}>{name} {currentYear}</option>
+            })}
+          </select>
+        )}
         {(role === 'manager' || role === 'admin') && (
           <button
             onClick={() => setShowAddModal(true)}
@@ -75,6 +102,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
               clients={filteredClients.filter(c => c.stage === stage)}
               onClientSelect={onClientSelect}
               onDrop={(id, newStage) => onStageChange(id, newStage)}
+              totalAmount={getStageTotalAmount(stage)}
             />
           ))}
         </div>
@@ -98,7 +126,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
   );
 }
 
-function Column({ stage, clients, onClientSelect, onDrop }) {
+function Column({ stage, clients, onClientSelect, onDrop, totalAmount }) {
   const [over, setOver] = useState(false)
   return (
     <div
@@ -107,10 +135,15 @@ function Column({ stage, clients, onClientSelect, onDrop }) {
       onDrop={e => { e.preventDefault(); setOver(false); const id = Number(e.dataTransfer.getData('clientId')); onDrop(id, stage) }}
       style={{ width: 190, minHeight: 100, background: over ? '#e8f4ff' : '#f5f5f5', borderRadius: 8, padding: 8, border: over ? '2px dashed #4a90e2' : '2px solid transparent' }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
         <span>{stage}</span>
         <span style={{ background: clients.length > 0 ? '#4a90e2' : '#ddd', color: clients.length > 0 ? 'white' : '#555', borderRadius: 20, padding: '1px 6px', fontSize: 11 }}>{clients.length}</span>
       </div>
+      {totalAmount !== null && (
+        <div style={{ fontSize: 11, color: '#2a9', fontWeight: 600, marginBottom: 6 }}>
+          {totalAmount.toLocaleString('ru-RU')} ₽
+        </div>
+      )}
       {clients.map(client => <Card key={client.id} client={client} onClientSelect={onClientSelect} />)}
     </div>
   )

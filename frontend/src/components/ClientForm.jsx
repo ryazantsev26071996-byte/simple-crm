@@ -39,6 +39,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     name: initialValue?.name || "",
     phone: initialValue?.phone || "",
     source: initialValue?.source || "",
+    lead_date: initialValue?.lead_date || "",
     stage: initialValue?.stage || "",
     subscription_type: initialValue?.subscription_type || "",
     lessons_total: initialValue?.lessons_total || 0,
@@ -55,6 +56,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       name: initialValue?.name || "",
       phone: initialValue?.phone || "",
       source: initialValue?.source || "",
+      lead_date: initialValue?.lead_date || "",
       stage: initialValue?.stage || "",
       subscription_type: initialValue?.subscription_type || "",
       lessons_total: initialValue?.lessons_total || 0,
@@ -126,6 +128,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       name: form.name.trim(),
       phone: form.phone.trim(),
       source: form.source.trim(),
+      lead_date: form.lead_date || null,
       stage: form.stage,
       subscription_type: form.subscription_type,
       lessons_total: Number(form.lessons_total),
@@ -162,6 +165,13 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
           <div className="fieldLabel">Источник</div>
           <input className="input" value={form.source} disabled={disabled} onChange={set('source')} placeholder="Авито, рекомендация..." />
         </div>
+        <div className="formGroup">
+          <div className="fieldLabel">Дата прихода лида</div>
+          <input className="input" type="datetime-local" value={form.lead_date} disabled={disabled} onChange={set('lead_date')} />
+        </div>
+      </div>
+      <div style={{ height: 8 }} />
+      <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Стадия</div>
           <select className="input" value={form.stage} disabled={disabled} onChange={set('stage')}>
