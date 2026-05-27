@@ -15,6 +15,7 @@ import ContractBlock from "./components/ContractBlock.jsx";
 import LearningStrategy from "./components/LearningStrategy.jsx";
 import Schedule from "./Schedule.jsx";
 import TrialSchedule from "./TrialSchedule.jsx";
+import TeamOnline from "./TeamOnline.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -81,6 +82,7 @@ export default function App() {
               {(role === 'manager' || role === 'admin') && <button onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Запись на пробные</button>}
               {(role === 'manager' || role === 'admin') && <button onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Запись на занятия</button>}
               {(role === 'manager' || role === 'admin') && <button onClick={() => setView('lost')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'lost' ? '#e55' : 'white', color: view === 'lost' ? 'white' : '#e55', cursor: 'pointer' }}>Потеряшки</button>}
+              {role === 'admin' && <button onClick={() => setView('team')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'team' ? '#7c3aed' : 'white', color: view === 'team' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Команда</button>}
             </>}
             <button onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
           </div>
@@ -98,6 +100,7 @@ export default function App() {
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: selectedId ? '0 0 60%' : '1', overflow: 'auto', borderRight: selectedId ? '1px solid #eee' : 'none' }}>
+          {view === 'team' && role === 'admin' && <TeamOnline />}
           {view === 'trial' && (role === 'manager' || role === 'admin') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
           {view === 'schedule' && (role === 'manager' || role === 'admin') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
 
@@ -107,12 +110,10 @@ export default function App() {
                 onSubmit={async (payload) => {
                   setError("");
                   try {
-                    console.log('Creating client:', payload);
                     const newClient = await createClient({ role, name: authorName }, payload);
-                    console.log('Created:', newClient);
                     setClients((prev) => [newClient, ...prev]);
                     setSelectedId(newClient.id);
-                  } catch (err) { console.error('Error:', err); setError(err.message); alert(err.message); }
+                  } catch (err) { setError(err.message); alert(err.message); }
                 }}
               />
             </div>
