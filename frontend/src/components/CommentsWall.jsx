@@ -56,16 +56,22 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   }, [showDostigay]);
 
   function parseDostigayBlocks(text) {
-    console.log('parseDostigayBlocks input:', text.slice(0, 200));
     const lines = text.split('\n');
     const blocks = [];
     let current = null;
-    const headerRe = /^(?:.+,\s*\[\d{1,2}\s+\S+\.?\s+\d{2,4}\s+г\.,\s*\d{2}:\d{2}:\d{2}\]:|\[\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}\]\s+.+:)$/;
+    const fmt1Re = /^.+,\s*\[\d{1,2}\s+\S+\.?\s+\d{2,4}\s+г\.,\s*\d{2}:\d{2}:\d{2}\]:$/;
+    const fmt2Re = /^\[\d{2}\.\d{2}\.\d{4}\s+\d{1,2}:\d{2}\]/;
     for (const line of lines) {
-      console.log('headerRe test:', JSON.stringify(line.trim()), '->', headerRe.test(line.trim()));
-      if (headerRe.test(line.trim())) {
+      const trimmed = line.trim();
+      if (fmt1Re.test(trimmed)) {
         if (current) blocks.push(current);
         current = { lines: [] };
+      } else if (fmt2Re.test(trimmed)) {
+        if (current) blocks.push(current);
+        const afterBracket = trimmed.replace(/^\[\d{2}\.\d{2}\.\d{4}\s+\d{1,2}:\d{2}\]\s*/, '');
+        const colonIdx = afterBracket.indexOf(':');
+        const firstContent = colonIdx >= 0 ? afterBracket.slice(colonIdx + 1).trim() : '';
+        current = { lines: firstContent ? [firstContent] : [] };
       } else if (current !== null) {
         current.lines.push(line);
       }
