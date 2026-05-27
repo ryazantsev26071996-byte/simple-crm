@@ -56,11 +56,13 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   }, [showDostigay]);
 
   function parseDostigayBlocks(text) {
+    console.log('parseDostigayBlocks input:', text.slice(0, 200));
     const lines = text.split('\n');
     const blocks = [];
     let current = null;
     const headerRe = /^(?:.+,\s*\[\d{1,2}\s+\S+\.?\s+\d{2,4}\s+г\.,\s*\d{2}:\d{2}:\d{2}\]:|\[\d{2}\.\d{2}\.\d{4}\s+\d{2}:\d{2}\]\s+.+:)$/;
     for (const line of lines) {
+      console.log('headerRe test:', JSON.stringify(line.trim()), '->', headerRe.test(line.trim()));
       if (headerRe.test(line.trim())) {
         if (current) blocks.push(current);
         current = { lines: [] };
