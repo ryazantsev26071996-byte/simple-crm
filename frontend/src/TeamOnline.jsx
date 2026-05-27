@@ -38,7 +38,7 @@ export default function TeamOnline() {
 
   async function fetchData() {
     const [{ data: profs }, { data: pres }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role"),
+      supabase.from("profiles").select("id, full_name, role"),
       supabase.from("user_presence").select("user_id, last_seen"),
     ]);
     if (profs) setProfiles(profs);
@@ -101,7 +101,7 @@ export default function TeamOnline() {
                   <span style={{ fontWeight: 500, fontSize: 14 }}>{p.full_name || "—"}</span>
                   <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 8, background: color + "18", color, fontWeight: 500 }}>{ROLE_LABELS[p.role] || p.role}</span>
                 </div>
-                <div style={{ fontSize: 12, color: "#aaa" }}>{p.email}</div>
+
               </div>
               <div style={{ fontSize: 11, color: online ? "#27ae60" : "#bbb", whiteSpace: "nowrap", flexShrink: 0 }}>
                 {online ? "онлайн" : formatLastSeen(lastSeen)}
