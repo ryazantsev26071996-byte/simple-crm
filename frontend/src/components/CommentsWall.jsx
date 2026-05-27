@@ -339,7 +339,11 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
         {comments.length === 0 ? (
           <div className="hint">Комментариев пока нет.</div>
         ) : (
-          comments.map((c) => (
+          [...comments].sort((a, b) => {
+            const aDate = a.lesson_date || a.created_at || '';
+            const bDate = b.lesson_date || b.created_at || '';
+            return bDate.localeCompare(aDate);
+          }).map((c) => (
             <div className="commentCard" key={c.id} style={{
               background: (c.message||c.text||'').includes('ЗАМОРОЗКА') ? '#fff8e1' : 'white'
             }}>
