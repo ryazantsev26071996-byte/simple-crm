@@ -42,6 +42,82 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   const [submitting, setSubmitting] = React.useState(false);
   const [editingId, setEditingId] = React.useState(null);
   const [editText, setEditText] = React.useState("");
+  const [showDostigay, setShowDostigay] = React.useState(false);
+  const [dostigayText, setDostigayText] = React.useState("");
+  const [dostigayParsed, setDostigayParsed] = React.useState(null);
+  const [dostigaySaving, setDostigaySaving] = React.useState(false);
+  const [dostigayProfiles, setDostigayProfiles] = React.useState([]);
+
+  React.useEffect(() => {
+    if (!showDostigay || dostigayProfiles.length > 0) return;
+    supabase.from('profiles').select('id, full_name').then(({ data }) => {
+      if (data) setDostigayProfiles(data);
+    });
+  }, [showDostigay]);
+
+  function parseDostigayBlocks(text) {
+    const lines = text.split('\n');
+    const blocks = [];
+    let current = null;
+    const headerRe = /^.+,\s*\[\d{1,2}\s+\S+\.?\s+\d{2,4}\s+г\.,\s*\d{2}:\d{2}:\d{2}\]:$/;
+    for (const line of lines) {
+      if (headerRe.test(line.trim())) {
+        if (current) blocks.push(current);
+        current = { lines: [] };
+      } else if (current !== null) {
+        current.lines.push(line);
+      }
+    }
+    if (current) blocks.push(current);
+    return blocks.map(block => {
+      const allText = block.lines.join('\n');
+      const dateMatch = allText.match(/Дата занятия:\s*(\d{1,2})\.(\d{1,2})\.(\d{2,4})/);
+      let lessonDate = null;
+      if (dateMatch) {
+        let [, d, m, y] = dateMatch;
+        if (y.length === 2) y = '20' + y;
+        lessonDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      const teacherMatch = allText.match(/Педагог:\s*(.+)/);
+      const teacherRaw = teacherMatch ? teacherMatch[1].trim() : null;
+      const bodyLines = block.lines.filter(l => {
+        const t = l.trim();
+        return t && !/^Дата занятия:/i.test(t) && !/^Педагог:/i.test(t);
+      });
+      const body = bodyLines.join('\n').trim();
+      if (!body) return null;
+      let resolvedAuthorId = currentUserId;
+      let resolvedAuthorName = authorName;
+      if (teacherRaw) {
+        const firstName = teacherRaw.split(/\s+/)[0].toLowerCase();
+        const matched = dostigayProfiles.find(p => p.full_name && p.full_name.toLowerCase().includes(firstName));
+        if (matched) { resolvedAuthorId = matched.id; resolvedAuthorName = matched.full_name; }
+      }
+      const datePrefix = lessonDate
+        ? (() => { const [y, m, d] = lessonDate.split('-'); return `[${d}.${m}.${y}] `; })()
+        : '';
+      return { lessonDate, authorId: resolvedAuthorId, authorName: resolvedAuthorName, text: datePrefix + body, preview: body };
+    }).filter(Boolean);
+  }
+
+  async function handleDostigaySave() {
+    if (!dostigayParsed || dostigayParsed.length === 0) return;
+    setDostigaySaving(true);
+    try {
+      for (const c of dostigayParsed) {
+        await supabase.from('comments').insert({ client_id: client.id, author_id: c.authorId, text: c.text });
+      }
+      if (onCommentsChange) try { await onCommentsChange(); } catch {}
+      setShowDostigay(false);
+      setDostigayText("");
+      setDostigayParsed(null);
+    } catch (err) {
+      setError(err.message || String(err));
+    } finally {
+      setDostigaySaving(false);
+    }
+  }
+
   const canComment = role === "teacher" || role === "admin" || role === "manager";
   const isActiveStudent = ["ученик", "пробный месяц", "тест-драйв"].includes(client?.stage);
   const canFreeze = role === "manager" || role === "admin" || role === "teacher";
@@ -176,7 +252,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
                 ))}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="btn btnPrimary" type="button" onClick={handleSubmit} disabled={!message.trim() || submitting}>Добавить</button>
               {canFreeze && freezeLeft > 0 && isActiveStudent && (
                 <button type="button" onClick={() => setShowFreeze(!showFreeze)}
@@ -184,6 +260,10 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
                   🧊 Заморозка
                 </button>
               )}
+              <button type="button" onClick={() => setShowDostigay(true)}
+                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#888' }}>
+                📥 Из Достигай
+              </button>
             </div>
           </div>
         )}
@@ -209,6 +289,51 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
           </div>
         )}
       </div>
+
+      {showDostigay && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 12, width: '90%', maxWidth: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 20, gap: 12, boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>📥 Вставить из Достигай</div>
+              <button onClick={() => { setShowDostigay(false); setDostigayText(""); setDostigayParsed(null); }}
+                style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#888', lineHeight: 1 }}>×</button>
+            </div>
+            <textarea
+              value={dostigayText}
+              onChange={e => { setDostigayText(e.target.value); setDostigayParsed(null); }}
+              placeholder="Вставьте текст из Достигай..."
+              style={{ width: '100%', minHeight: 130, padding: 10, borderRadius: 8, border: '1px solid #ddd', fontSize: 13, fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box', flexShrink: 0 }}
+            />
+            <button type="button" onClick={() => setDostigayParsed(parseDostigayBlocks(dostigayText))}
+              disabled={!dostigayText.trim()}
+              style={{ alignSelf: 'flex-start', fontSize: 13, padding: '6px 16px', borderRadius: 7, border: 'none', background: '#4a90e2', color: 'white', cursor: 'pointer', flexShrink: 0 }}>
+              Разобрать
+            </button>
+            {dostigayParsed !== null && (
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {dostigayParsed.length === 0 && (
+                  <div style={{ color: '#aaa', fontSize: 13, padding: 8 }}>Комментарии не найдены. Проверьте формат текста.</div>
+                )}
+                {dostigayParsed.map((c, i) => (
+                  <div key={i} style={{ padding: '10px 12px', borderRadius: 8, border: '1px solid #e0e7ff', background: '#f8f9ff', fontSize: 13 }}>
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 4, color: '#888', fontSize: 12 }}>
+                      <span>📅 {c.lessonDate || '—'}</span>
+                      <span>👤 {c.authorName}</span>
+                    </div>
+                    <div style={{ color: '#333', whiteSpace: 'pre-wrap' }}>{c.preview}</div>
+                  </div>
+                ))}
+                {dostigayParsed.length > 0 && (
+                  <button type="button" onClick={handleDostigaySave} disabled={dostigaySaving}
+                    style={{ alignSelf: 'flex-start', fontSize: 13, padding: '7px 20px', borderRadius: 7, border: 'none', background: '#27ae60', color: 'white', cursor: 'pointer', fontWeight: 500 }}>
+                    {dostigaySaving ? 'Сохранение...' : `Сохранить все (${dostigayParsed.length})`}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {comments.length === 0 ? (
