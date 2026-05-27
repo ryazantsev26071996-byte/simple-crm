@@ -38,7 +38,7 @@ export default function TeamOnline() {
 
   async function fetchData() {
     const [{ data: profs }, { data: pres }] = await Promise.all([
-      supabase.from("profiles").select("id, full_name, email, role"),
+      supabase.from("profiles").select("id, name, email, role"),
       supabase.from("user_presence").select("user_id, last_seen"),
     ]);
     if (profs) setProfiles(profs);
@@ -69,7 +69,7 @@ export default function TeamOnline() {
     const bOnline = isOnline(presence[b.id]);
     if (aOnline && !bOnline) return -1;
     if (!aOnline && bOnline) return 1;
-    return (a.full_name || "").localeCompare(b.full_name || "", "ru");
+    return (a.name || "").localeCompare(b.name || "", "ru");
   });
 
   const onlineCount = sorted.filter(p => isOnline(presence[p.id])).length;
@@ -92,13 +92,13 @@ export default function TeamOnline() {
             <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "white", borderRadius: 10, border: "1px solid #eee", boxShadow: online ? "0 1px 4px rgba(39,174,96,0.08)" : "none" }}>
               <div style={{ position: "relative", flexShrink: 0 }}>
                 <div style={{ width: 40, height: 40, borderRadius: "50%", background: color + "22", color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 15 }}>
-                  {getInitials(p.full_name)}
+                  {getInitials(p.name)}
                 </div>
                 <div style={{ position: "absolute", bottom: 1, right: 1, width: 10, height: 10, borderRadius: "50%", background: online ? "#27ae60" : "#ccc", border: "2px solid white" }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontWeight: 500, fontSize: 14 }}>{p.full_name || "—"}</span>
+                  <span style={{ fontWeight: 500, fontSize: 14 }}>{p.name || "—"}</span>
                   <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 8, background: color + "18", color, fontWeight: 500 }}>{ROLE_LABELS[p.role] || p.role}</span>
                 </div>
                 <div style={{ fontSize: 12, color: "#aaa" }}>{p.email}</div>
