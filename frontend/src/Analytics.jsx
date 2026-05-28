@@ -6,7 +6,7 @@ import ClientCard from "./components/ClientCard.jsx";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const MANAGERS = ["Салампи", "Татьяна", "Арина"];
+const MANAGERS = ["Салампи", "Татьяна"];
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKS = [
   { label: "ИТОГИ 1", from: 1,  to: 7  },
@@ -150,7 +150,12 @@ export default function Analytics() {
     };
   }
 
-  const installmentClients = clients.filter(c => (c.payment_method || "").toLowerCase() === "рассрочка");
+  const arinaTrials    = trials.filter(t => t.account_manager === "Арина");
+  const arinaAttended  = arinaTrials.filter(t => t.attended === true);
+  const arinaRenewals  = clients.filter(c => c.manager_name === "Арина" && ["ученик","продажа"].includes(c.stage) && (c.contract_amount || 0) > 0);
+  const arinaRevenue   = arinaRenewals.reduce((s, c) => s + (c.contract_amount || 0), 0);
+  const arinaBonus     = arinaRenewals.reduce((s, c) => s + calcBonus(c), 0);
+
   const totalSales   = salesClients.length;
   const totalRevenue = salesClients.reduce((s, c) => s + (c.contract_amount || 0), 0);
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
@@ -311,31 +316,40 @@ export default function Analytics() {
         })}
       </div>
 
-      {/* ── Account manager: installments & renewals ── */}
+      {/* ── Арина: account manager ── */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Аккаунт-менеджер (рассрочки и продления)</div>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Аккаунт-менеджер — Арина</div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-          <StatCard label="Рассрочек" value={installmentClients.length} />
+          <StatCard label="Записано на ВУ"       value={arinaTrials.length} />
+          <StatCard label="Пришло на ВУ"         value={arinaAttended.length} />
+          <StatCard label="Продлений / продаж"   value={arinaRenewals.length} />
           <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма рассрочек</div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{installmentClients.reduce((s,c)=>s+(c.contract_amount||0),0).toLocaleString("ru-RU")} ₽</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка (продления)</div>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{arinaRevenue.toLocaleString("ru-RU")} ₽</div>
+          </div>
+          <StatCard label="CV записи → приход"    value={pct(arinaAttended.length, arinaTrials.length)} />
+          <StatCard label="CV приход → продление" value={pct(arinaRenewals.length, arinaAttended.length)} />
+          <div style={{ background: "#fffbf0", borderRadius: 8, padding: "10px 14px", border: "1px solid #ffe0a0", minWidth: 150 }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Бонус</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#e67e22" }}>{Math.round(arinaBonus).toLocaleString("ru-RU")} ₽</div>
           </div>
         </div>
-        {installmentClients.length > 0 && (
+        {arinaRenewals.length > 0 && (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 600 }}>
+            <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
               <thead>
-                <tr>{["Клиент","Сумма","Менеджер","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+                <tr>{["Клиент","Сумма","Оплата","Стадия","Бонус"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
               </thead>
               <tbody>
-                {installmentClients.map(c => (
+                {arinaRenewals.map(c => (
                   <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
                     onMouseLeave={e => e.currentTarget.style.background = "white"}>
                     <td style={TD}>{c.name}</td>
                     <td style={TD}>{(c.contract_amount||0).toLocaleString("ru-RU")} ₽</td>
-                    <td style={TD}>{c.manager_name || "—"}</td>
+                    <td style={TD}>{c.payment_method || "—"}</td>
                     <td style={TD}>{c.stage}</td>
+                    <td style={{...TD, color: "#e67e22"}}>{Math.round(calcBonus(c)).toLocaleString("ru-RU")} ₽</td>
                   </tr>
                 ))}
               </tbody>
