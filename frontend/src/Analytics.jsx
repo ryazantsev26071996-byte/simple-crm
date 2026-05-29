@@ -214,10 +214,14 @@ export default function Analytics() {
   async function handleSalesSave() {
     if (!salesModal) return;
     setSalesSaving(true);
+    console.log("[handleSalesSave] manager:", salesModal.manager);
+    console.log("[handleSalesSave] selected ids:", [...salesSelected]);
     try {
-      await Promise.all([...salesSelected].map(id =>
-        apiFetch(`clients?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ manager_name: salesModal.manager }) })
-      ));
+      await Promise.all([...salesSelected].map(async id => {
+        const res = await apiFetch(`clients?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ manager_name: salesModal.manager }) });
+        console.log("[handleSalesSave] PATCH response for id", id, res);
+        return res;
+      }));
       setSalesModal(null);
       setSalesSearch("");
       setSalesSearchResults([]);
@@ -248,10 +252,10 @@ export default function Analytics() {
 
   const monthSum = sumRows(dailyRows);
 
-  const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && (c.amount_paid || 0) > 0);
+  const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && c.manager_name);
 
   function mgStats(manager) {
-    const mSales   = salesClients.filter(c => c.manager_name === manager);
+    const mSales   = clients.filter(c => c.manager_name === manager && ["продажа","ученик"].includes(c.stage));
     const mLessons = lessons.filter(l => l.recorded_by === manager);
     const mTrials  = trials.filter(t => t.manager === manager);
     const mAtt     = mTrials.filter(t => t.attended === true);
