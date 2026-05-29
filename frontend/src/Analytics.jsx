@@ -117,7 +117,7 @@ export default function Analytics() {
         apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
         apiFetch(`clients?stage=in.(продажа,ученик)&select=*&order=created_at.desc&limit=500`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
-        apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*`),
+        apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*&limit=1000`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
       ]);
       const leads = Array.isArray(leadsData) ? leadsData : [];
@@ -290,7 +290,7 @@ export default function Analytics() {
   const totalSales   = salesClients.length;
   const totalRevenue = salesClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
-  const refusals     = clients.filter(c => c.stage === "был не купил").length;
+  const refusals     = clients.filter(c => c.stage === "расторжение").length;
   const avgCheck     = totalSales ? Math.round(totalRevenue / totalSales) : 0;
   const distinctSlots     = new Set(lessons.map(l => `${l.date}_${l.time}`)).size;
   const avgStudentsPerSlot = distinctSlots ? (lessons.length / distinctSlots).toFixed(1) : "—";
@@ -568,11 +568,11 @@ export default function Analytics() {
             ["Заявки корявые",             monthSum.badLeads],
             ["Заявки нормальные",          monthSum.normalLeads],
             ["CV в приход",                pct(monthSum.attended, monthSum.newLeads)],
-            ["Кол-во учеников на уроке",   avgStudentsPerSlot],
-            ["CV в продажу (с отказами)",  pct(totalSales, totalSales + refusals)],
+            ["Кол-во учеников на уроке",   lessons.length],
+            ["CV в продажу (с отказами)",  pct(totalSales, monthSum.attended)],
             ["Кол-во продаж",              totalSales],
             ["CV из заявки в продажу",     pct(totalSales, monthSum.newLeads)],
-            ["Кол-во отказов",             refusals],
+            ["Расторжений",                refusals],
             ["Ср. чек",                    avgCheck ? avgCheck.toLocaleString("ru-RU") + " ₽" : "—"],
             ["% корявых заявок",           pct(monthSum.badLeads, monthSum.newLeads)],
             ["Всего уроков",               lessons.length],
