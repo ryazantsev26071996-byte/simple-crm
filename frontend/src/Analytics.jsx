@@ -530,7 +530,7 @@ export default function Analytics() {
           <StatCard label="CV записи → приход"    value={pct(arinaAttended.length, arinaTrials.length)} />
           <StatCard label="CV приход → продление" value={pct(arinaRenewals.length, arinaAttended.length)} />
           <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма оформлений (Арина + Вероника)</div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма оформлений</div>
             <div style={{ fontSize: 16, fontWeight: 600 }}>{registrationSum.toLocaleString("ru-RU")} ₽</div>
           </div>
         </div>
