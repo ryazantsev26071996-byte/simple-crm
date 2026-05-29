@@ -102,7 +102,7 @@ export default function Analytics() {
       const start = dateFmt(year, month, 1);
       const end   = dateFmt(year, month, daysInMonth);
       const [cl, tr, le, pl] = await Promise.all([
-        apiFetch(`clients?lead_date=gte.${start}T00:00:00&lead_date=lte.${end}T23:59:59&select=*&order=lead_date.asc`),
+        apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
@@ -165,7 +165,7 @@ export default function Analytics() {
 
   const dailyRows = React.useMemo(() => days.map(d => {
     const ds = dateFmt(year, month, d);
-    const newL = clients.filter(c => c.lead_date === ds);
+    const newL = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === ds);
     const badL = newL.filter(c => c.stage === "корявый лид");
     const rec  = trials.filter(t => t.date === ds);
     const att  = rec.filter(t => t.attended === true);
