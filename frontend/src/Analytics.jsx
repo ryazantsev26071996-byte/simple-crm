@@ -137,12 +137,12 @@ export default function Analytics() {
 
   async function savePlan(manager, value) {
     const num = Number(value) || 0;
-    const existing = plans.find(p => p.manager === manager);
+    const existing = plans.find(p => p.manager_name === manager);
     try {
       if (existing) {
         await apiFetch(`manager_plans?id=eq.${existing.id}`, { method: "PATCH", body: JSON.stringify({ plan: num }) });
       } else {
-        await apiFetch("manager_plans", { method: "POST", body: JSON.stringify({ manager, month, year, plan: num }) });
+        await apiFetch("manager_plans", { method: "POST", body: JSON.stringify({ manager_name: manager, month, year, plan: num }) });
       }
       setEditPlan(p => { const next = {...p}; delete next[manager]; return next; });
       loadData();
@@ -256,7 +256,7 @@ export default function Analytics() {
     const mTrials  = trials.filter(t => t.manager === manager);
     const mAtt     = mTrials.filter(t => t.attended === true);
     const revenue  = mSales.reduce((s, c) => s + (c.amount_paid || 0), 0);
-    const plan     = plans.find(p => p.manager === manager)?.plan || 0;
+    const plan     = plans.find(p => p.manager_name === manager)?.plan || 0;
     return {
       sales:         mSales,
       lessonsCount:  mLessons.length,
