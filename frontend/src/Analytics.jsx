@@ -47,7 +47,7 @@ function pct(num, den) {
 }
 
 function calcBonus(c) {
-  const a = c.contract_amount || 0;
+  const a = c.amount_paid || 0;
   const pm = (c.payment_method || "").toLowerCase();
   if (pm === "рассрочка") return a * 0.01;
   if (pm === "наличные" || pm === "карта") return a * 0.02;
@@ -95,7 +95,7 @@ export default function Analytics() {
     if (salesSearch.length < 2) { setSalesSearchResults([]); return; }
     const timer = setTimeout(async () => {
       try {
-        const r = await apiFetch(`clients?or=(name.ilike.*${salesSearch}*,phone.ilike.*${salesSearch}*)&select=id,name,phone,stage,contract_amount,payment_method,manager_name&limit=10`);
+        const r = await apiFetch(`clients?or=(name.ilike.*${salesSearch}*,phone.ilike.*${salesSearch}*)&select=id,name,phone,stage,amount_paid,payment_method,manager_name&limit=10`);
         setSalesSearchResults(Array.isArray(r) ? r : []);
       } catch {}
     }, 300);
@@ -248,14 +248,14 @@ export default function Analytics() {
 
   const monthSum = sumRows(dailyRows);
 
-  const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && (c.contract_amount || 0) > 0);
+  const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && (c.amount_paid || 0) > 0);
 
   function mgStats(manager) {
     const mSales   = salesClients.filter(c => c.manager_name === manager);
     const mLessons = lessons.filter(l => l.recorded_by === manager);
     const mTrials  = trials.filter(t => t.manager === manager);
     const mAtt     = mTrials.filter(t => t.attended === true);
-    const revenue  = mSales.reduce((s, c) => s + (c.contract_amount || 0), 0);
+    const revenue  = mSales.reduce((s, c) => s + (c.amount_paid || 0), 0);
     const plan     = plans.find(p => p.manager === manager)?.plan || 0;
     return {
       sales:         mSales,
@@ -273,12 +273,12 @@ export default function Analytics() {
 
   const arinaTrials    = trials.filter(t => t.account_manager === "Арина");
   const arinaAttended  = arinaTrials.filter(t => t.attended === true);
-  const arinaRenewals  = clients.filter(c => c.manager_name === "Арина" && ["ученик","продажа"].includes(c.stage) && (c.contract_amount || 0) > 0);
-  const arinaRevenue   = arinaRenewals.reduce((s, c) => s + (c.contract_amount || 0), 0);
+  const arinaRenewals  = clients.filter(c => c.manager_name === "Арина" && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
+  const arinaRevenue   = arinaRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
   const arinaBonus     = arinaRenewals.reduce((s, c) => s + calcBonus(c), 0);
 
   const totalSales   = salesClients.length;
-  const totalRevenue = salesClients.reduce((s, c) => s + (c.contract_amount || 0), 0);
+  const totalRevenue = salesClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
   const refusals     = clients.filter(c => c.stage === "был не купил").length;
   const avgCheck     = totalSales ? Math.round(totalRevenue / totalSales) : 0;
@@ -491,7 +491,7 @@ export default function Analytics() {
                           onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
                           onMouseLeave={e => e.currentTarget.style.background = "white"}>
                           <td style={TD}>{c.name}</td>
-                          <td style={TD}>{(c.contract_amount||0).toLocaleString("ru-RU")} ₽</td>
+                          <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
                           <td style={TD}>{c.payment_method || "—"}</td>
                           <td style={TD}>{c.stage}</td>
                           <td style={{...TD, color: "#e67e22"}}>{Math.round(calcBonus(c)).toLocaleString("ru-RU")} ₽</td>
@@ -536,7 +536,7 @@ export default function Analytics() {
                     onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
                     onMouseLeave={e => e.currentTarget.style.background = "white"}>
                     <td style={TD}>{c.name}</td>
-                    <td style={TD}>{(c.contract_amount||0).toLocaleString("ru-RU")} ₽</td>
+                    <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
                     <td style={TD}>{c.payment_method || "—"}</td>
                     <td style={TD}>{c.stage}</td>
                     <td style={{...TD, color: "#e67e22"}}>{Math.round(calcBonus(c)).toLocaleString("ru-RU")} ₽</td>
@@ -616,7 +616,7 @@ export default function Analytics() {
                           <strong>{c.name}</strong>
                           <span style={{ color: "#888", marginLeft: 8, fontSize: 12 }}>{c.phone || "—"}</span>
                           <span style={{ color: "#aaa", marginLeft: 8, fontSize: 12 }}>{c.stage}</span>
-                          {c.contract_amount ? <span style={{ color: "#4a90e2", marginLeft: 8, fontSize: 12 }}>{c.contract_amount.toLocaleString("ru-RU")} ₽</span> : null}
+                          {c.amount_paid ? <span style={{ color: "#4a90e2", marginLeft: 8, fontSize: 12 }}>{c.amount_paid.toLocaleString("ru-RU")} ₽</span> : null}
                         </div>
                         <button onClick={() => handleSalesRemove(c.id)}
                           style={{ padding: "2px 10px", borderRadius: 4, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>
@@ -644,7 +644,7 @@ export default function Analytics() {
                             <strong>{c.name}</strong>
                             <span style={{ color: "#888", marginLeft: 8, fontSize: 12 }}>{c.phone || "—"}</span>
                             <span style={{ color: "#aaa", marginLeft: 8, fontSize: 12 }}>{c.stage}</span>
-                            {c.contract_amount ? <span style={{ color: "#4a90e2", marginLeft: 8, fontSize: 12 }}>{c.contract_amount.toLocaleString("ru-RU")} ₽</span> : null}
+                            {c.amount_paid ? <span style={{ color: "#4a90e2", marginLeft: 8, fontSize: 12 }}>{c.amount_paid.toLocaleString("ru-RU")} ₽</span> : null}
                             {c.manager_name && <span style={{ color: "#e67e22", marginLeft: 8, fontSize: 11 }}>→ {c.manager_name}</span>}
                           </div>
                         </label>
