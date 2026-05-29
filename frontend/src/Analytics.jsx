@@ -121,13 +121,18 @@ export default function Analytics() {
       const daysInMonth = new Date(year, month, 0).getDate();
       const start = dateFmt(year, month, 1);
       const end   = dateFmt(year, month, daysInMonth);
-      const [cl, tr, le, pl] = await Promise.all([
+      const [leadsData, salesData, tr, le, pl] = await Promise.all([
         apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
+        apiFetch(`clients?contract_date=gte.${start}&contract_date=lte.${end}&stage=in.(продажа,ученик)&select=*`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
       ]);
-      setClients(Array.isArray(cl) ? cl : []);
+      const leads = Array.isArray(leadsData) ? leadsData : [];
+      const sales = Array.isArray(salesData) ? salesData : [];
+      const merged = [...leads];
+      sales.forEach(s => { if (!merged.find(c => c.id === s.id)) merged.push(s); });
+      setClients(merged);
       setTrials(Array.isArray(tr) ? tr : []);
       setLessons(Array.isArray(le) ? le : []);
       setPlans(Array.isArray(pl) ? pl : []);
@@ -255,7 +260,12 @@ export default function Analytics() {
   const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && c.manager_name);
 
   function mgStats(manager) {
-    const mSales   = clients.filter(c => c.manager_name === manager && ["продажа","ученик"].includes(c.stage));
+    const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
+    const mSales   = clients.filter(c =>
+      c.manager_name === manager &&
+      ["продажа","ученик"].includes(c.stage) &&
+      c.contract_date && c.contract_date.slice(0,7) === yearMonth
+    );
     const mLessons = lessons.filter(l => l.recorded_by === manager);
     const mTrials  = trials.filter(t => t.manager === manager);
     const mAtt     = mTrials.filter(t => t.attended === true);
@@ -453,8 +463,7 @@ export default function Analytics() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
                 <StatCard label="Уроков"   value={s.lessonsCount} />
                 <StatCard label="Учеников" value={s.studentsCount} />
-                <StatCard label="Продаж"   value={s.salesCount}
-                  onValueClick={role === "admin" ? () => { setSalesModal({ manager }); setSalesSelected(new Set()); setSalesSearch(""); setSalesSearchResults([]); } : undefined} />
+                <StatCard label="Продаж"   value={s.salesCount} />
                 <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{s.revenue.toLocaleString("ru-RU")} ₽</div>
