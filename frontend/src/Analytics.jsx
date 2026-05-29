@@ -474,10 +474,6 @@ export default function Analytics() {
                 </div>
                 <StatCard label="Конверсия"   value={s.conversion} />
                 <StatCard label="Средний чек" value={s.avgCheck ? s.avgCheck.toLocaleString("ru-RU") + " ₽" : "—"} />
-                <div style={{ background: "#fffbf0", borderRadius: 8, padding: "10px 14px", border: "1px solid #ffe0a0", minWidth: 150 }}>
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Бонус</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: "#e67e22" }}>{Math.round(s.bonus).toLocaleString("ru-RU")} ₽</div>
-                </div>
               </div>
               {s.sales.length > 0 && (
                 <div style={{ overflowX: "auto" }}>
