@@ -28,6 +28,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
     broker: client?.broker || "",
     payment_method: client?.payment_method || "",
     contract_date: client?.contract_date || "",
+    payment_date: client?.payment_date || "",
     manager_name: client?.manager_name || "",
     contract_amount: client?.contract_amount || "",
     installment_term: client?.installment_term || "",
@@ -45,6 +46,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
       broker: client?.broker || "",
       payment_method: client?.payment_method || "",
       contract_date: client?.contract_date || "",
+      payment_date: client?.payment_date || "",
       manager_name: client?.manager_name || "",
       contract_amount: client?.contract_amount || "",
       installment_term: client?.installment_term || "",
@@ -73,6 +75,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
           broker: form.broker || null,
           payment_method: form.payment_method || null,
           contract_date: form.contract_date || null,
+          payment_date: form.payment_date || null,
           manager_name: form.manager_name || null,
           contract_amount: form.contract_amount ? Number(form.contract_amount) : null,
           installment_term: form.installment_term ? Number(form.installment_term) : null,
@@ -137,6 +140,12 @@ export default function ContractBlock({ client, onUpdate, role }) {
           <div style={labelStyle}>Дата договора</div>
           <input style={inputStyle} type={editing ? "date" : "text"} value={form.contract_date} readOnly={!editing}
             onChange={e => setForm(f => ({ ...f, contract_date: e.target.value }))}
+            placeholder={editing ? "" : "Не заполнено"} />
+        </div>
+        <div>
+          <div style={labelStyle}>Дата оплаты</div>
+          <input style={inputStyle} type={editing ? "date" : "text"} value={form.payment_date} readOnly={!editing}
+            onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))}
             placeholder={editing ? "" : "Не заполнено"} />
         </div>
         <div>
