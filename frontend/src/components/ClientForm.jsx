@@ -148,16 +148,13 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
   }
 
   async function handlePhoneBlur() {
-    console.log('[dupCheck] onOpenClient:', !!onOpenClient)
     const phone = form.phone.trim()
     if (!phone || isLink(phone)) return
     const digits = phone.replace(/\D/g, '').slice(-10)
     if (digits.length < 10) return
     const spaced = digits.slice(0,3) + ' ' + digits.slice(3,6) + ' ' + digits.slice(6,8) + ' ' + digits.slice(8,10)
-    console.log('[dupCheck] digits:', digits, '| spaced:', spaced)
     try {
       const results = await apiFetch(`clients?phone=ilike.*${spaced}*&select=id,name,phone,stage&limit=3`)
-      console.log('[dupCheck] API response:', results)
       const filtered = results.filter(c => !initialValue?.id || c.id !== initialValue.id)
       setDupWarning(filtered.length > 0 ? filtered : null)
     } catch (err) {
