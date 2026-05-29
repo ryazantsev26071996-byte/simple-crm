@@ -103,7 +103,8 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         reminder_call_day: false, reminder_sms_day: false, confirmed_day: false,
         reminder_call_2h: false, reminder_sms_2h: false, confirmed_2h: false,
         attended: null, bought: null, short_presentation: false, call_3days: false,
-        bought_testdrive: null, feedback: "", newStage: 'записан на пробное' });
+        bought_testdrive: null, feedback: "", newStage: 'записан на пробное',
+        rescheduled: false, rescheduled_to: "" });
     }
   }
 
@@ -150,12 +151,33 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         call_3days: form.call_3days || false,
         bought_testdrive: form.bought_testdrive,
         feedback: form.feedback || null,
+        rescheduled: form.rescheduled || false,
+        rescheduled_to: form.rescheduled_to || null,
       };
 
       if (modal.entry) {
         await apiFetch(`trial_schedule?id=eq.${modal.entry.id}`, { method: "PATCH", body: JSON.stringify(payload) });
       } else {
         await apiFetch("trial_schedule", { method: "POST", body: JSON.stringify(payload) });
+      }
+
+      // Create a new entry on the new date when first marking as rescheduled
+      if (form.rescheduled && form.rescheduled_to && !modal.entry?.rescheduled) {
+        await apiFetch("trial_schedule", {
+          method: "POST",
+          body: JSON.stringify({
+            date: form.rescheduled_to,
+            time: modal.time,
+            client_id: clientId || null,
+            client_name: clientName || null,
+            phone: form.phone || null,
+            source: form.source || null,
+            lesson_type: form.lesson_type || null,
+            manager: form.manager || null,
+            account_manager: form.account_manager || null,
+            recorded_by: form.recorded_by || null,
+          }),
+        });
       }
 
       // Купил/не купил — менять стадию
@@ -231,8 +253,8 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                         {entries.map(e => (
                           <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
                             style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
-                              background: e.bought===true?"#e8f5e9":e.bought===false?"#fff3e0":e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",
-                              border:`1px solid ${e.bought===true?"#a5d6a7":e.bought===false?"#ffcc80":e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
+                              background: e.rescheduled?"#e8f0ff":e.bought===true?"#e8f5e9":e.bought===false?"#fff3e0":e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",
+                              border:`1px solid ${e.rescheduled?"#b3c8f5":e.bought===true?"#a5d6a7":e.bought===false?"#ffcc80":e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
                             <div style={{fontWeight:500,color:e.client_id?"#e67e22":"#333",cursor:e.client_id?"pointer":"default"}}
                               onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
                               {e.client_name||"—"}
@@ -241,12 +263,20 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                             {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
                             {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
                             <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
-                              {e.confirmed_2h&&<span style={{color:"#1565c0",fontSize:10,fontWeight:600}}>✓подтв за 2ч</span>}
-                              {!e.confirmed_2h&&e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв за день</span>}
-                              {e.attended===true&&<span style={{color:"#2e7d32",fontSize:10}}>✓пришёл</span>}
-                              {e.attended===false&&<span style={{color:"#c62828",fontSize:10}}>✗не пришёл</span>}
-                              {e.bought===true&&<span style={{color:"#1b5e20",fontSize:10,fontWeight:600}}>💰купил</span>}
-                              {e.bought===false&&<span style={{color:"#b71c1c",fontSize:10}}>✗не купил</span>}
+                              {e.rescheduled && e.rescheduled_to ? (
+                                <span style={{color:"#4a90e2",fontSize:10,fontWeight:600}}>
+                                  🔄 {e.rescheduled_to.slice(8,10)}.{e.rescheduled_to.slice(5,7)}
+                                </span>
+                              ) : (
+                                <>
+                                  {e.confirmed_2h&&<span style={{color:"#1565c0",fontSize:10,fontWeight:600}}>✓подтв за 2ч</span>}
+                                  {!e.confirmed_2h&&e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв за день</span>}
+                                  {e.attended===true&&<span style={{color:"#2e7d32",fontSize:10}}>✓пришёл</span>}
+                                  {e.attended===false&&<span style={{color:"#c62828",fontSize:10}}>✗не пришёл</span>}
+                                  {e.bought===true&&<span style={{color:"#1b5e20",fontSize:10,fontWeight:600}}>💰купил</span>}
+                                  {e.bought===false&&<span style={{color:"#b71c1c",fontSize:10}}>✗не купил</span>}
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -392,6 +422,23 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                   <input type="checkbox" checked={form.bought_testdrive===false} onChange={e=>setForm(f=>({...f,bought_testdrive:e.target.checked?false:null}))} />✗ Не купил ТД
                 </label>
               </div>
+            </div>
+
+            {/* Перенос */}
+            <div style={{background:"#e8f0ff",borderRadius:8,padding:10,marginBottom:10}}>
+              <div style={{fontWeight:600,fontSize:12,marginBottom:8,color:"#1a56db"}}>🔄 Перенос</div>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer",marginBottom:6}}>
+                <input type="checkbox" checked={!!form.rescheduled}
+                  onChange={e=>setForm(f=>({...f,rescheduled:e.target.checked,rescheduled_to:e.target.checked?f.rescheduled_to:""}))} />
+                Перенести запись
+              </label>
+              {form.rescheduled && (
+                <div>
+                  <div style={{fontSize:12,color:"#888",marginBottom:4}}>Перенести на:</div>
+                  <input type="date" value={form.rescheduled_to||""} onChange={e=>setForm(f=>({...f,rescheduled_to:e.target.value}))}
+                    style={{padding:"4px 8px",borderRadius:6,border:"1px solid #b3c8f5",fontSize:13}} />
+                </div>
+              )}
             </div>
 
             <div style={{fontSize:12,color:"#888",marginBottom:4}}>Обратная связь после звонка</div>

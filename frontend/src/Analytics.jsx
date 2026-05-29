@@ -250,7 +250,7 @@ export default function Analytics() {
     const ds = dateFmt(year, month, d);
     const newL = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === ds);
     const badL = newL.filter(c => c.stage === "корявый лид");
-    const rec  = trials.filter(t => t.date === ds);
+    const rec  = trials.filter(t => t.date === ds && !t.rescheduled);
     const att  = rec.filter(t => t.attended === true);
     return { d, ds, newLeads: newL.length, badLeads: badL.length, normalLeads: newL.length - badL.length, recorded: rec.length, attended: att.length };
   }), [clients, trials, year, month]);
@@ -267,7 +267,7 @@ export default function Analytics() {
       c.contract_date && c.contract_date.slice(0,7) === yearMonth
     );
     const mLessons = lessons.filter(l => l.recorded_by === manager);
-    const mTrials  = trials.filter(t => t.manager === manager);
+    const mTrials  = trials.filter(t => t.manager === manager && !t.rescheduled);
     const mAtt     = mTrials.filter(t => t.attended === true);
     const revenue  = mSales.reduce((s, c) => s + (c.amount_paid || 0), 0);
     const plan     = plans.find(p => p.manager_name === manager)?.plan || 0;
@@ -285,7 +285,7 @@ export default function Analytics() {
     };
   }
 
-  const arinaTrials    = trials.filter(t => t.account_manager === "Арина");
+  const arinaTrials    = trials.filter(t => t.account_manager === "Арина" && !t.rescheduled);
   const arinaAttended  = arinaTrials.filter(t => t.attended === true);
   const arinaRenewals  = clients.filter(c => c.manager_name === "Арина" && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
   const arinaRevenue   = arinaRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
