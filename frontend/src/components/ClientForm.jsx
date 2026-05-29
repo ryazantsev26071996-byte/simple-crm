@@ -16,6 +16,7 @@ const SUBSCRIPTIONS = [
   { name: 'Тест-драйв', lessons: 3, freeze: 0, days: 7, unlimited: false },
   { name: 'Пробный месяц', lessons: 4, freeze: 0, days: 30, unlimited: false },
   { name: '8 занятий', lessons: 8, freeze: 0, days: 30, unlimited: false },
+  { name: '3 месяца', lessons: 30, freeze: 0, months: 3, unlimited: false },
   { name: 'Изучай старый с бонусами', lessons: 170, freeze: 60, months: 12, unlimited: false },
   { name: 'Изучай старый', lessons: 156, freeze: 60, months: 12, unlimited: false },
   { name: 'Отдыхай старый', lessons: 52, freeze: 30, months: 6, unlimited: false },
