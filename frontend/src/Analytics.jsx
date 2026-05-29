@@ -85,6 +85,22 @@ export default function Analytics() {
   const [leadsModal, setLeadsModal] = React.useState(null);
   const [leadsEditRow, setLeadsEditRow] = React.useState(null);
   const [leadsEditForm, setLeadsEditForm] = React.useState({ name: "", phone: "", source: "", stage: "" });
+  const [salesModal, setSalesModal] = React.useState(null);
+  const [salesSearch, setSalesSearch] = React.useState("");
+  const [salesSearchResults, setSalesSearchResults] = React.useState([]);
+  const [salesSelected, setSalesSelected] = React.useState(new Set());
+  const [salesSaving, setSalesSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    if (salesSearch.length < 2) { setSalesSearchResults([]); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const r = await apiFetch(`clients?or=(name.ilike.*${salesSearch}*,phone.ilike.*${salesSearch}*)&select=id,name,phone,stage,contract_amount,payment_method,manager_name&limit=10`);
+        setSalesSearchResults(Array.isArray(r) ? r : []);
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [salesSearch]);
 
   React.useEffect(() => {
     if (addLeadSearch.length < 2) { setAddLeadResults([]); return; }
@@ -188,6 +204,36 @@ export default function Analytics() {
     } catch (e) { alert(e.message); }
   }
 
+  async function handleSalesRemove(clientId) {
+    try {
+      await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ manager_name: null }) });
+      loadData();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleSalesSave() {
+    if (!salesModal) return;
+    setSalesSaving(true);
+    try {
+      await Promise.all([...salesSelected].map(id =>
+        apiFetch(`clients?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ manager_name: salesModal.manager }) })
+      ));
+      setSalesModal(null);
+      setSalesSearch("");
+      setSalesSearchResults([]);
+      setSalesSelected(new Set());
+      loadData();
+    } catch (e) { alert(e.message); }
+    setSalesSaving(false);
+  }
+
+  function closeSalesModal() {
+    setSalesModal(null);
+    setSalesSearch("");
+    setSalesSearchResults([]);
+    setSalesSelected(new Set());
+  }
+
   const daysInMonth = new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
@@ -243,11 +289,14 @@ export default function Analytics() {
   const TD  = { padding: "5px 10px", border: "1px solid #eee", fontSize: 12 };
   const TDt = { padding: "6px 10px", border: "1px solid #dde", fontSize: 12, fontWeight: 600, background: "#eef2ff" };
 
-  function StatCard({ label, value }) {
+  function StatCard({ label, value, onValueClick }) {
     return (
       <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
         <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{label}</div>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>{value}</div>
+        <div onClick={onValueClick}
+          style={{ fontSize: 16, fontWeight: 600, ...(onValueClick ? { color: "#4a90e2", textDecoration: "underline", cursor: "pointer" } : {}) }}>
+          {value}
+        </div>
       </div>
     );
   }
@@ -395,7 +444,8 @@ export default function Analytics() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
                 <StatCard label="Уроков"   value={s.lessonsCount} />
                 <StatCard label="Учеников" value={s.studentsCount} />
-                <StatCard label="Продаж"   value={s.salesCount} />
+                <StatCard label="Продаж"   value={s.salesCount}
+                  onValueClick={role === "admin" ? () => { setSalesModal({ manager }); setSalesSelected(new Set()); setSalesSearch(""); setSalesSearchResults([]); } : undefined} />
                 <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка</div>
                   <div style={{ fontSize: 16, fontWeight: 600 }}>{s.revenue.toLocaleString("ru-RU")} ₽</div>
@@ -543,6 +593,79 @@ export default function Analytics() {
           onDelete={() => setClientModal(null)}
         />
       )}
+
+      {salesModal && (() => {
+        const assigned = salesClients.filter(c => c.manager_name === salesModal.manager);
+        const inp = { width: "100%", padding: "5px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box" };
+        return (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "white", borderRadius: 12, width: "90%", maxWidth: 700, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
+                <strong style={{ fontSize: 15 }}>Продажи — {salesModal.manager}</strong>
+                <button onClick={closeSalesModal} style={{ fontSize: 22, background: "none", border: "none", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ overflowY: "auto", flex: 1 }}>
+
+                {/* Already assigned */}
+                {assigned.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Назначенные продажи</div>
+                    {assigned.map(c => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderBottom: "1px solid #f0f0f0" }}>
+                        <div style={{ flex: 1, fontSize: 13 }}>
+                          <strong>{c.name}</strong>
+                          <span style={{ color: "#888", marginLeft: 8, fontSize: 12 }}>{c.phone || "—"}</span>
+                          <span style={{ color: "#aaa", marginLeft: 8, fontSize: 12 }}>{c.stage}</span>
+                          {c.contract_amount ? <span style={{ color: "#4a90e2", marginLeft: 8, fontSize: 12 }}>{c.contract_amount.toLocaleString("ru-RU")} ₽</span> : null}
+                        </div>
+                        <button onClick={() => handleSalesRemove(c.id)}
+                          style={{ padding: "2px 10px", borderRadius: 4, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 12, cursor: "pointer", flexShrink: 0 }}>
+                          Убрать
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Search */}
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Найти клиента в CRM</div>
+                <input placeholder="Имя или телефон..." value={salesSearch}
+                  onChange={e => setSalesSearch(e.target.value)}
+                  style={{...inp, marginBottom: 8}} />
+                {salesSearchResults.length > 0 && (
+                  <div style={{ border: "1px solid #eee", borderRadius: 6, marginBottom: 12, overflow: "hidden" }}>
+                    {salesSearchResults.map(c => {
+                      const checked = salesSelected.has(c.id);
+                      return (
+                        <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderBottom: "1px solid #f4f4f4", cursor: "pointer", background: checked ? "#f0f7ff" : "white" }}>
+                          <input type="checkbox" checked={checked}
+                            onChange={e => setSalesSelected(prev => { const next = new Set(prev); e.target.checked ? next.add(c.id) : next.delete(c.id); return next; })} />
+                          <div style={{ flex: 1, fontSize: 13 }}>
+                            <strong>{c.name}</strong>
+                            <span style={{ color: "#888", marginLeft: 8, fontSize: 12 }}>{c.phone || "—"}</span>
+                            <span style={{ color: "#aaa", marginLeft: 8, fontSize: 12 }}>{c.stage}</span>
+                            {c.contract_amount ? <span style={{ color: "#4a90e2", marginLeft: 8, fontSize: 12 }}>{c.contract_amount.toLocaleString("ru-RU")} ₽</span> : null}
+                            {c.manager_name && <span style={{ color: "#e67e22", marginLeft: 8, fontSize: 11 }}>→ {c.manager_name}</span>}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14, flexShrink: 0 }}>
+                {salesSelected.size > 0 && <span style={{ fontSize: 12, color: "#888", alignSelf: "center" }}>Выбрано: {salesSelected.size}</span>}
+                <button onClick={closeSalesModal} style={{ padding: "6px 18px", borderRadius: 6, border: "1px solid #ddd", background: "white", fontSize: 13, cursor: "pointer" }}>Отмена</button>
+                <button onClick={handleSalesSave} disabled={salesSaving || salesSelected.size === 0}
+                  style={{ padding: "6px 18px", borderRadius: 6, border: "none", background: salesSelected.size === 0 ? "#ccc" : "#4a90e2", color: "white", fontSize: 13, cursor: salesSelected.size === 0 ? "default" : "pointer" }}>
+                  {salesSaving ? "Сохранение..." : `Назначить (${salesSelected.size})`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {leadsModal && (() => {
         const dayClients = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === leadsModal.dateStr);
