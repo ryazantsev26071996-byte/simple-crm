@@ -292,8 +292,8 @@ export default function Analytics() {
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
   const refusals     = clients.filter(c => c.stage === "расторжение").length;
   const avgCheck     = totalSales ? Math.round(totalRevenue / totalSales) : 0;
-  const distinctSlots     = new Set(lessons.map(l => `${l.date}_${l.time}`)).size;
-  const avgStudentsPerSlot = distinctSlots ? (lessons.length / distinctSlots).toFixed(1) : "—";
+  const uniqueTrialSlots   = new Set(trials.filter(t => t.attended).map(t => `${t.date}_${t.time}`)).size;
+  const avgPerSlot         = uniqueTrialSlots ? (monthSum.attended / uniqueTrialSlots).toFixed(1) : "—";
 
   const TH  = { padding: "4px 8px", background: "#f0f4ff", border: "1px solid #dde", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" };
   const TD  = { padding: "3px 8px", border: "1px solid #eee", fontSize: 11 };
@@ -568,15 +568,15 @@ export default function Analytics() {
             ["Заявки корявые",             monthSum.badLeads],
             ["Заявки нормальные",          monthSum.normalLeads],
             ["CV в приход",                pct(monthSum.attended, monthSum.newLeads)],
-            ["Кол-во учеников на уроке",   lessons.length],
+            ["Кол-во учеников на уроке",   monthSum.attended],
             ["CV в продажу (с отказами)",  pct(totalSales, monthSum.attended)],
             ["Кол-во продаж",              totalSales],
             ["CV из заявки в продажу",     pct(totalSales, monthSum.newLeads)],
             ["Расторжений",                refusals],
             ["Ср. чек",                    avgCheck ? avgCheck.toLocaleString("ru-RU") + " ₽" : "—"],
             ["% корявых заявок",           pct(monthSum.badLeads, monthSum.newLeads)],
-            ["Всего уроков",               lessons.length],
-            ["Ср. кол-во учеников на 1 ВУ", monthSum.recorded ? (monthSum.attended / monthSum.recorded).toFixed(2) : "—"],
+            ["Всего уроков",               monthSum.attended],
+            ["Ср. кол-во учеников на 1 ВУ", avgPerSlot],
             ["CV в продажу (без отказов)", pct(totalSales, monthSum.attended)],
             ["План школы",                 totalPlan ? totalPlan.toLocaleString("ru-RU") + " ₽" : "—"],
             ["Выручка школы",              totalRevenue.toLocaleString("ru-RU") + " ₽"],
