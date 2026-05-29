@@ -104,7 +104,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         reminder_call_2h: false, reminder_sms_2h: false, confirmed_2h: false,
         attended: null, bought: null, short_presentation: false, call_3days: false,
         bought_testdrive: null, feedback: "", newStage: 'записан на пробное',
-        rescheduled: false, rescheduled_to: "" });
+        rescheduled: false, rescheduled_to: "", rescheduled_time: "" });
     }
   }
 
@@ -167,7 +167,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
           method: "POST",
           body: JSON.stringify({
             date: form.rescheduled_to,
-            time: modal.time,
+            time: form.rescheduled_time || modal.time,
             client_id: clientId || null,
             client_name: clientName || null,
             phone: form.phone || null,
@@ -433,10 +433,19 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                 Перенести запись
               </label>
               {form.rescheduled && (
-                <div>
-                  <div style={{fontSize:12,color:"#888",marginBottom:4}}>Перенести на:</div>
-                  <input type="date" value={form.rescheduled_to||""} onChange={e=>setForm(f=>({...f,rescheduled_to:e.target.value}))}
-                    style={{padding:"4px 8px",borderRadius:6,border:"1px solid #b3c8f5",fontSize:13}} />
+                <div style={{display:"flex",gap:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                  <div>
+                    <div style={{fontSize:12,color:"#888",marginBottom:4}}>Перенести на:</div>
+                    <input type="date" value={form.rescheduled_to||""} onChange={e=>setForm(f=>({...f,rescheduled_to:e.target.value}))}
+                      style={{padding:"4px 8px",borderRadius:6,border:"1px solid #b3c8f5",fontSize:13}} />
+                  </div>
+                  <div>
+                    <div style={{fontSize:12,color:"#888",marginBottom:4}}>Время:</div>
+                    <select value={form.rescheduled_time||modal.time} onChange={e=>setForm(f=>({...f,rescheduled_time:e.target.value}))}
+                      style={{padding:"4px 8px",borderRadius:6,border:"1px solid #b3c8f5",fontSize:13}}>
+                      {TIMES.map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
                 </div>
               )}
             </div>
