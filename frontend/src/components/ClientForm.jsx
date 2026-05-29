@@ -154,9 +154,10 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     const digits = phone.replace(/\D/g, '')
     if (digits.length < 10) return
     const last10 = digits.slice(-10)
-    console.log('[dupCheck] searching phone:', phone, '| last10 digits:', last10)
+    const spaced = last10.replace(/(\d{1})(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5')
+    console.log('[dupCheck] searching phone:', phone, '| spaced:', spaced)
     try {
-      const results = await apiFetch(`clients?phone=ilike.*${last10}*&select=id,name,phone,stage&limit=3`)
+      const results = await apiFetch(`clients?phone=ilike.*${spaced}*&select=id,name,phone,stage&limit=3`)
       console.log('[dupCheck] API response:', results)
       const filtered = results.filter(c => !initialValue?.id || c.id !== initialValue.id)
       setDupWarning(filtered.length > 0 ? filtered : null)
