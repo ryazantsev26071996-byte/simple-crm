@@ -151,11 +151,10 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     console.log('[dupCheck] onOpenClient:', !!onOpenClient)
     const phone = form.phone.trim()
     if (!phone || isLink(phone)) return
-    const digits = phone.replace(/\D/g, '')
+    const digits = phone.replace(/\D/g, '').slice(-10)
     if (digits.length < 10) return
-    const last10 = digits.slice(-10)
-    const spaced = last10.replace(/(\d{1})(\d{3})(\d{3})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5')
-    console.log('[dupCheck] searching phone:', phone, '| spaced:', spaced)
+    const spaced = digits[0] + ' ' + digits.slice(1,4) + ' ' + digits.slice(4,7) + ' ' + digits.slice(7,9) + ' ' + digits.slice(9,11)
+    console.log('[dupCheck] digits:', digits, '| spaced:', spaced)
     try {
       const results = await apiFetch(`clients?phone=ilike.*${spaced}*&select=id,name,phone,stage&limit=3`)
       console.log('[dupCheck] API response:', results)
