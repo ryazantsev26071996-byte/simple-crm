@@ -61,8 +61,14 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
   React.useEffect(() => { setAllClients(clients); }, [clients]);
 
   const days = getWeekDays(weekStart);
-  const leadClients = allClients.filter(c => c.stage !== 'ученик').sort((a, b) => a.name.localeCompare(b.name, "ru"));
-  const filteredClients = leadClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
+  const filteredClients = React.useMemo(() => {
+    if (!clientSearch) return []
+    const q = clientSearch.toLowerCase()
+    const digits = q.replace(/\D/g, '')
+    return allClients
+      .filter(c => c.name?.toLowerCase().includes(q) || (digits.length >= 3 && (c.phone || '').replace(/\D/g, '').endsWith(digits)))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  }, [allClients, clientSearch])
 
   const [blocks, setBlocks] = React.useState([]);
 
