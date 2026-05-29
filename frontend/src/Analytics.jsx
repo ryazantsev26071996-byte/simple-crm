@@ -76,6 +76,9 @@ export default function Analytics() {
   const [loading, setLoading] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
   const [editPlan, setEditPlan] = React.useState({});
+  const [addLeadDay, setAddLeadDay] = React.useState(null);
+  const [addLeadForm, setAddLeadForm] = React.useState({ name: "", phone: "", source: "", stage: "новая заявка" });
+  const [addLeadSaving, setAddLeadSaving] = React.useState(false);
 
   React.useEffect(() => { loadData(); }, [month, year]);
 
@@ -111,6 +114,27 @@ export default function Analytics() {
       setEditPlan(p => { const next = {...p}; delete next[manager]; return next; });
       loadData();
     } catch (e) { alert(e.message); }
+  }
+
+  async function handleAddLead(dateStr) {
+    if (!addLeadForm.name.trim()) return;
+    setAddLeadSaving(true);
+    try {
+      await apiFetch("clients", {
+        method: "POST",
+        body: JSON.stringify({
+          name:      addLeadForm.name.trim(),
+          phone:     addLeadForm.phone.trim() || null,
+          source:    addLeadForm.source.trim() || null,
+          stage:     addLeadForm.stage,
+          lead_date: dateStr,
+        }),
+      });
+      setAddLeadDay(null);
+      setAddLeadForm({ name: "", phone: "", source: "", stage: "новая заявка" });
+      loadData();
+    } catch (e) { alert(e.message); }
+    setAddLeadSaving(false);
   }
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -204,10 +228,13 @@ export default function Analytics() {
                 {["Дата","Новые заявки","Корявые лиды","Нормальные лиды","Записано на ВУ","Пришло на ВУ"].map(h =>
                   <th key={h} style={TH}>{h}</th>
                 )}
+                {role === "admin" && <th style={{...TH, width: 32, padding: "6px 4px"}} />}
               </tr>
             </thead>
             <tbody>
               {dailyRows.flatMap(r => {
+                const isOpen = addLeadDay === r.ds;
+                const inp = { padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12, fontFamily: "inherit" };
                 const row = (
                   <tr key={r.d}>
                     <td style={TD}>{String(r.d).padStart(2,"0")}.{String(month).padStart(2,"0")}</td>
@@ -216,13 +243,47 @@ export default function Analytics() {
                     <td style={{...TD, textAlign:"center"}}>{r.normalLeads || ""}</td>
                     <td style={{...TD, textAlign:"center"}}>{r.recorded || ""}</td>
                     <td style={{...TD, textAlign:"center", color: r.attended ? "#2a9" : ""}}>{r.attended || ""}</td>
+                    {role === "admin" && (
+                      <td style={{...TD, padding: "3px 4px", textAlign: "center"}}>
+                        <button onClick={() => { setAddLeadDay(isOpen ? null : r.ds); setAddLeadForm({ name: "", phone: "", source: "", stage: "новая заявка" }); }}
+                          style={{ fontSize: 13, lineHeight: 1, width: 22, height: 22, borderRadius: 4, border: "1px solid #acd", background: isOpen ? "#4a90e2" : "#f0f6ff", color: isOpen ? "white" : "#4a90e2", cursor: "pointer", padding: 0 }}>
+                          {isOpen ? "×" : "+"}
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
+                const formRow = isOpen ? (
+                  <tr key={`form-${r.d}`} style={{ background: "#f8fbff" }}>
+                    <td colSpan={7} style={{ padding: "8px 10px", borderBottom: "1px solid #dde" }}>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                        <input placeholder="Имя *" value={addLeadForm.name}
+                          onChange={e => setAddLeadForm(f => ({...f, name: e.target.value}))}
+                          style={{...inp, width: 130}} />
+                        <input placeholder="Телефон" value={addLeadForm.phone}
+                          onChange={e => setAddLeadForm(f => ({...f, phone: e.target.value}))}
+                          style={{...inp, width: 120}} />
+                        <input placeholder="Источник" value={addLeadForm.source}
+                          onChange={e => setAddLeadForm(f => ({...f, source: e.target.value}))}
+                          style={{...inp, width: 110}} />
+                        <select value={addLeadForm.stage} onChange={e => setAddLeadForm(f => ({...f, stage: e.target.value}))} style={{...inp}}>
+                          <option value="новая заявка">новая заявка</option>
+                          <option value="корявый лид">корявый лид</option>
+                        </select>
+                        <button onClick={() => handleAddLead(r.ds)} disabled={addLeadSaving || !addLeadForm.name.trim()}
+                          style={{ padding: "3px 12px", borderRadius: 4, border: "none", background: "#4a90e2", color: "white", fontSize: 12, cursor: "pointer", opacity: !addLeadForm.name.trim() ? 0.5 : 1 }}>
+                          {addLeadSaving ? "..." : "Добавить"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null;
                 const week = WEEKS.find(w => r.d === Math.min(w.to, daysInMonth) && r.d >= w.from);
-                if (!week) return [row];
+                if (!week) return [row, formRow].filter(Boolean);
                 const ws = sumRows(dailyRows.filter(x => x.d >= week.from && x.d <= r.d));
                 return [
                   row,
+                  formRow,
                   <tr key={week.label} style={{ background: "#eef2ff" }}>
                     <td style={TDt}>{week.label}</td>
                     <td style={{...TDt, textAlign:"center"}}>{ws.newLeads}</td>
@@ -230,13 +291,15 @@ export default function Analytics() {
                     <td style={{...TDt, textAlign:"center"}}>{ws.normalLeads}</td>
                     <td style={{...TDt, textAlign:"center"}}>{ws.recorded}</td>
                     <td style={{...TDt, textAlign:"center"}}>{ws.attended}</td>
+                    {role === "admin" && <td style={{...TDt, padding: "6px 4px"}} />}
                   </tr>
-                ];
+                ].filter(Boolean);
               })}
               <tr style={{ background: "#dde8ff" }}>
                 {["ИТОГО", monthSum.newLeads, monthSum.badLeads, monthSum.normalLeads, monthSum.recorded, monthSum.attended].map((v, i) =>
                   <td key={i} style={{...TDt, background:"#dde8ff", textAlign: i ? "center" : "left"}}>{v}</td>
                 )}
+                {role === "admin" && <td style={{...TDt, background:"#dde8ff", padding: "6px 4px"}} />}
               </tr>
             </tbody>
           </table>
