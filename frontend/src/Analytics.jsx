@@ -7,6 +7,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const MANAGERS = ["Салампи", "Татьяна"];
+const STAGES = ["новая заявка","записан на пробное","на следующий месяц","был не купил","не пришел","дожимать","продажа","ученик","бронь","тест-драйв","пробный месяц","рассылка","на МК или ОД","корявый лид","расторжение"];
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKS = [
   { label: "ИТОГИ 1", from: 1,  to: 7  },
@@ -81,6 +82,9 @@ export default function Analytics() {
   const [addLeadSaving, setAddLeadSaving] = React.useState(false);
   const [addLeadSearch, setAddLeadSearch] = React.useState("");
   const [addLeadResults, setAddLeadResults] = React.useState([]);
+  const [leadsModal, setLeadsModal] = React.useState(null);
+  const [leadsEditRow, setLeadsEditRow] = React.useState(null);
+  const [leadsEditForm, setLeadsEditForm] = React.useState({ name: "", phone: "", source: "", stage: "" });
 
   React.useEffect(() => {
     if (addLeadSearch.length < 2) { setAddLeadResults([]); return; }
@@ -148,6 +152,30 @@ export default function Analytics() {
       loadData();
     } catch (e) { alert(e.message); }
     setAddLeadSaving(false);
+  }
+
+  async function handleLeadsDelete(clientId, name) {
+    if (!window.confirm(`Удалить клиента ${name}?`)) return;
+    try {
+      await apiFetch(`clients?id=eq.${clientId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      loadData();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleLeadsSave(clientId) {
+    try {
+      await apiFetch(`clients?id=eq.${clientId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name:   leadsEditForm.name.trim() || undefined,
+          phone:  leadsEditForm.phone.trim() || null,
+          source: leadsEditForm.source.trim() || null,
+          stage:  leadsEditForm.stage,
+        }),
+      });
+      setLeadsEditRow(null);
+      loadData();
+    } catch (e) { alert(e.message); }
   }
 
   async function handleLinkClient(clientId, dateStr) {
@@ -261,7 +289,9 @@ export default function Analytics() {
                 const row = (
                   <tr key={r.d}>
                     <td style={TD}>{String(r.d).padStart(2,"0")}.{String(month).padStart(2,"0")}</td>
-                    <td style={{...TD, textAlign:"center"}}>{r.newLeads || ""}</td>
+                    <td style={{...TD, textAlign:"center"}}>
+                      {r.newLeads ? <span onClick={() => { setLeadsModal({ dateStr: r.ds }); setLeadsEditRow(null); }} style={{ color: "#4a90e2", textDecoration: "underline", cursor: "pointer" }}>{r.newLeads}</span> : ""}
+                    </td>
                     <td style={{...TD, textAlign:"center", color: r.badLeads ? "#e55" : ""}}>{r.badLeads || ""}</td>
                     <td style={{...TD, textAlign:"center"}}>{r.normalLeads || ""}</td>
                     <td style={{...TD, textAlign:"center"}}>{r.recorded || ""}</td>
@@ -513,6 +543,77 @@ export default function Analytics() {
           onDelete={() => setClientModal(null)}
         />
       )}
+
+      {leadsModal && (() => {
+        const dayClients = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === leadsModal.dateStr);
+        const ds = leadsModal.dateStr;
+        const displayDate = `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
+        const inp = { width: "100%", padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12, boxSizing: "border-box" };
+        return (
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "white", borderRadius: 12, width: "90%", maxWidth: 820, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
+                <strong style={{ fontSize: 15 }}>Заявки за {displayDate}</strong>
+                <button onClick={() => { setLeadsModal(null); setLeadsEditRow(null); }} style={{ fontSize: 22, background: "none", border: "none", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
+              </div>
+              <div style={{ overflowY: "auto", flex: 1 }}>
+                <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+                  <thead>
+                    <tr>{["Имя","Телефон","Источник","Стадия","Действия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {dayClients.length === 0 && (
+                      <tr><td colSpan={5} style={{ padding: "20px", textAlign: "center", color: "#aaa" }}>Нет заявок за этот день</td></tr>
+                    )}
+                    {dayClients.map(c => {
+                      const isEditing = leadsEditRow === c.id;
+                      if (isEditing) {
+                        return (
+                          <tr key={c.id} style={{ background: "#f8fbff" }}>
+                            <td style={TD}><input value={leadsEditForm.name}   onChange={e => setLeadsEditForm(f => ({...f, name:   e.target.value}))} style={inp} /></td>
+                            <td style={TD}><input value={leadsEditForm.phone}  onChange={e => setLeadsEditForm(f => ({...f, phone:  e.target.value}))} style={inp} /></td>
+                            <td style={TD}><input value={leadsEditForm.source} onChange={e => setLeadsEditForm(f => ({...f, source: e.target.value}))} style={inp} /></td>
+                            <td style={TD}>
+                              <select value={leadsEditForm.stage} onChange={e => setLeadsEditForm(f => ({...f, stage: e.target.value}))}
+                                style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12, width: "100%" }}>
+                                {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </td>
+                            <td style={TD}>
+                              <div style={{ display: "flex", gap: 4 }}>
+                                <button onClick={() => handleLeadsSave(c.id)} style={{ padding: "3px 10px", borderRadius: 4, border: "none", background: "#4a90e2", color: "white", fontSize: 12, cursor: "pointer" }}>Сохранить</button>
+                                <button onClick={() => setLeadsEditRow(null)} style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "white", fontSize: 12, cursor: "pointer" }}>Отмена</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return (
+                        <tr key={c.id} style={{ borderBottom: "1px solid #f0f0f0" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#fafcff"}
+                          onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                          <td style={TD}>{c.name}</td>
+                          <td style={TD}>{c.phone || "—"}</td>
+                          <td style={TD}>{c.source || "—"}</td>
+                          <td style={TD}>{c.stage}</td>
+                          <td style={TD}>
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button onClick={() => { setLeadsEditRow(c.id); setLeadsEditForm({ name: c.name || "", phone: c.phone || "", source: c.source || "", stage: c.stage || "новая заявка" }); }}
+                                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "white", fontSize: 12, cursor: "pointer" }}>Редактировать</button>
+                              <button onClick={() => handleLeadsDelete(c.id, c.name)}
+                                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 12, cursor: "pointer" }}>Удалить</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
