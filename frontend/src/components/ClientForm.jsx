@@ -1,4 +1,26 @@
 import React from "react";
+import { supabase } from '../supabase'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`
+    const raw = localStorage.getItem(key)
+    if (raw) { const parsed = JSON.parse(raw); if (parsed?.access_token) return parsed.access_token }
+  } catch {}
+  const { data } = await supabase.auth.getSession()
+  return data.session?.access_token
+}
+
+async function apiFetch(path) {
+  const token = await getToken()
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+  })
+  return res.ok ? res.json() : []
+}
 
 const STAGES = [
   'новая заявка','записан на пробное','на следующий месяц','был не купил',
@@ -41,7 +63,7 @@ function addDays(date, days) {
   return d.toISOString().split('T')[0]
 }
 
-export default function ClientForm({ mode, initialValue, disabled, onSubmit, submitLabel }) {
+export default function ClientForm({ mode, initialValue, disabled, onSubmit, submitLabel, onOpenClient }) {
   const [form, setForm] = React.useState({
     name: initialValue?.name || "",
     phone: initialValue?.phone || "",
@@ -57,6 +79,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     is_unlimited: initialValue?.is_unlimited || false,
   })
   const [phoneError, setPhoneError] = React.useState("")
+  const [dupWarning, setDupWarning] = React.useState(null)
 
   React.useEffect(() => {
     setForm({
@@ -124,6 +147,20 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     else setPhoneError("")
   }
 
+  async function handlePhoneBlur() {
+    if (!onOpenClient) return
+    const phone = form.phone.trim()
+    if (!phone || isLink(phone)) return
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length < 10) return
+    const last10 = digits.slice(-10)
+    try {
+      const results = await apiFetch(`clients?phone=ilike.*${last10}*&select=id,name,phone,stage&limit=3`)
+      const filtered = results.filter(c => !initialValue?.id || c.id !== initialValue.id)
+      setDupWarning(filtered.length > 0 ? filtered : null)
+    } catch {}
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
     const phone = form.phone.trim()
@@ -162,8 +199,20 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Контакт</div>
-          <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
+          <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} onBlur={handlePhoneBlur} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
           {phoneError && <div style={{ color: '#e55', fontSize: 11, marginTop: 3 }}>{phoneError}</div>}
+          {dupWarning && (
+            <div style={{ marginTop: 6, padding: '8px 10px', background: '#fff8e1', border: '1px solid #f5c518', borderRadius: 6, fontSize: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>⚠️ Клиент с таким номером уже существует:</div>
+              {dupWarning.map(c => (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ flex: 1 }}>{c.name} — {c.stage}</span>
+                  <button type="button" onClick={() => onOpenClient(c.id)} style={{ padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #4a90e2', background: 'white', color: '#4a90e2', cursor: 'pointer' }}>Открыть карточку</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setDupWarning(null)} style={{ marginTop: 2, padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #aaa', background: 'white', color: '#555', cursor: 'pointer' }}>Создать всё равно</button>
+            </div>
+          )}
         </div>
       </div>
       <div style={{ height: 8 }} />

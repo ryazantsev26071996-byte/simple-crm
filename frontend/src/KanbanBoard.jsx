@@ -24,12 +24,13 @@ function matchesSearch(client, query) {
   return false
 }
 
-function ClientFormInline({ onSubmit }) {
+function ClientFormInline({ onSubmit, onOpenClient }) {
   const [error, setError] = React.useState('');
   return (
     <div>
       {error && <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{error}</div>}
       <ClientForm mode="Новый клиент" disabled={false} submitLabel="Добавить"
+        onOpenClient={onOpenClient}
         onSubmit={async (payload) => {
           try { setError(''); await onSubmit(payload); }
           catch(err) { setError(err.message); }
@@ -120,10 +121,13 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
               <strong style={{ fontSize: 16 }}>Новый клиент</strong>
               <button onClick={() => setShowAddModal(false)} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
             </div>
-            <ClientFormInline onSubmit={async (payload) => {
-              if (onClientCreated) await onClientCreated(payload);
-              setShowAddModal(false);
-            }} />
+            <ClientFormInline
+              onOpenClient={(id) => { setShowAddModal(false); onClientSelect(id); }}
+              onSubmit={async (payload) => {
+                if (onClientCreated) await onClientCreated(payload);
+                setShowAddModal(false);
+              }}
+            />
           </div>
         </div>
       )}
