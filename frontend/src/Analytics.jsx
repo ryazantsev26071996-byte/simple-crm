@@ -285,9 +285,9 @@ export default function Analytics() {
   const distinctSlots     = new Set(lessons.map(l => `${l.date}_${l.time}`)).size;
   const avgStudentsPerSlot = distinctSlots ? (lessons.length / distinctSlots).toFixed(1) : "—";
 
-  const TH  = { padding: "6px 10px", background: "#f0f4ff", border: "1px solid #dde", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" };
-  const TD  = { padding: "5px 10px", border: "1px solid #eee", fontSize: 12 };
-  const TDt = { padding: "6px 10px", border: "1px solid #dde", fontSize: 12, fontWeight: 600, background: "#eef2ff" };
+  const TH  = { padding: "4px 8px", background: "#f0f4ff", border: "1px solid #dde", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" };
+  const TD  = { padding: "3px 8px", border: "1px solid #eee", fontSize: 11 };
+  const TDt = { padding: "4px 8px", border: "1px solid #dde", fontSize: 11, fontWeight: 600, background: "#eef2ff" };
 
   function StatCard({ label, value, onValueClick }) {
     return (
@@ -321,14 +321,14 @@ export default function Analytics() {
       {/* ── Daily breakdown ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Ежедневная сводка</div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse" }}>
+        <div style={{ width: "fit-content" }}>
+          <table style={{ borderCollapse: "collapse", width: "auto" }}>
             <thead>
               <tr>
-                {["Дата","Новые заявки","Корявые лиды","Нормальные лиды","Записано на ВУ","Пришло на ВУ"].map(h =>
-                  <th key={h} style={TH}>{h}</th>
+                {[["Дата",70],["Новые заявки",90],["Корявые лиды",90],["Нормальные лиды",100],["Записано на ВУ",100],["Пришло на ВУ",90]].map(([h, w]) =>
+                  <th key={h} style={{...TH, width: w}}>{h}</th>
                 )}
-                {role === "admin" && <th style={{...TH, width: 32, padding: "6px 4px"}} />}
+                {role === "admin" && <th style={{...TH, width: 40, padding: "4px 2px"}} />}
               </tr>
             </thead>
             <tbody>
@@ -417,7 +417,7 @@ export default function Analytics() {
                     <td style={{...TDt, textAlign:"center"}}>{ws.normalLeads}</td>
                     <td style={{...TDt, textAlign:"center"}}>{ws.recorded}</td>
                     <td style={{...TDt, textAlign:"center"}}>{ws.attended}</td>
-                    {role === "admin" && <td style={{...TDt, padding: "6px 4px"}} />}
+                    {role === "admin" && <td style={{...TDt, padding: "4px 2px"}} />}
                   </tr>
                 ].filter(Boolean);
               })}
