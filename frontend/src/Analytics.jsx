@@ -497,7 +497,7 @@ export default function Analytics() {
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
                     <thead>
-                      <tr>{["Клиент","Сумма","Оплата","Стадия","Бонус"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+                      <tr>{["Клиент","Сумма","Оплата","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {s.sales.map(c => (
@@ -508,7 +508,6 @@ export default function Analytics() {
                           <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
                           <td style={TD}>{c.payment_method || "—"}</td>
                           <td style={TD}>{c.stage}</td>
-                          <td style={{...TD, color: "#e67e22"}}>{Math.round(calcBonus(c)).toLocaleString("ru-RU")} ₽</td>
                         </tr>
                       ))}
                     </tbody>
