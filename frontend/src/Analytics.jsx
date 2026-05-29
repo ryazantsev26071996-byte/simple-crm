@@ -46,15 +46,6 @@ function pct(num, den) {
   return (num / den * 100).toFixed(1) + "%";
 }
 
-function calcBonus(c) {
-  const a = c.amount_paid || 0;
-  const pm = (c.payment_method || "").toLowerCase();
-  if (pm === "рассрочка") return a * 0.01;
-  if (pm === "наличные" || pm === "карта") return a * 0.02;
-  if (c.manager_name) return a * 0.005;
-  return 0;
-}
-
 function sumRows(rows) {
   return rows.reduce(
     (acc, r) => ({ newLeads: acc.newLeads + r.newLeads, badLeads: acc.badLeads + r.badLeads, normalLeads: acc.normalLeads + r.normalLeads, recorded: acc.recorded + r.recorded, attended: acc.attended + r.attended }),
@@ -286,7 +277,6 @@ export default function Analytics() {
       remaining:  plan - revenue,
       conversion: pct(mSales.length, mAtt.length),
       avgCheck:   mSales.length ? Math.round(revenue / mSales.length) : 0,
-      bonus:      mSales.reduce((s, c) => s + calcBonus(c), 0),
     };
   }
 
@@ -294,7 +284,8 @@ export default function Analytics() {
   const arinaAttended  = arinaTrials.filter(t => t.attended === true);
   const arinaRenewals  = clients.filter(c => c.manager_name === "Арина" && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
   const arinaRevenue   = arinaRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
-  const arinaBonus     = arinaRenewals.reduce((s, c) => s + calcBonus(c), 0);
+  const registrationClients = clients.filter(c => ["ученик","продажа"].includes(c.stage) && (c.registered_by === "Арина" || c.registered_by === "Вероника"));
+  const registrationSum = registrationClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
 
   const totalSales   = salesClients.length;
   const totalRevenue = salesClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
@@ -502,7 +493,7 @@ export default function Analytics() {
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
                     <thead>
-                      <tr>{["Клиент","Сумма","Оплата","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+                      <tr>{["Клиент","Сумма","Оплата","Кто оформил","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {s.sales.map(c => (
@@ -512,6 +503,7 @@ export default function Analytics() {
                           <td style={TD}>{c.name}</td>
                           <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
                           <td style={TD}>{c.payment_method || "—"}</td>
+                          <td style={TD}>{c.registered_by || "—"}</td>
                           <td style={TD}>{c.stage}</td>
                         </tr>
                       ))}
@@ -537,16 +529,16 @@ export default function Analytics() {
           </div>
           <StatCard label="CV записи → приход"    value={pct(arinaAttended.length, arinaTrials.length)} />
           <StatCard label="CV приход → продление" value={pct(arinaRenewals.length, arinaAttended.length)} />
-          <div style={{ background: "#fffbf0", borderRadius: 8, padding: "10px 14px", border: "1px solid #ffe0a0", minWidth: 150 }}>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Бонус</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#e67e22" }}>{Math.round(arinaBonus).toLocaleString("ru-RU")} ₽</div>
+          <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма оформлений (Арина + Вероника)</div>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{registrationSum.toLocaleString("ru-RU")} ₽</div>
           </div>
         </div>
         {arinaRenewals.length > 0 && (
           <div style={{ overflowX: "auto" }}>
             <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
               <thead>
-                <tr>{["Клиент","Сумма","Оплата","Стадия","Бонус"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+                <tr>{["Клиент","Сумма","Оплата","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {arinaRenewals.map(c => (
@@ -557,7 +549,6 @@ export default function Analytics() {
                     <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
                     <td style={TD}>{c.payment_method || "—"}</td>
                     <td style={TD}>{c.stage}</td>
-                    <td style={{...TD, color: "#e67e22"}}>{Math.round(calcBonus(c)).toLocaleString("ru-RU")} ₽</td>
                   </tr>
                 ))}
               </tbody>

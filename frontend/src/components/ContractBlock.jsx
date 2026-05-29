@@ -33,6 +33,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
     contract_amount: client?.contract_amount || "",
     installment_term: client?.installment_term || "",
     amount_paid: client?.amount_paid || "",
+    registered_by: client?.registered_by || "",
     bank_application_number: client?.bank_application_number || "",
     bank_contract_number: client?.bank_contract_number || "",
     requisites: client?.requisites || "",
@@ -51,6 +52,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
       contract_amount: client?.contract_amount || "",
       installment_term: client?.installment_term || "",
       amount_paid: client?.amount_paid || "",
+      registered_by: client?.registered_by || "",
       bank_application_number: client?.bank_application_number || "",
       bank_contract_number: client?.bank_contract_number || "",
       requisites: client?.requisites || "",
@@ -80,6 +82,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
           contract_amount: form.contract_amount ? Number(form.contract_amount) : null,
           installment_term: form.installment_term ? Number(form.installment_term) : null,
           amount_paid: form.amount_paid ? Number(form.amount_paid) : null,
+          registered_by: form.registered_by || null,
           bank_application_number: form.bank_application_number || null,
           bank_contract_number: form.bank_contract_number || null,
           requisites: form.requisites || null,
@@ -159,6 +162,18 @@ export default function ContractBlock({ client, onUpdate, role }) {
           <input style={inputStyle} value={form.manager_name} readOnly={!editing}
             onChange={e => setForm(f => ({ ...f, manager_name: e.target.value }))}
             placeholder={editing ? "ФИО менеджера" : "Не заполнено"} />
+        </div>
+        <div>
+          <div style={labelStyle}>Кто оформил</div>
+          {editing ? (
+            <select style={inputStyle} value={form.registered_by}
+              onChange={e => setForm(f => ({ ...f, registered_by: e.target.value }))}>
+              <option value="">— выбрать —</option>
+              {["Арина","Вероника","Салампи","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          ) : (
+            <input style={inputStyle} value={form.registered_by} readOnly placeholder="Не заполнено" />
+          )}
         </div>
         <div>
           <div style={labelStyle}>Способ оплаты</div>
