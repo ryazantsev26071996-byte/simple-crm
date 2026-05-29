@@ -318,8 +318,11 @@ export default function Analytics() {
         {loading && <span style={{ fontSize: 12, color: "#888" }}>Загрузка...</span>}
       </div>
 
+      {/* ── Daily + Managers side by side ── */}
+      <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 28 }}>
+      <div style={{ flexShrink: 0 }}>
       {/* ── Daily breakdown ── */}
-      <div style={{ marginBottom: 28 }}>
+      <div style={{ marginBottom: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Ежедневная сводка</div>
         <div style={{ width: "fit-content" }}>
           <table style={{ borderCollapse: "collapse", width: "auto" }}>
@@ -432,6 +435,8 @@ export default function Analytics() {
         </div>
       </div>
 
+      </div> {/* end flexShrink daily */}
+      <div style={{ flex: 1, minWidth: 0 }}>
       {/* ── Managers ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Менеджеры</div>
@@ -543,6 +548,8 @@ export default function Analytics() {
           </div>
         )}
       </div>
+      </div> {/* end flex right column */}
+      </div> {/* end flex container */}
 
       {/* ── Bottom stats ── */}
       <div style={{ marginBottom: 16 }}>
