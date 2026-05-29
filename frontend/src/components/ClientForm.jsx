@@ -23,6 +23,12 @@ const SUBSCRIPTIONS = [
   { name: 'Покоряй старый', lessons: 0, freeze: 90, months: 12, unlimited: true },
 ]
 
+function toDatetimeLocal(v) {
+  if (!v) return "";
+  if (v.includes("T")) return v.slice(0, 16);
+  return v + "T00:00";
+}
+
 function addMonths(date, months) {
   const d = new Date(date)
   d.setMonth(d.getMonth() + months)
@@ -40,7 +46,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     name: initialValue?.name || "",
     phone: initialValue?.phone || "",
     source: initialValue?.source || "",
-    lead_date: initialValue?.lead_date || "",
+    lead_date: toDatetimeLocal(initialValue?.lead_date),
     stage: initialValue?.stage || "",
     subscription_type: initialValue?.subscription_type || "",
     lessons_total: initialValue?.lessons_total || 0,
@@ -57,7 +63,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       name: initialValue?.name || "",
       phone: initialValue?.phone || "",
       source: initialValue?.source || "",
-      lead_date: initialValue?.lead_date || "",
+      lead_date: toDatetimeLocal(initialValue?.lead_date),
       stage: initialValue?.stage || "",
       subscription_type: initialValue?.subscription_type || "",
       lessons_total: initialValue?.lessons_total || 0,
