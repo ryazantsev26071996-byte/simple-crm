@@ -79,6 +79,19 @@ export default function Analytics() {
   const [addLeadDay, setAddLeadDay] = React.useState(null);
   const [addLeadForm, setAddLeadForm] = React.useState({ name: "", phone: "", source: "", stage: "новая заявка" });
   const [addLeadSaving, setAddLeadSaving] = React.useState(false);
+  const [addLeadSearch, setAddLeadSearch] = React.useState("");
+  const [addLeadResults, setAddLeadResults] = React.useState([]);
+
+  React.useEffect(() => {
+    if (addLeadSearch.length < 2) { setAddLeadResults([]); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const results = await apiFetch(`clients?or=(name.ilike.*${addLeadSearch}*,phone.ilike.*${addLeadSearch}*)&select=id,name,phone,stage,lead_date&limit=5`);
+        setAddLeadResults(Array.isArray(results) ? results : []);
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [addLeadSearch]);
 
   React.useEffect(() => { loadData(); }, [month, year]);
 
@@ -89,7 +102,7 @@ export default function Analytics() {
       const start = dateFmt(year, month, 1);
       const end   = dateFmt(year, month, daysInMonth);
       const [cl, tr, le, pl] = await Promise.all([
-        apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
+        apiFetch(`clients?lead_date=gte.${start}T00:00:00&lead_date=lte.${end}T23:59:59&select=*&order=lead_date.asc`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
@@ -135,6 +148,16 @@ export default function Analytics() {
       loadData();
     } catch (e) { alert(e.message); }
     setAddLeadSaving(false);
+  }
+
+  async function handleLinkClient(clientId, dateStr) {
+    try {
+      await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ lead_date: dateStr }) });
+      setAddLeadDay(null);
+      setAddLeadSearch("");
+      setAddLeadResults([]);
+      loadData();
+    } catch (e) { alert(e.message); }
   }
 
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -245,7 +268,7 @@ export default function Analytics() {
                     <td style={{...TD, textAlign:"center", color: r.attended ? "#2a9" : ""}}>{r.attended || ""}</td>
                     {role === "admin" && (
                       <td style={{...TD, padding: "3px 4px", textAlign: "center"}}>
-                        <button onClick={() => { setAddLeadDay(isOpen ? null : r.ds); setAddLeadForm({ name: "", phone: "", source: "", stage: "новая заявка" }); }}
+                        <button onClick={() => { setAddLeadDay(isOpen ? null : r.ds); setAddLeadForm({ name: "", phone: "", source: "", stage: "новая заявка" }); setAddLeadSearch(""); setAddLeadResults([]); }}
                           style={{ fontSize: 13, lineHeight: 1, width: 22, height: 22, borderRadius: 4, border: "1px solid #acd", background: isOpen ? "#4a90e2" : "#f0f6ff", color: isOpen ? "white" : "#4a90e2", cursor: "pointer", padding: 0 }}>
                           {isOpen ? "×" : "+"}
                         </button>
@@ -256,6 +279,30 @@ export default function Analytics() {
                 const formRow = isOpen ? (
                   <tr key={`form-${r.d}`} style={{ background: "#f8fbff" }}>
                     <td colSpan={7} style={{ padding: "8px 10px", borderBottom: "1px solid #dde" }}>
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>Найти в CRM</div>
+                        <div style={{ position: "relative", display: "inline-block" }}>
+                          <input placeholder="Имя или телефон..." value={addLeadSearch}
+                            onChange={e => setAddLeadSearch(e.target.value)}
+                            style={{...inp, width: 220}} />
+                          {addLeadResults.length > 0 && (
+                            <div style={{ position: "absolute", top: "100%", left: 0, background: "white", border: "1px solid #ddd", borderRadius: 6, zIndex: 100, boxShadow: "0 4px 12px rgba(0,0,0,0.12)", minWidth: 320 }}>
+                              {addLeadResults.map(c => (
+                                <div key={c.id} onMouseDown={() => handleLinkClient(c.id, r.ds)}
+                                  style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, borderBottom: "1px solid #f0f0f0" }}
+                                  onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
+                                  onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                                  <strong>{c.name}</strong>
+                                  <span style={{ color: "#888", marginLeft: 8 }}>{c.phone || "—"}</span>
+                                  <span style={{ color: "#aaa", marginLeft: 8, fontSize: 11 }}>{c.stage}</span>
+                                  {c.lead_date && <span style={{ color: "#bbb", marginLeft: 8, fontSize: 11 }}>{c.lead_date.slice(0,10)}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>или добавить нового</div>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                         <input placeholder="Имя *" value={addLeadForm.name}
                           onChange={e => setAddLeadForm(f => ({...f, name: e.target.value}))}
