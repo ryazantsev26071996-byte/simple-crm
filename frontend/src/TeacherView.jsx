@@ -23,7 +23,23 @@ function calcEndDate(start, type) {
 }
 
 function effectiveEnd(c) {
-  return c.subscription_end_with_freeze || c.subscription_end || calcEndDate(c.subscription_start, c.subscription_type)
+  if (c.subscription_end_with_freeze) return c.subscription_end_with_freeze;
+  if (c.subscription_end) {
+    if (c.freeze_days_used > 0) {
+      const d = new Date(c.subscription_end);
+      d.setDate(d.getDate() + (c.freeze_days_used || 0));
+      return d.toISOString().slice(0, 10);
+    }
+    return c.subscription_end;
+  }
+  const base = calcEndDate(c.subscription_start, c.subscription_type);
+  if (!base) return null;
+  if (c.freeze_days_used > 0) {
+    const d = new Date(base);
+    d.setDate(d.getDate() + (c.freeze_days_used || 0));
+    return d.toISOString().slice(0, 10);
+  }
+  return base;
 }
 
 function daysLeft(endDate) {
