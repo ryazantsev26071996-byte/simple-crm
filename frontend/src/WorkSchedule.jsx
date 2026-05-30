@@ -137,8 +137,8 @@ export default function WorkSchedule() {
 
   // Calendar grid
   const daysInMonth = new Date(year, month, 0).getDate();
-  const firstDow    = new Date(year, month - 1, 1).getDay();
-  const startOffset = firstDow === 0 ? 6 : firstDow - 1;
+  const firstDay    = new Date(year, month - 1, 1).getDay();
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
   const totalCells  = Math.ceil((startOffset + daysInMonth) / 7) * 7;
   const cells       = Array.from({ length: totalCells }, (_, i) => {
     const day = i - startOffset + 1;
