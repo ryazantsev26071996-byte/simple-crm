@@ -9,6 +9,13 @@ const EMPLOYEES = {
   "Педагоги":  ["Юлия", "Екатерина", "Александра", "Софья", "Анастасия", "Дарья"],
 };
 
+const EMPLOYEE_ROLE = {
+  "Арина": "Аккаунты", "Вероника": "Аккаунты",
+  "Татьяна": "Менеджеры", "Салампи": "Менеджеры",
+  "Юлия": "Педагоги", "Екатерина": "Педагоги", "Александра": "Педагоги",
+  "Софья": "Педагоги", "Анастасия": "Педагоги", "Дарья": "Педагоги",
+};
+
 const ROLE_COLOR = {
   "Аккаунты":  "#4a90e2",
   "Менеджеры": "#e67e22",
@@ -116,7 +123,7 @@ export default function WorkSchedule() {
               method: "POST",
               headers: { Prefer: "resolution=merge-duplicates,return=representation" },
               body: JSON.stringify({
-                date: dateStr, employee_name: emp,
+                date: dateStr, employee_name: emp, employee_role: EMPLOYEE_ROLE[emp],
                 start_time: f.start || null, end_time: f.end || null,
                 hours: hours || null,
               }),
