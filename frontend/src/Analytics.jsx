@@ -262,15 +262,14 @@ export default function Analytics() {
         ["продажа","ученик"].includes(c.stage) &&
         d && d.slice(0,7) === yearMonth;
     });
-    const mLessons = lessons.filter(l => l.recorded_by === manager);
     const mTrials  = trials.filter(t => t.manager === manager && !t.rescheduled);
     const mAtt     = mTrials.filter(t => t.attended === true);
     const revenue  = mSales.reduce((s, c) => s + (c.amount_paid || 0), 0);
     const plan     = plans.find(p => p.manager_name === manager)?.plan || 0;
     return {
       sales:         mSales,
-      lessonsCount:  mLessons.length,
-      studentsCount: new Set(mLessons.filter(l => l.client_id).map(l => l.client_id)).size,
+      lessonsCount:  mAtt.length,
+      studentsCount: mAtt.length,
       salesCount:    mSales.length,
       revenue,
       plan,
@@ -457,8 +456,8 @@ export default function Analytics() {
             <div key={manager} style={{ marginBottom: 24, borderBottom: "1px solid #f0f0f0", paddingBottom: 20 }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: "#4a90e2", marginBottom: 10 }}>{manager}</div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-                <StatCard label="Уроков"   value={s.lessonsCount} />
-                <StatCard label="Учеников" value={s.studentsCount} />
+                <StatCard label="Провёл ВУ"   value={s.lessonsCount} />
+                <StatCard label="Пришло на ВУ" value={s.studentsCount} />
                 <StatCard label="Продаж"   value={s.salesCount} />
                 <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка</div>
