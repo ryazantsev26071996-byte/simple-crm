@@ -51,6 +51,7 @@ export function TeacherView({ clients, onClientSelect }) {
   const [search, setSearch] = React.useState('')
   const [sortField, setSortField] = React.useState('name')
   const [sortDir, setSortDir] = React.useState('asc')
+  const [showLost, setShowLost] = React.useState(false)
 
   const filtered = clients
     .filter(c => TEACHER_STAGES.includes(c.stage) && c.subscription_type)
@@ -96,83 +97,149 @@ export function TeacherView({ clients, onClientSelect }) {
     )
   }
 
+  const lostStudents = React.useMemo(() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    return clients
+      .filter(c => c.stage === 'ученик')
+      .filter(c => {
+        if (!c.last_visit) return true;
+        const diff = Math.floor((today - new Date(c.last_visit)) / (1000*60*60*24));
+        return diff > 7;
+      })
+      .map(c => {
+        const days = c.last_visit ? Math.floor((today - new Date(c.last_visit)) / (1000*60*60*24)) : null;
+        return { ...c, _daysSince: days };
+      })
+      .sort((a, b) => {
+        if (a._daysSince === null && b._daysSince === null) return 0;
+        if (a._daysSince === null) return -1;
+        if (b._daysSince === null) return 1;
+        return b._daysSince - a._daysSince;
+      });
+  }, [clients]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', flexShrink: 0 }}>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск по имени или номеру..."
-          style={{ width: '100%', padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
-        />
-        <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-          Учеников на абонементах: <strong>{filtered.length}</strong>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Поиск по имени или номеру..."
+            style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
+          />
+          <button
+            onClick={() => setShowLost(v => !v)}
+            style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', background: showLost ? '#e55' : 'white', color: showLost ? 'white' : '#e55', fontWeight: 500 }}
+          >
+            Потеряшки {lostStudents.length > 0 && <span style={{ background: showLost ? 'rgba(255,255,255,0.3)' : '#ffe0e0', color: showLost ? 'white' : '#e55', borderRadius: 20, padding: '1px 6px', fontSize: 11, marginLeft: 4 }}>{lostStudents.length}</span>}
+          </button>
+        </div>
+        <div style={{ fontSize: 12, color: '#888' }}>
+          {showLost
+            ? <>Ученики без занятий более 7 дней: <strong style={{ color: '#e55' }}>{lostStudents.length}</strong></>
+            : <>Учеников на абонементах: <strong>{filtered.length}</strong></>
+          }
         </div>
       </div>
 
-      <div style={{ overflowY: 'auto', flex: 1 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-          <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-            <tr style={{ borderBottom: '1px solid #eee' }}>
-              <SortTh field="name" label="Имя" />
-              <SortTh field="subscription_type" label="Абонемент" />
-              <SortTh field="lessons_left" label="Занятий осталось" />
-              <SortTh field="days_left" label="До окончания" />
-              <SortTh field="last_visit" label="Последнее занятие" />
-              <SortTh field="stage" label="Стадия" />
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(c => {
-              const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0))
-              const endDate = effectiveEnd(c)
-              const days = daysLeft(endDate)
-              const isCalc = !c.subscription_end_with_freeze && !c.subscription_end && !!endDate
-              const daysColor = days !== null ? (days < 7 ? '#e55' : days < 30 ? '#f90' : '#2a9') : '#aaa'
-              const lessonsColor = lessonsLeft !== '∞' && lessonsLeft <= 3 ? '#e55' : '#333'
+      {showLost ? (
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
+                {['Имя', 'Телефон', 'Абонемент', 'Занятий осталось', 'Последнее занятие', 'Дней без занятий'].map(col => (
+                  <th key={col} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lostStudents.length === 0 ? (
+                <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>Потеряшек нет</td></tr>
+              ) : lostStudents.map(c => {
+                const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
+                return (
+                  <tr key={c.id} onClick={() => onClientSelect(c.id)}
+                    style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                    <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
+                    <td style={{ padding: '8px 12px', color: '#888' }}>{c.phone || '—'}</td>
+                    <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
+                    <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
+                    <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 600, color: c._daysSince === null ? '#aaa' : c._daysSince > 30 ? '#e55' : '#e8a000' }}>{c._daysSince === null ? '—' : c._daysSince}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+              <tr style={{ borderBottom: '1px solid #eee' }}>
+                <SortTh field="name" label="Имя" />
+                <SortTh field="subscription_type" label="Абонемент" />
+                <SortTh field="lessons_left" label="Занятий осталось" />
+                <SortTh field="days_left" label="До окончания" />
+                <SortTh field="last_visit" label="Последнее занятие" />
+                <SortTh field="stage" label="Стадия" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(c => {
+                const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0))
+                const endDate = effectiveEnd(c)
+                const days = daysLeft(endDate)
+                const isCalc = !c.subscription_end_with_freeze && !c.subscription_end && !!endDate
+                const daysColor = days !== null ? (days < 7 ? '#e55' : days < 30 ? '#f90' : '#2a9') : '#aaa'
+                const lessonsColor = lessonsLeft !== '∞' && lessonsLeft <= 3 ? '#e55' : '#333'
 
-              return (
-                <tr key={c.id} onClick={() => onClientSelect(c.id)}
-                  style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#f9f9f9'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                  <td style={{ padding: '10px 12px', fontWeight: 500 }}>
-                    {c.name}
-                    {c.phone && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.phone}</div>}
-                  </td>
-                  <td style={{ padding: '10px 12px', color: '#555' }}>{c.subscription_type || '—'}</td>
-                  <td style={{ padding: '10px 12px', fontWeight: 600, color: lessonsColor }}>
-                    {c.subscription_type ? lessonsLeft : '—'}
-                    {!c.is_unlimited && c.lessons_total > 0 && (
-                      <span style={{ color: '#aaa', fontWeight: 400 }}> / {c.lessons_total}</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 12px', color: daysColor, fontWeight: days !== null && days < 14 ? 600 : 400 }}>
-                    {days !== null ? `${days} дн` : '—'}
-                    {endDate && (
-                      <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>
-                        {new Date(endDate).toLocaleDateString('ru-RU')}
-                        {isCalc && <span style={{ marginLeft: 3, color: '#ccc' }}>*</span>}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '10px 12px', color: '#888', fontSize: 12 }}>
-                    {c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}
-                  </td>
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: c.stage === 'ученик' ? '#e8f5e9' : '#fff3e0', color: c.stage === 'ученик' ? '#2e7d32' : '#e65100' }}>
-                      {c.stage}
-                    </span>
-                  </td>
-                </tr>
-              )
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>Ученики не найдены</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                return (
+                  <tr key={c.id} onClick={() => onClientSelect(c.id)}
+                    style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#f9f9f9'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                    <td style={{ padding: '10px 12px', fontWeight: 500 }}>
+                      {c.name}
+                      {c.phone && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.phone}</div>}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: '#555' }}>{c.subscription_type || '—'}</td>
+                    <td style={{ padding: '10px 12px', fontWeight: 600, color: lessonsColor }}>
+                      {c.subscription_type ? lessonsLeft : '—'}
+                      {!c.is_unlimited && c.lessons_total > 0 && (
+                        <span style={{ color: '#aaa', fontWeight: 400 }}> / {c.lessons_total}</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: daysColor, fontWeight: days !== null && days < 14 ? 600 : 400 }}>
+                      {days !== null ? `${days} дн` : '—'}
+                      {endDate && (
+                        <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>
+                          {new Date(endDate).toLocaleDateString('ru-RU')}
+                          {isCalc && <span style={{ marginLeft: 3, color: '#ccc' }}>*</span>}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '10px 12px', color: '#888', fontSize: 12 }}>
+                      {c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}
+                    </td>
+                    <td style={{ padding: '10px 12px' }}>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: c.stage === 'ученик' ? '#e8f5e9' : '#fff3e0', color: c.stage === 'ученик' ? '#2e7d32' : '#e65100' }}>
+                        {c.stage}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>Ученики не найдены</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

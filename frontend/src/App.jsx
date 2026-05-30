@@ -85,7 +85,6 @@ export default function App() {
               <button onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
               {(role === 'manager' || role === 'admin') && <button onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Запись на пробные</button>}
               {(role === 'manager' || role === 'admin') && <button onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Запись на занятия</button>}
-              {(role === 'manager' || role === 'admin') && <button onClick={() => setView('lost')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'lost' ? '#e55' : 'white', color: view === 'lost' ? 'white' : '#e55', cursor: 'pointer' }}>Потеряшки</button>}
               {role === 'admin' && <button onClick={() => setView('team')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'team' ? '#7c3aed' : 'white', color: view === 'team' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Команда</button>}
               {(role === 'admin' || role === 'manager') && <button onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>}
               {user?.email === 'crm@artschool.ru' && <button onClick={() => setView('events')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'events' ? '#7c3aed' : 'white', color: view === 'events' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Мероприятия</button>}
@@ -127,61 +126,6 @@ export default function App() {
               />
             </div>
           )}
-
-          {!loadingClients && view === 'lost' && (role === 'manager' || role === 'admin') && (() => {
-            const today = new Date(); today.setHours(0,0,0,0);
-            const lost = clients
-              .filter(c => c.stage === 'ученик')
-              .filter(c => {
-                if (!c.last_visit) return true;
-                const diff = Math.floor((today - new Date(c.last_visit)) / (1000*60*60*24));
-                return diff > 7;
-              })
-              .map(c => {
-                const days = c.last_visit ? Math.floor((today - new Date(c.last_visit)) / (1000*60*60*24)) : null;
-                return { ...c, _daysSince: days };
-              })
-              .sort((a, b) => {
-                if (a._daysSince === null && b._daysSince === null) return 0;
-                if (a._daysSince === null) return -1;
-                if (b._daysSince === null) return 1;
-                return b._daysSince - a._daysSince;
-              });
-            return (
-              <div>
-                <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 13, color: '#888' }}>
-                  Ученики без занятий более 7 дней: <strong style={{ color: '#e55' }}>{lost.length}</strong>
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
-                      {['Имя', 'Телефон', 'Абонемент', 'Занятий осталось', 'Последнее занятие', 'Дней без занятий'].map(col => (
-                        <th key={col} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{col}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lost.length === 0 ? (
-                      <tr><td colSpan={6} style={{ padding: '16px 12px', color: '#aaa', textAlign: 'center' }}>Потеряшек нет</td></tr>
-                    ) : lost.map(c => {
-                      const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
-                      return (
-                        <tr key={c.id} onClick={() => setSelectedId(c.id)}
-                          style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#fff0f0' : 'white' }}>
-                          <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
-                          <td style={{ padding: '8px 12px', color: '#888' }}>{c.phone || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
-                          <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>
-                          <td style={{ padding: '8px 12px', fontWeight: 600, color: c._daysSince === null ? '#aaa' : c._daysSince > 30 ? '#e55' : '#e8a000' }}>{c._daysSince === null ? '—' : c._daysSince}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()}
 
           {loadingClients && <div style={{ padding: 16, color: '#888', fontSize: 13 }}>Загрузка клиентов...</div>}
 
