@@ -2,10 +2,33 @@ import React from "react";
 
 const TEACHER_STAGES = ['ученик', 'пробный месяц', 'тест-драйв']
 
+const SUB_MONTHS = {
+  'Отдыхай': 6, 'Отдыхай с бонусами': 6, 'Отдыхай старый': 6,
+  'Изучай': 9, 'Изучай с бонусами': 9, 'Изучай старый': 9, 'Изучай старый с бонусами': 9,
+  'Покоряй': 12, 'Покоряй с бонусами': 12, 'Покоряй старый': 12,
+  '3 месяца': 3,
+}
+const SUB_DAYS = {
+  'Тест-драйв': 7,
+  'Пробный месяц': 30,
+  '8 занятий': 30,
+}
+
+function calcEndDate(start, type) {
+  if (!start || !type) return null
+  const d = new Date(start)
+  if (SUB_MONTHS[type]) { d.setMonth(d.getMonth() + SUB_MONTHS[type]); return d.toISOString().slice(0,10) }
+  if (SUB_DAYS[type])   { d.setDate(d.getDate() + SUB_DAYS[type]);     return d.toISOString().slice(0,10) }
+  return null
+}
+
+function effectiveEnd(c) {
+  return c.subscription_end_with_freeze || c.subscription_end || calcEndDate(c.subscription_start, c.subscription_type)
+}
+
 function daysLeft(endDate) {
   if (!endDate) return null
-  const d = Math.ceil((new Date(endDate) - new Date()) / 86400000)
-  return d
+  return Math.ceil((new Date(endDate) - new Date()) / 86400000)
 }
 
 export function TeacherView({ clients, onClientSelect }) {
@@ -29,8 +52,8 @@ export function TeacherView({ clients, onClientSelect }) {
         aVal = a.is_unlimited ? 9999 : Math.max(0, (a.lessons_total||0)-(a.lessons_used||0))
         bVal = b.is_unlimited ? 9999 : Math.max(0, (b.lessons_total||0)-(b.lessons_used||0))
       } else if (sortField === 'days_left') {
-        aVal = daysLeft(a.subscription_end_with_freeze || a.subscription_end) ?? 9999
-        bVal = daysLeft(b.subscription_end_with_freeze || b.subscription_end) ?? 9999
+        aVal = daysLeft(effectiveEnd(a)) ?? 9999
+        bVal = daysLeft(effectiveEnd(b)) ?? 9999
       } else if (sortField === 'last_visit') {
         aVal = a.last_visit || ''
         bVal = b.last_visit || ''
@@ -86,8 +109,9 @@ export function TeacherView({ clients, onClientSelect }) {
           <tbody>
             {filtered.map(c => {
               const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0))
-              const endDate = c.subscription_end_with_freeze || c.subscription_end
+              const endDate = effectiveEnd(c)
               const days = daysLeft(endDate)
+              const isCalc = !c.subscription_end_with_freeze && !c.subscription_end && !!endDate
               const daysColor = days !== null ? (days < 7 ? '#e55' : days < 30 ? '#f90' : '#2a9') : '#aaa'
               const lessonsColor = lessonsLeft !== '∞' && lessonsLeft <= 3 ? '#e55' : '#333'
 
@@ -109,7 +133,12 @@ export function TeacherView({ clients, onClientSelect }) {
                   </td>
                   <td style={{ padding: '10px 12px', color: daysColor, fontWeight: days !== null && days < 14 ? 600 : 400 }}>
                     {days !== null ? `${days} дн` : '—'}
-                    {endDate && <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>{new Date(endDate).toLocaleDateString('ru-RU')}</div>}
+                    {endDate && (
+                      <div style={{ fontSize: 11, color: '#aaa', fontWeight: 400 }}>
+                        {new Date(endDate).toLocaleDateString('ru-RU')}
+                        {isCalc && <span style={{ marginLeft: 3, color: '#ccc' }}>*</span>}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '10px 12px', color: '#888', fontSize: 12 }}>
                     {c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}
