@@ -237,7 +237,8 @@ export default function WorkSchedule() {
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                       {Object.entries(EMPLOYEES).map(([role, names]) => {
-                        const group = workers.filter(w => w.role === role);
+                        const group = workers.filter(w => w.role === role)
+                          .sort((a, b) => role === "Педагоги" ? (a.entry?.start_time || "").localeCompare(b.entry?.start_time || "") : 0);
                         if (!group.length) return null;
                         return (
                           <div key={role}>
