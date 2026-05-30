@@ -279,6 +279,25 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
           </div>
         </div>
       )}
+      {form.subscription_type && form.freeze_days_total > 0 && (
+        <div className="formGroup" style={{ marginTop: 8 }}>
+          <div className="fieldLabel">Уже использовано дней заморозки</div>
+          <input
+            className="input"
+            type="number"
+            min="0"
+            max={form.freeze_days_total}
+            value={form.freeze_days_used}
+            disabled={disabled}
+            onChange={e => setForm(f => ({ ...f, freeze_days_used: Number(e.target.value) }))}
+            placeholder="0"
+            style={{ width: 120 }}
+          />
+          <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>
+            Заполните если клиент уже использовал дни заморозки
+          </div>
+        </div>
+      )}
 
       {form.subscription_type && (
         <div style={{ marginTop: 8, padding: '10px 12px', background: '#f8f9ff', borderRadius: 8, fontSize: 13, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
