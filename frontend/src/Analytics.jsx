@@ -2,6 +2,7 @@ import React from "react";
 import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
 import ClientCard from "./components/ClientCard.jsx";
+import TeamOnline from "./TeamOnline.jsx";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -81,6 +82,7 @@ export default function Analytics() {
   const [salesSearchResults, setSalesSearchResults] = React.useState([]);
   const [salesSelected, setSalesSelected] = React.useState(new Set());
   const [salesSaving, setSalesSaving] = React.useState(false);
+  const [showTeam, setShowTeam] = React.useState(false);
 
   React.useEffect(() => {
     if (salesSearch.length < 2) { setSalesSearchResults([]); return; }
@@ -325,7 +327,15 @@ export default function Analytics() {
           {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         {loading && <span style={{ fontSize: 12, color: "#888" }}>Загрузка...</span>}
+        {user?.email === 'crm@artschool.ru' && (
+          <button onClick={() => setShowTeam(v => !v)}
+            style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #7c3aed", background: showTeam ? "#7c3aed" : "white", color: showTeam ? "white" : "#7c3aed", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
+            👥 Команда
+          </button>
+        )}
       </div>
+
+      {showTeam && <TeamOnline />}
 
       {/* ── Daily + Managers side by side ── */}
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 28 }}>
