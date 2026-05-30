@@ -1,6 +1,7 @@
 import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
+import Events from "./Events.jsx";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
@@ -44,6 +45,7 @@ function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "
 
 export default function Schedule({ clients, role, authorName, userId, onClientsChange }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
+  const [showEvents, setShowEvents] = React.useState(false);
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
@@ -148,9 +150,10 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
         <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
         <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
         {role === "admin" && <button onClick={() => setShowBlocks(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
+        <button onClick={() => setShowEvents(v => !v)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7c3aed", background: showEvents ? "#7c3aed" : "white", color: showEvents ? "white" : "#7c3aed", cursor: "pointer", fontSize: 12 }}>🎨 Мероприятия</button>
       </div>
 
-      {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
+      {showEvents ? <Events /> : loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
         <div style={{overflowX:"auto"}}>
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:800}}>
             <thead>
