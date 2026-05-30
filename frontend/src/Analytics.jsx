@@ -3,7 +3,6 @@ import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
 import ClientCard from "./components/ClientCard.jsx";
 import TeamOnline from "./TeamOnline.jsx";
-import WorkSchedule from "./WorkSchedule.jsx";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -84,7 +83,6 @@ export default function Analytics() {
   const [salesSelected, setSalesSelected] = React.useState(new Set());
   const [salesSaving, setSalesSaving] = React.useState(false);
   const [showTeam, setShowTeam] = React.useState(false);
-  const [showSchedule, setShowSchedule] = React.useState(false);
 
   React.useEffect(() => {
     if (salesSearch.length < 2) { setSalesSearchResults([]); return; }
@@ -335,16 +333,9 @@ export default function Analytics() {
             👥 Команда
           </button>
         )}
-        {user?.email === 'crm@artschool.ru' && (
-          <button onClick={() => setShowSchedule(v => !v)}
-            style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #0e7a6c", background: showSchedule ? "#0e7a6c" : "white", color: showSchedule ? "white" : "#0e7a6c", cursor: "pointer", fontSize: 12, fontWeight: 500 }}>
-            📅 График
-          </button>
-        )}
       </div>
 
       {showTeam && <TeamOnline />}
-      {showSchedule && <WorkSchedule />}
 
       {/* ── Daily + Managers side by side ── */}
       <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 28 }}>
