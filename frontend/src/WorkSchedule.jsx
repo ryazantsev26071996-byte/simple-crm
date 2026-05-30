@@ -155,7 +155,7 @@ export default function WorkSchedule() {
   function workersForDay(day) {
     const ds = dateFmt(year, month, day);
     return Object.entries(EMPLOYEES).flatMap(([role, names]) =>
-      names.filter(emp => data[`${ds}_${emp}`]).map(emp => ({ emp, role }))
+      names.filter(emp => data[`${ds}_${emp}`]).map(emp => ({ emp, role, entry: data[`${ds}_${emp}`] }))
     );
   }
 
@@ -235,13 +235,21 @@ export default function WorkSchedule() {
                     <div style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isToday ? "#4a90e2" : isWeekend ? "#e55" : "#333", marginBottom: 3 }}>
                       {day}
                     </div>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                      {workers.map(({ emp, role }) => (
-                        <div key={emp} title={emp}
-                          style={{ fontSize: 10, borderRadius: 3, padding: "1px 4px", background: ROLE_COLOR[role], color: "white", whiteSpace: "nowrap", overflow: "hidden", maxWidth: 54, textOverflow: "ellipsis" }}>
-                          {emp.slice(0, 4)}
-                        </div>
-                      ))}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                      {Object.entries(EMPLOYEES).map(([role, names]) => {
+                        const group = workers.filter(w => w.role === role);
+                        if (!group.length) return null;
+                        return (
+                          <div key={role}>
+                            <div style={{ fontSize: 9, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 1 }}>{role}</div>
+                            {group.map(({ emp, entry }) => (
+                              <div key={emp} style={{ fontSize: 11, color: ROLE_COLOR[role], lineHeight: 1.3 }}>
+                                {emp}{entry?.start_time && entry?.end_time ? ` ${entry.start_time.slice(0,5)}–${entry.end_time.slice(0,5)}` : ""}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 )}
