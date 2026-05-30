@@ -82,7 +82,7 @@ export default function WorkSchedule() {
     try {
       const rows = await apiFetch(`work_schedule?date=gte.${rangeStart}&date=lte.${rangeEnd}&order=date.asc`);
       const map = {};
-      (rows || []).forEach(r => { map[`${r.date}_${r.employee}`] = r; });
+      (rows || []).forEach(r => { map[`${r.date}_${r.employee_name}`] = r; });
       setData(map);
     } catch (e) { console.error(e); }
     setLoading(false);
@@ -94,7 +94,7 @@ export default function WorkSchedule() {
     for (const names of Object.values(EMPLOYEES)) {
       for (const emp of names) {
         const ent = data[`${dateStr}_${emp}`];
-        form[emp] = { checked: !!ent, start: ent?.start_time || "10:00", end: ent?.end_time || "19:00" };
+        form[emp] = { checked: !!ent, start: ent?.start_time || "10:00", end: ent?.end_time || "21:00" };
       }
     }
     setModalForm(form);
@@ -112,17 +112,17 @@ export default function WorkSchedule() {
           const hasExisting = !!data[`${dateStr}_${emp}`];
           if (f.checked) {
             const hours = calcHours(f.start, f.end);
-            return apiFetch(`work_schedule?on_conflict=date,employee`, {
+            return apiFetch(`work_schedule?on_conflict=date,employee_name`, {
               method: "POST",
               headers: { Prefer: "resolution=merge-duplicates,return=representation" },
               body: JSON.stringify({
-                date: dateStr, employee: emp,
+                date: dateStr, employee_name: emp,
                 start_time: f.start || null, end_time: f.end || null,
                 hours: hours || null,
               }),
             });
           } else if (hasExisting) {
-            return apiFetch(`work_schedule?date=eq.${dateStr}&employee=eq.${encodeURIComponent(emp)}`, {
+            return apiFetch(`work_schedule?date=eq.${dateStr}&employee_name=eq.${encodeURIComponent(emp)}`, {
               method: "DELETE", headers: { Prefer: "return=minimal" },
             });
           }
@@ -303,7 +303,7 @@ export default function WorkSchedule() {
                   {role}
                 </div>
                 {names.map(emp => {
-                  const f = modalForm[emp] || { checked: false, start: "10:00", end: "19:00" };
+                  const f = modalForm[emp] || { checked: false, start: "10:00", end: "21:00" };
                   const hours = calcHours(f.start, f.end);
                   return (
                     <div key={emp} style={{
