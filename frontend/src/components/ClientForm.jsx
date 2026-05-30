@@ -80,6 +80,8 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
   })
   const [phoneError, setPhoneError] = React.useState("")
   const [dupWarning, setDupWarning] = React.useState(null)
+  const [customSub, setCustomSub] = React.useState({ months: '', lessons: '', freeze: '' })
+  const [showCustomSub, setShowCustomSub] = React.useState(false)
 
   React.useEffect(() => {
     setForm({
@@ -97,12 +99,22 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       is_unlimited: initialValue?.is_unlimited || false,
     })
     setPhoneError("")
+    setShowCustomSub(false)
+    if (initialValue?.subscription_type === 'Индивидуальные условия') {
+      setCustomSub({ months: '', lessons: initialValue.lessons_total || '', freeze: initialValue.freeze_days_total || '' })
+    }
   }, [initialValue?.id, JSON.stringify(initialValue)])
 
   const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }))
 
   function handleSubscriptionChange(e) {
     const name = e.target.value
+    if (name === 'Индивидуальные условия') {
+      setShowCustomSub(true)
+      setForm(f => ({ ...f, subscription_type: 'Индивидуальные условия', is_unlimited: false }))
+      return
+    }
+    setShowCustomSub(false)
     const sub = SUBSCRIPTIONS.find(s => s.name === name)
     if (!sub) { setForm(f => ({ ...f, subscription_type: '' })); return }
     setForm(f => ({
@@ -114,13 +126,33 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     }))
   }
 
+  function handleCustomSubConfirm() {
+    const months = Number(customSub.months) || 0
+    const lessons = Number(customSub.lessons) || 0
+    const freeze = Number(customSub.freeze) || 0
+    const end = months && form.subscription_start ? addMonths(form.subscription_start, months) : ''
+    setForm(f => ({
+      ...f,
+      lessons_total: lessons,
+      freeze_days_total: freeze,
+      is_unlimited: false,
+      subscription_end: end,
+      subscription_end_with_freeze: end,
+    }))
+    setShowCustomSub(false)
+  }
+
   function handleStartChange(e) {
     const start = e.target.value
     const sub = SUBSCRIPTIONS.find(s => s.name === form.subscription_type)
     let end = ''
-    if (sub && start) {
-      if (sub.months) end = addMonths(start, sub.months)
-      else if (sub.days) end = addDays(start, sub.days)
+    if (start) {
+      if (sub) {
+        if (sub.months) end = addMonths(start, sub.months)
+        else if (sub.days) end = addDays(start, sub.days)
+      } else if (form.subscription_type === 'Индивидуальные условия' && Number(customSub.months) > 0) {
+        end = addMonths(start, Number(customSub.months))
+      }
     }
     setForm(f => ({ ...f, subscription_start: start, subscription_end: end, subscription_end_with_freeze: end }))
   }
@@ -244,8 +276,38 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
           <select className="input" value={form.subscription_type} disabled={disabled} onChange={handleSubscriptionChange}>
             <option value="">— выбрать —</option>
             {SUBSCRIPTIONS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+            <option value="Индивидуальные условия">Индивидуальные условия</option>
           </select>
-          {form.subscription_type && (
+          {form.subscription_type === 'Индивидуальные условия' && showCustomSub && !disabled && (
+            <div style={{ marginTop: 8, padding: '10px 12px', background: '#fff8e1', border: '1px solid #f5c518', borderRadius: 8, fontSize: 13 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12 }}>Настроить условия</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Срок (мес)</div>
+                  <input type="number" min="0" value={customSub.months}
+                    onChange={e => setCustomSub(s => ({ ...s, months: e.target.value }))}
+                    style={{ width: 80, padding: '4px 8px', borderRadius: 5, border: '1px solid #ddd', fontSize: 13 }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Занятий</div>
+                  <input type="number" min="0" value={customSub.lessons}
+                    onChange={e => setCustomSub(s => ({ ...s, lessons: e.target.value }))}
+                    style={{ width: 80, padding: '4px 8px', borderRadius: 5, border: '1px solid #ddd', fontSize: 13 }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Заморозка (дн)</div>
+                  <input type="number" min="0" value={customSub.freeze}
+                    onChange={e => setCustomSub(s => ({ ...s, freeze: e.target.value }))}
+                    style={{ width: 90, padding: '4px 8px', borderRadius: 5, border: '1px solid #ddd', fontSize: 13 }} />
+                </div>
+              </div>
+              <button type="button" onClick={handleCustomSubConfirm}
+                style={{ padding: '4px 14px', fontSize: 12, borderRadius: 5, border: 'none', background: '#4a90e2', color: 'white', cursor: 'pointer' }}>
+                Применить
+              </button>
+            </div>
+          )}
+          {form.subscription_type && !showCustomSub && (
             <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>
               {form.is_unlimited ? 'Безлимит' : `${form.lessons_total} занятий`}
               {form.freeze_days_total > 0 && ` · заморозка ${form.freeze_days_total} дн`}
