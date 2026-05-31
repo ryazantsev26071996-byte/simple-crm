@@ -96,8 +96,19 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
     } : { client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false });
   }
 
+  function isDuplicateSameDay() {
+    if (!form.client_id || !modal) return false;
+    return slots.some(s =>
+      s.client_id === Number(form.client_id) &&
+      s.date === modal.date &&
+      s.attended === true &&
+      s.id !== modal.entry?.id
+    );
+  }
+
   async function handleSave() {
-    if (form.attended === true && !form.lesson_comment.trim()) {
+    const duplicate = isDuplicateSameDay();
+    if (form.attended === true && !form.lesson_comment.trim() && !duplicate) {
       alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
       return;
     }
@@ -120,8 +131,10 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
         if (cl && !cl.is_unlimited) {
           await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ lessons_used: (cl.lessons_used||0)+1, last_visit: new Date().toISOString().split("T")[0] }) });
         }
-        const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ");
-        await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText }) });
+        if (!duplicate || form.lesson_comment.trim()) {
+          const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ");
+          await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText }) });
+        }
       }
       setModal(null);
       loadSlots();
@@ -263,12 +276,14 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
 
             {(form.attended===true||form.attended===false)&&(
               <div style={{marginBottom:10}}>
-                <div style={{fontSize:12,marginBottom:4,color:form.attended===true?"#e55":"#888",fontWeight:form.attended===true?600:400}}>
-                  Комментарий после занятия {form.attended===true?"* (обязательно)":"(опционально)"}
+                {(()=>{const dup=isDuplicateSameDay();const req=form.attended===true&&!dup;return(<>
+                <div style={{fontSize:12,marginBottom:4,color:req?"#e55":"#888",fontWeight:req?600:400}}>
+                  Комментарий после занятия {req?"* (обязательно)":"(опционально)"}
                 </div>
-                <textarea style={{...inp,minHeight:80,resize:"vertical",borderColor:form.attended===true&&!form.lesson_comment.trim()?"#e55":"#ddd",marginBottom:4}}
+                <textarea style={{...inp,minHeight:80,resize:"vertical",borderColor:req&&!form.lesson_comment.trim()?"#e55":"#ddd",marginBottom:4}}
                   value={form.lesson_comment} onChange={e=>setForm(f=>({...f,lesson_comment:e.target.value}))} placeholder="Что делали, прогресс, пожелания..." />
-                {form.attended===true&&form.client_id&&<div style={{fontSize:11,color:"#888"}}>Спишется 1 занятие и комментарий добавится в карточку ученика</div>}
+                {form.attended===true&&form.client_id&&<div style={{fontSize:11,color:"#888"}}>{dup?"Спишется 1 занятие (повторное в этот день)":"Спишется 1 занятие и комментарий добавится в карточку ученика"}</div>}
+                </>);})()}
               </div>
             )}
 
