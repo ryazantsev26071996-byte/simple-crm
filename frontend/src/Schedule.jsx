@@ -191,8 +191,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                       <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
                           <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
-                            <div style={{fontSize:11,fontWeight:600,color:e.client_id?"#4a90e2":"#888",textDecoration:e.client_id?"underline":"none",cursor:e.client_id?"pointer":"default",padding:"4px 10px 2px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
-                              onClick={()=>e.client_id&&openClientModal(e.client_id)}>
+                            <div style={{fontSize:11,fontWeight:600,color:"#333",padding:"4px 10px 2px",whiteSpace:"normal",wordBreak:"break-word"}}>
                               {e.client_name||"—"}
                             </div>
                             <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
@@ -245,8 +244,13 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
               )}
             </div>
             {form.client_id&&(
-              <div style={{fontSize:12,color:"#4a90e2",marginBottom:8}}>
-                {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));return cl?`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0))} зан.`:"";})()}
+              <div style={{marginBottom:8}}>
+                <span onClick={()=>openClientModal(Number(form.client_id))} style={{color:"#4a90e2",cursor:"pointer",textDecoration:"underline",fontWeight:600,fontSize:14}}>
+                  {form.client_name}
+                </span>
+                <div style={{fontSize:12,color:"#888",marginTop:2}}>
+                  {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));return cl?`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0))} зан.`:"";})()}
+                </div>
               </div>
             )}
 
