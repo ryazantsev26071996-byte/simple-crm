@@ -176,8 +176,8 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:800}}>
             <thead>
               <tr>
-                <th style={{width:60,padding:"6px 8px",background:"#f0f0f0",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,zIndex:3,borderRight:"2px solid #ccc"}}>Время</th>
-                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:120}}>{fmtDisplay(d)}</th>)}
+                <th style={{width:60,padding:"6px 8px",background:"#f0f0f0",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:4,borderRight:"2px solid #ccc"}}>Время</th>
+                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:140,position:"sticky",top:0,zIndex:3}}>{fmtDisplay(d)}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -190,8 +190,8 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                     return (
                       <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
-                          <div key={e.id} onClick={() => openModal(fmt(d),time,e)} style={{marginBottom:3,padding:"3px 6px",borderRadius:4,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
-                            <div style={{fontWeight:500,color:e.client_id?"#4a90e2":"#333",cursor:e.client_id?"pointer":"default"}} onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
+                          <div key={e.id} onClick={() => openModal(fmt(d),time,e)} style={{marginBottom:4,padding:"8px 10px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
+                            <div style={{fontWeight:600,color:e.client_id?"#4a90e2":"#333",cursor:e.client_id?"pointer":"default",textDecoration:e.client_id?"underline":"none",marginBottom:2}} onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
                               {e.client_name||"—"}
                             </div>
                             {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
