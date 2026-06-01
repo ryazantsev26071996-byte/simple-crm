@@ -99,19 +99,17 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
         {search && <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>Найдено: {filteredClients.length}</div>}
       </div>
 
-      <div style={{ overflowX: 'auto', flex: 1, padding: '12px 0' }}>
-        <div style={{ display: 'flex', gap: 10, minWidth: 'max-content', padding: '0 16px', alignItems: 'flex-start' }}>
-          {visibleStages.map(stage => (
-            <Column
-              key={stage}
-              stage={stage}
-              clients={filteredClients.filter(c => c.stage === stage)}
-              onClientSelect={onClientSelect}
-              onDrop={(id, newStage) => onStageChange(id, newStage)}
-              totalAmount={getStageTotalAmount(stage)}
-            />
-          ))}
-        </div>
+      <div style={{ display: 'flex', overflowX: 'auto', height: 'calc(100vh - 120px)', alignItems: 'flex-start', gap: 10, padding: '12px 16px' }}>
+        {visibleStages.map(stage => (
+          <Column
+            key={stage}
+            stage={stage}
+            clients={filteredClients.filter(c => c.stage === stage)}
+            onClientSelect={onClientSelect}
+            onDrop={(id, newStage) => onStageChange(id, newStage)}
+            totalAmount={getStageTotalAmount(stage)}
+          />
+        ))}
       </div>
 
       {showAddModal && (
@@ -137,23 +135,28 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
 
 function Column({ stage, clients, onClientSelect, onDrop, totalAmount }) {
   const [over, setOver] = useState(false)
+  const bg = over ? '#e8f4ff' : '#f5f5f5'
   return (
     <div
       onDragOver={e => { e.preventDefault(); setOver(true) }}
       onDragLeave={() => setOver(false)}
       onDrop={e => { e.preventDefault(); setOver(false); const id = Number(e.dataTransfer.getData('clientId')); onDrop(id, stage) }}
-      style={{ width: 190, minHeight: 100, background: over ? '#e8f4ff' : '#f5f5f5', borderRadius: 8, padding: 8, border: over ? '2px dashed #4a90e2' : '2px solid transparent' }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 200, maxWidth: 220, flexShrink: 0, background: bg, borderRadius: 8, border: over ? '2px dashed #4a90e2' : '2px solid transparent' }}
     >
-      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-        <span>{stage}</span>
-        <span style={{ background: clients.length > 0 ? '#4a90e2' : '#ddd', color: clients.length > 0 ? 'white' : '#555', borderRadius: 20, padding: '1px 6px', fontSize: 11 }}>{clients.length}</span>
-      </div>
-      {totalAmount !== null && (
-        <div style={{ fontSize: 11, color: '#2a9', fontWeight: 600, marginBottom: 6 }}>
-          {totalAmount.toLocaleString('ru-RU')} ₽
+      <div style={{ position: 'sticky', top: 0, zIndex: 1, background: bg, padding: '8px 8px 4px', borderRadius: '8px 8px 0 0' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
+          <span>{stage}</span>
+          <span style={{ background: clients.length > 0 ? '#4a90e2' : '#ddd', color: clients.length > 0 ? 'white' : '#555', borderRadius: 20, padding: '1px 6px', fontSize: 11 }}>{clients.length}</span>
         </div>
-      )}
-      {clients.map(client => <Card key={client.id} client={client} onClientSelect={onClientSelect} />)}
+        {totalAmount !== null && (
+          <div style={{ fontSize: 11, color: '#2a9', fontWeight: 600, marginTop: 4 }}>
+            {totalAmount.toLocaleString('ru-RU')} ₽
+          </div>
+        )}
+      </div>
+      <div style={{ overflowY: 'auto', flex: 1, padding: 8 }}>
+        {clients.map(client => <Card key={client.id} client={client} onClientSelect={onClientSelect} />)}
+      </div>
     </div>
   )
 }
