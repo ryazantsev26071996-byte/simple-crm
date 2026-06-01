@@ -267,7 +267,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                             {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
                             {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
                             {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
-                            {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
+                            {e.comment&&<div style={{color:"#666",fontSize:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{e.comment}</div>}
                             <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
                               {e.rescheduled && e.rescheduled_to ? (
                                 <span style={{color:"#4a90e2",fontSize:10,fontWeight:600}}>
@@ -381,7 +381,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
             </div>
 
             <div style={{fontSize:12,color:"#888",marginBottom:4}}>Комментарий</div>
-            <textarea style={{...inp,minHeight:50,resize:"vertical"}} value={form.comment||""} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Заметки о клиенте..." />
+            <textarea style={{...inp,minHeight:80,resize:"none",overflow:"hidden"}} value={form.comment||""} onInput={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Заметки о клиенте..." />
 
             {/* Напоминания за ДЕНЬ */}
             <div style={{background:"#e3f2fd",borderRadius:8,padding:10,marginBottom:8}}>
