@@ -242,7 +242,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
       </div>
 
       {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
-        <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 200px)",position:"relative"}}>
+        <div style={{overflowX:"auto",overflowY:"scroll",height:"calc(100vh - 180px)",position:"relative",WebkitOverflowScrolling:"touch"}}>
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:900}}>
             <thead>
               <tr>
