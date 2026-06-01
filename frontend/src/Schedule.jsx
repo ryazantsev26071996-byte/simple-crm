@@ -42,6 +42,7 @@ function getWeekDays(date) {
 
 function fmt(date) { const d = new Date(date); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
+function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 
 export default function Schedule({ clients, role, authorName, userId, onClientsChange }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
@@ -157,13 +158,17 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
 
   return (
     <div style={{ padding: "0 16px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16, paddingTop: 16 }}>
-        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>← Пред</button>
-        <strong style={{ fontSize: 14 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
-        <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>След →</button>
-        <button onClick={() => setWeekStart(new Date())} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
-        {role === "admin" && <button onClick={() => setShowBlocks(true)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
-        <button onClick={() => setShowEvents(v => !v)} style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #7c3aed", background: showEvents ? "#7c3aed" : "white", color: showEvents ? "white" : "#7c3aed", cursor: "pointer", fontSize: 12 }}>🎨 Мероприятия</button>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16, paddingTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ minWidth: 44, minHeight: 44, padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", flexShrink: 0 }}>←</button>
+          <strong style={{ fontSize: 14, flex: 1, textAlign: "center", minWidth: 0 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
+          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ minWidth: 44, minHeight: 44, padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", flexShrink: 0 }}>→</button>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => setWeekStart(new Date())} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
+          {role === "admin" && <button onClick={() => setShowBlocks(true)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
+          <button onClick={() => setShowEvents(v => !v)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #7c3aed", background: showEvents ? "#7c3aed" : "white", color: showEvents ? "white" : "#7c3aed", cursor: "pointer", fontSize: 12 }}>🎨 Мероприятия</button>
+        </div>
       </div>
 
       {showEvents ? <Events /> : loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
@@ -171,14 +176,14 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:800}}>
             <thead>
               <tr>
-                <th style={{width:60,padding:"6px 8px",background:"#f0f0f0",border:"1px solid #ddd",fontSize:12}}>Время</th>
+                <th style={{width:60,padding:"6px 8px",background:"#f0f0f0",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,zIndex:3,borderRight:"2px solid #ccc"}}>Время</th>
                 {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",background:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:120}}>{fmtDisplay(d)}</th>)}
               </tr>
             </thead>
             <tbody>
               {TIMES.map(time => (
                 <tr key={time}>
-                  <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",background:"#fafafa"}}>{time}</td>
+                  <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",background:"#fafafa",position:"sticky",left:0,zIndex:2,borderRight:"2px solid #ccc"}}>{time}</td>
                   {days.map(d => {
                     const entries = slotEntries(d, time);
                     const isFull = entries.length >= MAX_PER_SLOT;
@@ -194,6 +199,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                             {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
                             {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
                             {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
+                            {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
                           </div>
                         ))}
                         {!isFull&&(role==="manager"||role==="admin")&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
@@ -212,7 +218,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
         <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{background:"white",borderRadius:12,width:"90%",maxWidth:480,maxHeight:"90vh",overflowY:"auto",padding:20}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-              <strong>{modal.date} в {modal.time}</strong>
+              <strong>{formatDate(modal.date)} в {modal.time}</strong>
               <button onClick={()=>setModal(null)} style={{fontSize:20,background:"none",border:"none",cursor:"pointer"}}>×</button>
             </div>
 
