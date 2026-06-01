@@ -34,8 +34,10 @@ export default function App() {
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
   const [view, setView] = React.useState(() => { const saved = localStorage.getItem('crm_view'); return saved || 'kanban'; });
+  const [theme, setTheme] = React.useState(() => localStorage.getItem('crm_theme') || 'light');
 
   React.useEffect(() => { localStorage.setItem('crm_view', view); }, [view]);
+  React.useEffect(() => { document.documentElement.setAttribute('data-theme', theme); localStorage.setItem('crm_theme', theme); }, [theme]);
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [showMerge, setShowMerge] = React.useState(false);
@@ -76,8 +78,8 @@ export default function App() {
   if (!user) return <LoginPage />;
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #eee", flexShrink: 0 }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)', color: 'var(--text)' }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--header-bg)", flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <strong style={{ fontSize: 15 }}>Simple CRM</strong>
           <div style={{ display: 'flex', gap: 4 }}>
@@ -98,7 +100,8 @@ export default function App() {
           {role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт</button>}
           {role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍 Дубли</button>}
           {role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
-          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
+          <button onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')} style={{ fontSize: 14, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card-bg)', cursor: 'pointer' }} title={theme === 'dark' ? 'Светлая тема' : 'Тёмная тема'}>{theme === 'dark' ? '☀️' : '🌙'}</button>
+          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--card-bg)', color: 'var(--text)', cursor: 'pointer' }}>Выйти</button>
         </div>
       </div>
 

@@ -1,11 +1,52 @@
-:root {
+:root[data-theme='light'] {
   --bg: #f6f7fb;
+  --bg-secondary: #f5f5f5;
   --panel: #ffffff;
+  --card-bg: #ffffff;
+  --header-bg: #ffffff;
   --text: #111827;
+  --text-secondary: #666;
   --muted: #6b7280;
   --border: #e5e7eb;
   --accent: #2563eb;
   --danger: #dc2626;
+  --input-bg: #ffffff;
+  --table-bg: #ffffff;
+  --th-bg: #fafafa;
+}
+
+:root[data-theme='dark'] {
+  --bg: #1a1a2e;
+  --bg-secondary: #16213e;
+  --panel: #0f3460;
+  --card-bg: #0f3460;
+  --header-bg: #16213e;
+  --text: #e0e0e0;
+  --text-secondary: #aaa;
+  --muted: #aaa;
+  --border: #2a2a4a;
+  --accent: #4a90e2;
+  --danger: #ff6b6b;
+  --input-bg: #16213e;
+  --table-bg: #0f3460;
+  --th-bg: #16213e;
+}
+
+:root {
+  --bg: #f6f7fb;
+  --bg-secondary: #f5f5f5;
+  --panel: #ffffff;
+  --card-bg: #ffffff;
+  --header-bg: #ffffff;
+  --text: #111827;
+  --text-secondary: #666;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --danger: #dc2626;
+  --input-bg: #ffffff;
+  --table-bg: #ffffff;
+  --th-bg: #fafafa;
 }
 
 * {
@@ -25,6 +66,14 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+input,
+select,
+textarea {
+  background: var(--input-bg);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 .appShell {
@@ -59,7 +108,8 @@ textarea {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--input-bg);
+  color: var(--text);
 }
 
 .textarea {
@@ -101,7 +151,8 @@ textarea {
 
 .btn {
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card-bg);
+  color: var(--text);
   border-radius: 12px;
   padding: 9px 12px;
   cursor: pointer;
@@ -114,7 +165,7 @@ textarea {
 }
 
 .btnDanger {
-  background: #fff;
+  background: var(--card-bg);
   border-color: var(--danger);
   color: var(--danger);
 }
@@ -157,7 +208,8 @@ textarea {
 table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--table-bg);
+  color: var(--text);
 }
 
 th,
@@ -172,7 +224,7 @@ td {
 th {
   font-size: 12px;
   color: var(--muted);
-  background: #fafafa;
+  background: var(--th-bg);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -216,7 +268,8 @@ th {
 .commentCard {
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--card-bg);
+  color: var(--text);
   padding: 12px;
 }
 
