@@ -212,7 +212,7 @@ export default function App() {
                 <thead>
                   <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
                     {[
-                      { key: 'name', label: 'Имя' },
+                      { key: 'name', label: 'Имя', sticky: true },
                       { key: 'stage', label: 'Стадия' },
                       { key: 'subscription_type', label: 'Абонемент' },
                       { key: 'lessons_left', label: 'Занятий осталось' },
@@ -222,7 +222,7 @@ export default function App() {
                     ].map(col => (
                       <th key={col.key}
                         onClick={() => { if (sortField === col.key) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(col.key); setSortDir('asc'); } }}
-                        style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none' }}>
+                        style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', ...(col.sticky ? { position: 'sticky', left: 0, zIndex: 2, background: '#fafafa', borderRight: '1px solid #eee' } : {}) }}>
                         {col.label} {sortField === col.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                       </th>
                     ))}
@@ -252,7 +252,7 @@ export default function App() {
                     return (
                       <tr key={c.id} onClick={() => setSelectedId(c.id)}
                         style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
-                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
+                        <td style={{ padding: '8px 12px', fontWeight: 500, position: 'sticky', left: 0, zIndex: 1, background: c.id === selectedId ? '#f0f7ff' : 'white', borderRight: '1px solid #eee' }}>{c.name}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{c.stage || '—'}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
                         <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
