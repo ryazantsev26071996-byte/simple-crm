@@ -26,14 +26,16 @@ function truncate(str, max = 30) {
   return str.length > max ? str.slice(0, max) + '...' : str
 }
 
+const linkStyle = { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+
 function renderContact(value) {
   if (!value) return null
   if (value.startsWith('@'))
-    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer" style={linkStyle}>{truncate(value)}</a>
   if (value.startsWith('t.me/'))
-    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer" style={linkStyle}>{truncate(value)}</a>
   if (value.startsWith('vk.com/'))
-    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer" style={linkStyle}>{truncate(value)}</a>
   return null
 }
 
@@ -43,7 +45,7 @@ function renderTelegram(value) {
   if (value.startsWith('https://')) href = value
   else if (value.startsWith('t.me/')) href = `https://${value}`
   else href = `https://t.me/${value.replace(/^@/, '')}`
-  return <a href={href} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+  return <a href={href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{truncate(value)}</a>
 }
 
 function renderVk(value) {
@@ -52,7 +54,7 @@ function renderVk(value) {
   if (value.startsWith('https://')) href = value
   else if (value.startsWith('vk.com/')) href = `https://${value}`
   else href = `https://vk.com/${value}`
-  return <a href={href} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+  return <a href={href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{truncate(value)}</a>
 }
 
 const STAGES = [
