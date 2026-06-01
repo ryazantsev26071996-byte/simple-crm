@@ -269,7 +269,7 @@ export default function WorkSchedule() {
               <tr>
                 <th style={{ ...TH, minWidth: 110 }}>Сотрудник</th>
                 <th style={{ ...TH, minWidth: 90 }}>Роль</th>
-                <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 1–25</th>
+                <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 10–25</th>
                 <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 26–10</th>
                 <th style={{ ...TH, minWidth: 70, textAlign: "center" }}>Всего</th>
               </tr>
@@ -283,7 +283,7 @@ export default function WorkSchedule() {
                   </td>
                 </tr>,
                 ...names.map(emp => {
-                  const p1  = sumPeriod(emp, 1, month, year, 25, month, year);
+                  const p1  = sumPeriod(emp, 10, month, year, 25, month, year);
                   const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 10, month, year);
                   const tot = monthTotal(emp);
                   return (
