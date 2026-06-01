@@ -172,34 +172,37 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
       </div>
 
       {showEvents ? <Events /> : loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
-        <div style={{overflowX:"auto"}}>
-          <table style={{borderCollapse:"collapse",width:"100%",minWidth:800}}>
+        <div style={{overflowX:"auto", position:"relative"}}>
+          <table style={{borderCollapse:"collapse",width:"100%",minWidth:800, position:"relative"}}>
             <thead>
               <tr>
                 <th style={{width:60,padding:"6px 8px",backgroundColor:"#f0f0f0",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:12,borderRight:"2px solid #ccc"}}>Время</th>
-                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",backgroundColor:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:160,position:"sticky",top:0,zIndex:10}}>{fmtDisplay(d)}</th>)}
+                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",backgroundColor:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:180,position:"sticky",top:0,zIndex:10}}>{fmtDisplay(d)}</th>)}
               </tr>
             </thead>
             <tbody>
               {TIMES.map(time => (
                 <tr key={time}>
-                  <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",background:"#fafafa",position:"sticky",left:0,zIndex:2,borderRight:"2px solid #ccc"}}>{time}</td>
+                  <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",backgroundColor:"#fafafa",position:"sticky",left:0,zIndex:2,borderRight:"2px solid #ccc"}}>{time}</td>
                   {days.map(d => {
                     const entries = slotEntries(d, time);
                     const isFull = entries.length >= MAX_PER_SLOT;
                     return (
-                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:160,background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
+                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
-                          <div key={e.id} onClick={() => openModal(fmt(d),time,e)} style={{marginBottom:4,padding:"8px 10px",borderRadius:6,fontSize:11,cursor:"pointer",width:"100%",boxSizing:"border-box",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
-                            <div style={{fontWeight:600,color:e.client_id?"#4a90e2":"#333",cursor:e.client_id?"pointer":"default",textDecoration:e.client_id?"underline":"none",marginBottom:2}} onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
+                          <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
+                            <div style={{fontSize:11,fontWeight:600,color:e.client_id?"#4a90e2":"#888",textDecoration:e.client_id?"underline":"none",cursor:e.client_id?"pointer":"default",padding:"4px 10px 2px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}
+                              onClick={()=>e.client_id&&openClientModal(e.client_id)}>
                               {e.client_name||"—"}
                             </div>
+                            <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
                             {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
                             {e.teacher&&<div style={{color:"#4a90e2"}}>{e.teacher}</div>}
                             {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
                             {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
                             {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
                             {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
+                            </div>
                           </div>
                         ))}
                         {!isFull&&(role==="manager"||role==="admin")&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
