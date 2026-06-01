@@ -128,17 +128,17 @@ export default function App() {
           {!isMobile && role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍 Дубли</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
           {isMobile && <button onClick={() => setShowMobileMenu(true)} style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', color: '#333' }}>☰</button>}
-          <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
+          {!isMobile && <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>}
         </div>
       </div>
 
       {showMobileMenu && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(18,18,24,0.96)', zIndex: 2000, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
             <strong style={{ color: 'white', fontSize: 16 }}>Simple CRM</strong>
             <button onClick={() => setShowMobileMenu(false)} style={{ fontSize: 24, background: 'none', border: 'none', color: 'white', cursor: 'pointer', lineHeight: 1 }}>✕</button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 4, overflowY: 'auto' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 4, overflowY: 'auto' }}>
             {availableTabs.map(tab => (
               <button key={tab.key} onClick={() => { setView(tab.key); setShowMobileMenu(false); }}
                 style={{ fontSize: 17, padding: '14px 16px', borderRadius: 10, border: 'none', background: view === tab.key ? '#4a90e2' : 'rgba(255,255,255,0.07)', color: 'white', cursor: 'pointer', textAlign: 'left', fontWeight: view === tab.key ? 700 : 400 }}>
@@ -151,6 +151,10 @@ export default function App() {
               <button onClick={() => { setShowMerge(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ffd580', cursor: 'pointer', textAlign: 'left' }}>🔍 Дубли</button>
               <button onClick={() => { setShowAudit(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#80b8ff', cursor: 'pointer', textAlign: 'left' }}>📋 Журнал</button>
             </div>}
+          </div>
+          <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>{authorName} · {role}</div>
+            <button onClick={() => supabase.auth.signOut()} style={{ width: '100%', fontSize: 15, padding: '12px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'white', cursor: 'pointer', textAlign: 'left' }}>Выйти</button>
           </div>
         </div>
       )}
