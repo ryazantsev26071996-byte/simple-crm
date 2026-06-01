@@ -244,11 +244,11 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
       {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
         <div style={{overflowX:"auto"}}>
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:900}}>
-            <thead>
-              <tr style={{position:"sticky",top:0,zIndex:10}}>
-                <th style={{width:60,padding:"6px 8px",backgroundColor:"#f0f0f0",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:12,borderRight:"2px solid #ccc"}}>Время</th>
+            <thead style={{position:"sticky",top:0,zIndex:10}}>
+              <tr>
+                <th style={{width:60,padding:"6px 8px",backgroundColor:"white",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:20,borderRight:"2px solid #ccc"}}>Время</th>
                 {days.map(d => (
-                  <th key={fmt(d)} style={{padding:"6px 8px",backgroundColor:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:130,position:"sticky",top:0,zIndex:10}}>
+                  <th key={fmt(d)} style={{padding:"6px 8px",backgroundColor:"white",border:"1px solid #ddd",fontSize:12,minWidth:130,position:"sticky",top:0,zIndex:10}}>
                     {fmtDisplay(d)}
                   </th>
                 ))}
