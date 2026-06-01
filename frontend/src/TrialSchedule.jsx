@@ -275,7 +275,6 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                             {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
                             {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
                             {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
-                            {e.comment&&<div style={{color:"#666",fontSize:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginTop:2}}>{e.comment}</div>}
                             <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
                               {e.rescheduled && e.rescheduled_to ? (
                                 <span style={{color:"#4a90e2",fontSize:10,fontWeight:600}}>
