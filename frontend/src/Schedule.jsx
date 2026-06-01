@@ -191,9 +191,9 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                       <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
                           <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
-                            <div style={{fontSize:11,fontWeight:600,color:"#333",padding:"4px 10px 2px",whiteSpace:"normal",wordBreak:"break-word"}}>
+                            <span style={{fontSize:11,fontWeight:600,color:"#333",padding:"4px 10px 2px",whiteSpace:"normal",wordBreak:"break-word",display:"block"}}>
                               {e.client_name||"—"}
-                            </div>
+                            </span>
                             <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
                             {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
                             {e.teacher&&<div style={{color:"#4a90e2"}}>{e.teacher}</div>}
