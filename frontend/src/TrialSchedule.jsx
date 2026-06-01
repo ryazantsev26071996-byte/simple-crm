@@ -242,9 +242,9 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
       </div>
 
       {loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
-        <div style={{overflowX:"auto"}}>
+        <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 200px)",position:"relative"}}>
           <table style={{borderCollapse:"collapse",width:"100%",minWidth:900}}>
-            <thead style={{position:"sticky",top:0,zIndex:10}}>
+            <thead>
               <tr>
                 <th style={{width:60,padding:"6px 8px",backgroundColor:"white",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:20,borderRight:"2px solid #ccc"}}>Время</th>
                 {days.map(d => (
