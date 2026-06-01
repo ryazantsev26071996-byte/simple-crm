@@ -22,18 +22,37 @@ async function apiFetch(path) {
   return res.ok ? res.json() : []
 }
 
+function truncate(str, max = 30) {
+  return str.length > max ? str.slice(0, max) + '...' : str
+}
+
 function renderContact(value) {
   if (!value) return null
-  if (value.startsWith('@')) {
-    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer">{value}</a>
-  }
-  if (value.startsWith('t.me/')) {
-    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{value}</a>
-  }
-  if (value.startsWith('vk.com/')) {
-    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{value}</a>
-  }
+  if (value.startsWith('@'))
+    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+  if (value.startsWith('t.me/'))
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+  if (value.startsWith('vk.com/'))
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
   return null
+}
+
+function renderTelegram(value) {
+  if (!value) return null
+  let href
+  if (value.startsWith('https://')) href = value
+  else if (value.startsWith('t.me/')) href = `https://${value}`
+  else href = `https://t.me/${value.replace(/^@/, '')}`
+  return <a href={href} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
+}
+
+function renderVk(value) {
+  if (!value) return null
+  let href
+  if (value.startsWith('https://')) href = value
+  else if (value.startsWith('vk.com/')) href = `https://${value}`
+  else href = `https://vk.com/${value}`
+  return <a href={href} target="_blank" rel="noopener noreferrer">{truncate(value)}</a>
 }
 
 const STAGES = [
@@ -81,6 +100,8 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
   const [form, setForm] = React.useState({
     name: initialValue?.name || "",
     phone: initialValue?.phone || "",
+    telegram: initialValue?.telegram || "",
+    vk: initialValue?.vk || "",
     source: initialValue?.source || "",
     lead_date: toDatetimeLocal(initialValue?.lead_date),
     stage: initialValue?.stage || "",
@@ -101,6 +122,8 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     setForm({
       name: initialValue?.name || "",
       phone: initialValue?.phone || "",
+      telegram: initialValue?.telegram || "",
+      vk: initialValue?.vk || "",
       source: initialValue?.source || "",
       lead_date: toDatetimeLocal(initialValue?.lead_date),
       stage: initialValue?.stage || "",
@@ -218,6 +241,8 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     onSubmit({
       name: form.name.trim(),
       phone: form.phone.trim(),
+      telegram: form.telegram.trim(),
+      vk: form.vk.trim(),
       source: form.source.trim(),
       lead_date: form.lead_date || null,
       stage: form.stage,
@@ -247,7 +272,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         <div className="formGroup">
           <div className="fieldLabel">Контакт</div>
           {disabled && renderContact(form.phone)
-            ? <div className="input" style={{ display: 'flex', alignItems: 'center' }}>{renderContact(form.phone)}</div>
+            ? <div className="input" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderContact(form.phone)}</div>
             : <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} onBlur={handlePhoneBlur} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
           }
           {phoneError && <div style={{ color: '#e55', fontSize: 11, marginTop: 3 }}>{phoneError}</div>}
@@ -263,6 +288,23 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
               <button type="button" onClick={() => setDupWarning(null)} style={{ marginTop: 2, padding: '2px 8px', fontSize: 11, borderRadius: 4, border: '1px solid #aaa', background: 'white', color: '#555', cursor: 'pointer' }}>Создать всё равно</button>
             </div>
           )}
+        </div>
+      </div>
+      <div style={{ height: 8 }} />
+      <div className="grid2">
+        <div className="formGroup">
+          <div className="fieldLabel">Telegram</div>
+          {disabled && form.telegram
+            ? <div className="input" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderTelegram(form.telegram)}</div>
+            : <input className="input" value={form.telegram} disabled={disabled} onChange={set('telegram')} placeholder="@username или t.me/username" />
+          }
+        </div>
+        <div className="formGroup">
+          <div className="fieldLabel">ВКонтакте</div>
+          {disabled && form.vk
+            ? <div className="input" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderVk(form.vk)}</div>
+            : <input className="input" value={form.vk} disabled={disabled} onChange={set('vk')} placeholder="vk.com/username или id123456" />
+          }
         </div>
       </div>
       <div style={{ height: 8 }} />
