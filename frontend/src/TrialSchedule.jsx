@@ -57,6 +57,14 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
+  const commentRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (commentRef.current) {
+      commentRef.current.style.height = 'auto';
+      commentRef.current.style.height = commentRef.current.scrollHeight + 'px';
+    }
+  }, [modal]);
   const [allClients, setAllClients] = React.useState(clients);
 
   React.useEffect(() => { setAllClients(clients); }, [clients]);
@@ -381,7 +389,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
             </div>
 
             <div style={{fontSize:12,color:"#888",marginBottom:4}}>Комментарий</div>
-            <textarea style={{...inp,minHeight:80,resize:"none",overflow:"hidden"}} value={form.comment||""} onInput={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Заметки о клиенте..." />
+            <textarea ref={commentRef} style={{...inp,minHeight:80,resize:"none",overflow:"hidden",height:"auto"}} value={form.comment||""} onInput={e=>{e.target.style.height="auto";e.target.style.height=e.target.scrollHeight+"px";}} onChange={e=>setForm(f=>({...f,comment:e.target.value}))} placeholder="Заметки о клиенте..." />
 
             {/* Напоминания за ДЕНЬ */}
             <div style={{background:"#e3f2fd",borderRadius:8,padding:10,marginBottom:8}}>
