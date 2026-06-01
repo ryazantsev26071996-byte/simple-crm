@@ -42,8 +42,30 @@ export default function App() {
   const [listSearch, setListSearch] = React.useState("");
   const [sortField, setSortField] = React.useState("name");
   const [sortDir, setSortDir] = React.useState("asc");
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
+  const [showMobileMenu, setShowMobileMenu] = React.useState(false);
+
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
+
+  const VIEW_NAMES = { kanban: 'Канбан', list: 'Список', trial: 'Пробные', schedule: 'Занятия', analytics: 'Аналитика', grafik: 'График', students: 'Ученики' };
+
+  const availableTabs = [
+    ...(role === 'manager' || role === 'admin' ? [
+      { key: 'kanban', label: 'Канбан' },
+      { key: 'list', label: 'Список' },
+      { key: 'trial', label: 'Пробные' },
+      { key: 'schedule', label: 'Занятия' },
+      { key: 'analytics', label: 'Аналитика' },
+      ...(user?.email === 'crm@artschool.ru' ? [{ key: 'grafik', label: 'График' }] : []),
+    ] : []),
+    { key: 'students', label: 'Ученики' },
+  ];
 
 
 
@@ -78,29 +100,60 @@ export default function App() {
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderBottom: "1px solid #eee", flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <strong style={{ fontSize: 15 }}>Simple CRM</strong>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {(role === 'manager' || role === 'admin') && <>
-              <button className="tabBtn" onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
-              <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
-              {(role === 'manager' || role === 'admin') && <button className="tabBtn" onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Пробные</button>}
-              {(role === 'manager' || role === 'admin') && <button className="tabBtn" onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Занятия</button>}
-              {(role === 'admin' || role === 'manager') && <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>}
-              {user?.email === 'crm@artschool.ru' && <button className="tabBtn" onClick={() => setView('grafik')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'grafik' ? '#7c3aed' : 'white', color: view === 'grafik' ? 'white' : '#7c3aed', cursor: 'pointer' }}>График</button>}
-            </>}
-            <button className="tabBtn" onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
+        {isMobile ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <strong style={{ fontSize: 15 }}>Simple CRM</strong>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#4a90e2' }}>· {VIEW_NAMES[view] || view}</span>
           </div>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <strong style={{ fontSize: 15 }}>Simple CRM</strong>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {(role === 'manager' || role === 'admin') && <>
+                <button className="tabBtn" onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
+                <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
+                <button className="tabBtn" onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Пробные</button>
+                <button className="tabBtn" onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Занятия</button>
+                <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>
+                {user?.email === 'crm@artschool.ru' && <button className="tabBtn" onClick={() => setView('grafik')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'grafik' ? '#7c3aed' : 'white', color: view === 'grafik' ? 'white' : '#7c3aed', cursor: 'pointer' }}>График</button>}
+              </>}
+              <button className="tabBtn" onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
+            </div>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="userName" style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>
-          {role === 'admin' && <button onClick={() => setShowImport(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a' }}>📤<span className="btnLabel"> Импорт</span></button>}
-          {role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥<span className="btnLabel"> Экспорт</span></button>}
-          {role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍<span className="btnLabel"> Дубли</span></button>}
-          {role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋<span className="btnLabel"> Журнал</span></button>}
+          {!isMobile && <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>}
+          {!isMobile && role === 'admin' && <button onClick={() => setShowImport(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a' }}>📤 Импорт</button>}
+          {!isMobile && role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт</button>}
+          {!isMobile && role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍 Дубли</button>}
+          {!isMobile && role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
+          {isMobile && <button onClick={() => setShowMobileMenu(true)} style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', color: '#333' }}>☰</button>}
           <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>
         </div>
       </div>
+
+      {showMobileMenu && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(18,18,24,0.96)', zIndex: 2000, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <strong style={{ color: 'white', fontSize: 16 }}>Simple CRM</strong>
+            <button onClick={() => setShowMobileMenu(false)} style={{ fontSize: 24, background: 'none', border: 'none', color: 'white', cursor: 'pointer', lineHeight: 1 }}>✕</button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 16px', gap: 4, overflowY: 'auto' }}>
+            {availableTabs.map(tab => (
+              <button key={tab.key} onClick={() => { setView(tab.key); setShowMobileMenu(false); }}
+                style={{ fontSize: 17, padding: '14px 16px', borderRadius: 10, border: 'none', background: view === tab.key ? '#4a90e2' : 'rgba(255,255,255,0.07)', color: 'white', cursor: 'pointer', textAlign: 'left', fontWeight: view === tab.key ? 700 : 400 }}>
+                {tab.label}
+              </button>
+            ))}
+            {role === 'admin' && <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 8, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <button onClick={() => { setShowImport(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ffb3d9', cursor: 'pointer', textAlign: 'left' }}>📤 Импорт</button>
+              <button onClick={() => { exportToExcel(clients); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#7be8c0', cursor: 'pointer', textAlign: 'left' }}>📥 Экспорт</button>
+              <button onClick={() => { setShowMerge(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ffd580', cursor: 'pointer', textAlign: 'left' }}>🔍 Дубли</button>
+              <button onClick={() => { setShowAudit(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#80b8ff', cursor: 'pointer', textAlign: 'left' }}>📋 Журнал</button>
+            </div>}
+          </div>
+        </div>
+      )}
 
       {error && <div style={{ color: "red", padding: "8px 16px", flexShrink: 0 }}>{error}</div>}
 
