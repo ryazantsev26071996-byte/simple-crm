@@ -191,16 +191,16 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                       <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
                         {entries.map(e => (
                           <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
-                            <span style={{fontSize:11,fontWeight:600,color:"#333",padding:"4px 10px 2px",whiteSpace:"normal",wordBreak:"break-word",display:"block"}}>
-                              {e.client_name||"—"}
-                            </span>
                             <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
-                            {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
-                            {e.teacher&&<div style={{color:"#4a90e2"}}>{e.teacher}</div>}
-                            {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
-                            {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
-                            {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
-                            {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
+                              <span style={{fontSize:12,fontWeight:600,color:"#333",display:"block",marginBottom:2,whiteSpace:"normal",wordBreak:"break-word"}}>
+                                {e.client_name||"—"}
+                              </span>
+                              {e.lesson_type&&<div style={{color:"#888",fontSize:11}}>{e.lesson_type}</div>}
+                              {e.teacher&&<div style={{color:"#4a90e2",fontSize:11}}>{e.teacher}</div>}
+                              {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
+                              {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
+                              {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
+                              {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
                             </div>
                           </div>
                         ))}
