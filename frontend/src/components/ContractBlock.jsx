@@ -132,7 +132,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
         <div>
           <div style={labelStyle}>Номер договора</div>
           <input style={inputStyle} value={form.contract_number} readOnly={!editing}
