@@ -76,7 +76,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Поиск по имени или последним цифрам номера..."
-          style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
+          style={{ flex: 1, minWidth: 0, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
         />
         {(role === 'manager' || role === 'admin') && (
           <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
@@ -93,13 +93,13 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
             onClick={() => setShowAddModal(true)}
             style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#4a90e2', color: 'white', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}
           >
-            + Добавить клиента
+            +<span className="btnLabel"> Добавить клиента</span>
           </button>
         )}
         {search && <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>Найдено: {filteredClients.length}</div>}
       </div>
 
-      <div style={{ display: 'flex', overflowX: 'auto', height: 'calc(100vh - 120px)', alignItems: 'flex-start', gap: 10, padding: '12px 16px' }}>
+      <div className="kanbanScroll" style={{ display: 'flex', overflowX: 'auto', height: 'calc(100vh - 120px)', alignItems: 'flex-start', gap: 10, padding: '12px 16px' }}>
         {visibleStages.map(stage => (
           <Column
             key={stage}

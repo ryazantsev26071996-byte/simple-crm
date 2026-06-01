@@ -256,3 +256,29 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+.kanbanScroll {
+  scrollbar-width: none;
+}
+.kanbanScroll::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .tabBtn {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+  }
+  .btnLabel {
+    display: none;
+  }
+  .userName {
+    display: none;
+  }
+  * {
+    scrollbar-width: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+}
