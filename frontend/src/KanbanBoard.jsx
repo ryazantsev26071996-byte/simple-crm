@@ -158,14 +158,16 @@ function Column({ stage, clients, onClientSelect, onDrop, totalAmount }) {
   )
 }
 
+const contactLinkStyle = { display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }
+
 function renderContact(value) {
   if (!value) return null
   if (value.startsWith('@'))
-    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{value}</a>
+    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={contactLinkStyle}>{value}</a>
   if (value.startsWith('t.me/'))
-    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{value}</a>
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={contactLinkStyle}>{value}</a>
   if (value.startsWith('vk.com/'))
-    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>{value}</a>
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={contactLinkStyle}>{value}</a>
   return formatPhone(value)
 }
 
@@ -190,7 +192,7 @@ function Card({ client, onClientSelect }) {
       style={{ background: 'white', borderRadius: 6, padding: '8px 10px', marginBottom: 6, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', fontSize: 13 }}
     >
       <div style={{ fontWeight: 500, marginBottom: 2 }}>{client.name}</div>
-      {client.phone && <div style={{ color: '#888', fontSize: 12 }}>{renderContact(client.phone)}</div>}
+      {client.phone && <div style={{ color: '#888', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderContact(client.phone)}</div>}
       {client.subscription && (
         <div style={{ marginTop: 4, fontSize: 11, background: '#f0f7ff', color: '#4a90e2', borderRadius: 4, padding: '2px 6px', display: 'inline-block' }}>
           {client.subscription}
