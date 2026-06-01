@@ -1,4 +1,15 @@
 import React from "react";
+
+function renderContact(value) {
+  if (!value) return <span>{value}</span>
+  if (value.startsWith('@'))
+    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer">{value}</a>
+  if (value.startsWith('t.me/'))
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{value}</a>
+  if (value.startsWith('vk.com/'))
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{value}</a>
+  return <span>{value}</span>
+}
 import ClientForm from "./ClientForm.jsx";
 import CommentsWall from "./CommentsWall.jsx";
 import StudentInfoBlock from "./StudentInfoBlock.jsx";
@@ -28,7 +39,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
         <div>
           <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{client.name}</div>
           <div style={{ fontSize: 13, color: '#888' }}>
-            {client.phone && <span>{client.phone} · </span>}
+            {client.phone && <span>{renderContact(client.phone)} · </span>}
             {client.source && <span>{client.source} · </span>}
             <span>{client.stage || '—'}</span>
           </div>

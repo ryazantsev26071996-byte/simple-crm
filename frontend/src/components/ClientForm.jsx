@@ -22,10 +22,24 @@ async function apiFetch(path) {
   return res.ok ? res.json() : []
 }
 
+function renderContact(value) {
+  if (!value) return null
+  if (value.startsWith('@')) {
+    return <a href={`https://t.me/${value.slice(1)}`} target="_blank" rel="noopener noreferrer">{value}</a>
+  }
+  if (value.startsWith('t.me/')) {
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{value}</a>
+  }
+  if (value.startsWith('vk.com/')) {
+    return <a href={`https://${value}`} target="_blank" rel="noopener noreferrer">{value}</a>
+  }
+  return null
+}
+
 const STAGES = [
   'новая заявка','записан на пробное','на следующий месяц','был не купил',
   'не пришел','дожимать','продажа','ученик','бронь','тест-драйв',
-  'пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение',
+  'пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение','кончился абонемент',
 ]
 
 const SUBSCRIPTIONS = [
@@ -232,7 +246,10 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Контакт</div>
-          <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} onBlur={handlePhoneBlur} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
+          {disabled && renderContact(form.phone)
+            ? <div className="input" style={{ display: 'flex', alignItems: 'center' }}>{renderContact(form.phone)}</div>
+            : <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} onBlur={handlePhoneBlur} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
+          }
           {phoneError && <div style={{ color: '#e55', fontSize: 11, marginTop: 3 }}>{phoneError}</div>}
           {dupWarning && (
             <div style={{ marginTop: 6, padding: '8px 10px', background: '#fff8e1', border: '1px solid #f5c518', borderRadius: 6, fontSize: 12 }}>
