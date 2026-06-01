@@ -46,6 +46,13 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [filterMonth, setFilterMonth] = useState('all')
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768)
+
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
 
   const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
   const currentYear = new Date().getFullYear()
@@ -108,6 +115,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
             onClientSelect={onClientSelect}
             onDrop={(id, newStage) => onStageChange(id, newStage)}
             totalAmount={getStageTotalAmount(stage)}
+            isMobile={isMobile}
           />
         ))}
       </div>
@@ -133,15 +141,17 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
   );
 }
 
-function Column({ stage, clients, onClientSelect, onDrop, totalAmount }) {
+function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile }) {
   const [over, setOver] = useState(false)
   const bg = over ? '#e8f4ff' : '#f5f5f5'
+  const colWidth = isMobile ? 280 : 200
+  const colMaxWidth = isMobile ? 300 : 220
   return (
     <div
       onDragOver={e => { e.preventDefault(); setOver(true) }}
       onDragLeave={() => setOver(false)}
       onDrop={e => { e.preventDefault(); setOver(false); const id = Number(e.dataTransfer.getData('clientId')); onDrop(id, stage) }}
-      style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: 200, maxWidth: 220, flexShrink: 0, background: bg, borderRadius: 8, border: over ? '2px dashed #4a90e2' : '2px solid transparent' }}
+      style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: colWidth, maxWidth: colMaxWidth, flexShrink: 0, background: bg, borderRadius: 8, border: over ? '2px dashed #4a90e2' : '2px solid transparent' }}
     >
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: bg, padding: '8px 8px 4px', borderRadius: '8px 8px 0 0' }}>
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', display: 'flex', justifyContent: 'space-between' }}>

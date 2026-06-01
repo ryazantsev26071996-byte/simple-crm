@@ -162,7 +162,7 @@ export default function App() {
       {error && <div style={{ color: "red", padding: "8px 16px", flexShrink: 0 }}>{error}</div>}
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: selectedId ? '0 0 60%' : '1', overflow: 'auto', borderRight: selectedId ? '1px solid #eee' : 'none' }}>
+        <div style={{ flex: (!isMobile && selectedId) ? '0 0 60%' : '1', overflow: 'auto', borderRight: (!isMobile && selectedId) ? '1px solid #eee' : 'none' }}>
           {view === 'analytics' && (role === 'admin' || role === 'manager') && <Analytics />}
           {view === 'grafik' && user?.email === 'crm@artschool.ru' && <WorkSchedule />}
           {view === 'trial' && (role === 'manager' || role === 'admin') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
@@ -269,7 +269,13 @@ export default function App() {
         </div>
 
         {selectedId && selectedClient && (
-          <div style={{ flex: '0 0 40%', overflow: 'auto', padding: 16 }}>
+          <div style={isMobile
+            ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'white', overflowY: 'auto', padding: 16 }
+            : { flex: '0 0 40%', overflow: 'auto', padding: 16 }
+          }>
+            {isMobile && (
+              <button onClick={() => setSelectedId(null)} style={{ fontSize: 14, padding: '6px 14px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>← Назад</button>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{selectedClient.name}</div>
@@ -279,7 +285,7 @@ export default function App() {
                   <span>{selectedClient.stage || '—'}</span>
                 </div>
               </div>
-<div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 {(role === 'admin' || role === 'manager') && (
                   <button onClick={async () => {
                     if (!window.confirm('Удалить клиента ' + selectedClient.name + '?')) return;
@@ -291,7 +297,7 @@ export default function App() {
                     🗑️ Удалить
                   </button>
                 )}
-                <button onClick={() => setSelectedId(null)} style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
+                {!isMobile && <button onClick={() => setSelectedId(null)} style={{ fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>}
               </div>
             </div>
 
