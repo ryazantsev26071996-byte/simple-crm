@@ -176,7 +176,7 @@ export function TeacherView({ clients, onClientSelect }) {
           </table>
         </div>
       ) : (
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #eee' }}>
