@@ -172,12 +172,12 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
       </div>
 
       {showEvents ? <Events /> : loading ? <div style={{color:"#888"}}>Загрузка...</div> : (
-        <div style={{overflowX:"auto", position:"relative"}}>
-          <table style={{borderCollapse:"collapse",width:"100%",minWidth:800, position:"relative"}}>
+        <div style={{overflowX:"auto",overflowY:"scroll",height:"calc(100vh - 180px)",position:"relative",WebkitOverflowScrolling:"touch"}}>
+          <table style={{borderCollapse:"collapse",width:"100%",minWidth:800}}>
             <thead>
               <tr>
-                <th style={{width:60,padding:"6px 8px",backgroundColor:"#f0f0f0",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:12,borderRight:"2px solid #ccc"}}>Время</th>
-                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",backgroundColor:fmt(d)===fmt(new Date())?"#e8f4ff":"#f0f0f0",border:"1px solid #ddd",fontSize:12,minWidth:180,position:"sticky",top:0,zIndex:10}}>{fmtDisplay(d)}</th>)}
+                <th style={{width:60,padding:"6px 8px",backgroundColor:"white",border:"1px solid #ddd",fontSize:12,position:"sticky",left:0,top:0,zIndex:20,borderRight:"2px solid #ccc"}}>Время</th>
+                {days.map(d => <th key={fmt(d)} style={{padding:"6px 8px",backgroundColor:"white",border:"1px solid #ddd",fontSize:12,minWidth:180,position:"sticky",top:0,zIndex:10}}>{fmtDisplay(d)}</th>)}
               </tr>
             </thead>
             <tbody>
