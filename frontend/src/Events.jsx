@@ -248,7 +248,7 @@ export default function Events() {
               <thead>
                 <tr style={{ background: "#f0f4ff" }}>
                   {["Дата","Время","Название","Педагог","Аккаунт","Сценарий","Материалы","Пост","Дата поста"].map(h => (
-                    <th key={h} style={{ padding: "6px 10px", border: "1px solid #dde", fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" }}>{h}</th>
+                    <th key={h} style={{ padding: "6px 10px", border: "1px solid #dde", fontWeight: 600, whiteSpace: "nowrap", textAlign: "left", ...(h === "Название" ? { minWidth: 200 } : {}) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -261,7 +261,7 @@ export default function Events() {
                       {ev.date ? new Date(ev.date + "T00:00").toLocaleDateString("ru-RU") : "—"}
                     </td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee" }}>{ev.time?.slice(0,5) || "—"}</td>
-                    <td style={{ padding: "6px 10px", border: "1px solid #eee", fontWeight: 500 }}>
+                    <td style={{ padding: "6px 10px", border: "1px solid #eee", fontWeight: 500, minWidth: 200, wordBreak: "break-word", overflowWrap: "break-word", hyphens: "none" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                         <div style={{ width: 8, height: 8, borderRadius: "50%", background: chipColor(ev), flexShrink: 0 }} />
                         {ev.title}
