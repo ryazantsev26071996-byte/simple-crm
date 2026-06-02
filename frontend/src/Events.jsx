@@ -220,7 +220,7 @@ export default function Events() {
                     </div>
                     {dayEvents.map(ev => (
                       <div key={ev.id} onClick={() => openEdit(ev)}
-                        style={{ fontSize: 11, borderRadius: 3, padding: "2px 5px", marginBottom: 2, cursor: "pointer", background: chipColor(ev), color: "white", whiteSpace: "normal", wordBreak: "break-word" }}
+                        style={{ fontSize: 11, borderRadius: 3, padding: "2px 5px", marginBottom: 2, cursor: "pointer", background: chipColor(ev), color: "white", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}
                         title={ev.title}>
                         {ev.time?.slice(0,5) && <span style={{ opacity: 0.85, marginRight: 3 }}>{ev.time.slice(0,5)}</span>}
                         {ev.title}
