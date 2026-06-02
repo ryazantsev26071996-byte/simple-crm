@@ -200,12 +200,12 @@ export default function Events() {
 
       {/* Calendar grid */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(120px, 1fr))", gap: 2, marginBottom: 2, position: "sticky", top: 0, zIndex: 10, backgroundColor: "white" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(180px, 1fr))", gap: 2, marginBottom: 2, position: "sticky", top: 0, zIndex: 10, backgroundColor: "white" }}>
           {WEEKDAYS.map(d => (
             <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#888", padding: "4px 0" }}>{d}</div>
           ))}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(120px, 1fr))", gap: 2 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(180px, 1fr))", gap: 2 }}>
           {cells.map((day, i) => {
             const dayEvents = eventsForDay(day);
             const isToday = day && dateFmt(year, month, day) === dateFmt(now.getFullYear(), now.getMonth()+1, now.getDate());
@@ -220,7 +220,7 @@ export default function Events() {
                     </div>
                     {dayEvents.map(ev => (
                       <div key={ev.id} onClick={() => openEdit(ev)}
-                        style={{ fontSize: 11, borderRadius: 3, padding: "2px 5px", marginBottom: 2, cursor: "pointer", background: chipColor(ev), color: "white", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}
+                        style={{ fontSize: 11, borderRadius: 3, padding: "2px 5px", marginBottom: 2, cursor: "pointer", background: chipColor(ev), color: "white", whiteSpace: "normal", wordBreak: "break-word" }}
                         title={ev.title}>
                         {ev.time?.slice(0,5) && <span style={{ opacity: 0.85, marginRight: 3 }}>{ev.time.slice(0,5)}</span>}
                         {ev.title}
