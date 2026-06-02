@@ -83,6 +83,12 @@ export default function Analytics() {
   const [salesSelected, setSalesSelected] = React.useState(new Set());
   const [salesSaving, setSalesSaving] = React.useState(false);
   const [showTeam, setShowTeam] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   React.useEffect(() => {
     if (salesSearch.length < 2) { setSalesSearchResults([]); return; }
@@ -338,7 +344,7 @@ export default function Analytics() {
       {showTeam && <TeamOnline />}
 
       {/* ── Daily + Managers side by side ── */}
-      <div style={{ display: "flex", gap: 24, alignItems: "flex-start", marginBottom: 28 }}>
+      <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 16 : 24, alignItems: isMobile ? "stretch" : "flex-start", marginBottom: 28 }}>
       <div style={{ flexShrink: 0 }}>
       {/* ── Daily breakdown ── */}
       <div style={{ marginBottom: 0 }}>
