@@ -144,12 +144,12 @@ export function TeacherView({ clients, onClientSelect }) {
       </div>
 
       {showLost ? (
-        <div style={{ overflowY: 'auto', flex: 1 }}>
+        <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #eee', background: '#fafafa' }}>
                 {['Имя', 'Телефон', 'Абонемент', 'Занятий осталось', 'Последнее занятие', 'Дней без занятий'].map(col => (
-                  <th key={col} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap' }}>{col}</th>
+                  <th key={col} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap', ...(col === 'Имя' ? { position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 2, borderRight: '1px solid #eee' } : {}) }}>{col}</th>
                 ))}
               </tr>
             </thead>
@@ -163,7 +163,7 @@ export function TeacherView({ clients, onClientSelect }) {
                     style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
                     onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                    <td style={{ padding: '8px 12px', fontWeight: 500 }}>{c.name}</td>
+                    <td style={{ padding: '8px 12px', fontWeight: 500, position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 1, borderRight: '1px solid #eee' }}>{c.name}</td>
                     <td style={{ padding: '8px 12px', color: '#888' }}>{c.phone || '—'}</td>
                     <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
                     <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
