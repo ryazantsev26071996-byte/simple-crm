@@ -88,10 +88,10 @@ export function TeacherView({ clients, onClientSelect }) {
     else { setSortField(field); setSortDir('asc') }
   }
 
-  function SortTh({ field, label }) {
+  function SortTh({ field, label, style: extraStyle }) {
     return (
       <th onClick={() => toggleSort(field)}
-        style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', background: '#fafafa' }}>
+        style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', userSelect: 'none', background: '#fafafa', ...extraStyle }}>
         {label} {sortField === field ? (sortDir === 'asc' ? '↑' : '↓') : ''}
       </th>
     )
@@ -180,7 +180,7 @@ export function TeacherView({ clients, onClientSelect }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #eee' }}>
-                <SortTh field="name" label="Имя" />
+                <SortTh field="name" label="Имя" style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', borderRight: '1px solid #eee' }} />
                 <SortTh field="subscription_type" label="Абонемент" />
                 <SortTh field="lessons_left" label="Занятий осталось" />
                 <SortTh field="days_left" label="До окончания" />
@@ -202,7 +202,7 @@ export function TeacherView({ clients, onClientSelect }) {
                     style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#f9f9f9'}
                     onMouseLeave={e => e.currentTarget.style.background = 'white'}>
-                    <td style={{ padding: '10px 12px', fontWeight: 500 }}>
+                    <td style={{ padding: '10px 12px', fontWeight: 500, position: 'sticky', left: 0, zIndex: 1, backgroundColor: 'white', borderRight: '1px solid #eee' }}>
                       {c.name}
                       {c.phone && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.phone}</div>}
                     </td>
