@@ -130,9 +130,7 @@ export default function WorkSchedule() {
     setSalaryLoading(true);
     try {
       const rates = await apiFetch(`salary_rates?month=eq.${month}&year=eq.${year}`);
-      const rateMap = {};
-      (rates || []).forEach(r => { rateMap[r.employee_name] = r.hourly_rate; });
-      setSalaryRates(rateMap);
+      setSalaryRates(rates || []);
 
       const daysInMonthVal = new Date(year, month, 0).getDate();
       const monthStart = dateFmt(year, month, 1);
@@ -157,7 +155,14 @@ export default function WorkSchedule() {
         headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
         body: JSON.stringify({ employee_name: emp, month, year, hourly_rate: Number(rate) }),
       });
-      setSalaryRates(prev => ({ ...prev, [emp]: Number(rate) }));
+      setSalaryRates(prev => {
+        const exists = prev.some(r => r.employee_name === emp && r.month === month && r.year === year);
+        if (exists) {
+          return prev.map(r => r.employee_name === emp && r.month === month && r.year === year
+            ? { ...r, hourly_rate: Number(rate) } : r);
+        }
+        return [...prev, { employee_name: emp, month, year, hourly_rate: Number(rate) }];
+      });
     } catch (e) { console.error(e); }
   }
 
@@ -399,7 +404,8 @@ export default function WorkSchedule() {
                     const p1  = sumPeriod(emp, 10, month, year, 25, month, year);
                     const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 10, month, year);
                     const tot = monthTotal(emp);
-                    const rate   = salaryRates[emp] || 250;
+                    const savedRate = salaryRates.find(r => r.employee_name === emp && r.month === month && r.year === year)?.hourly_rate || 250;
+                    const rate   = editingRates[emp] !== undefined ? Number(editingRates[emp]) : savedRate;
                     const salary = Math.round(tot * rate);
                     return (
                       <tr key={emp}
@@ -411,7 +417,7 @@ export default function WorkSchedule() {
                         <td style={{ ...TD, textAlign: 'center', fontWeight: 600 }}>{tot > 0 ? tot : '—'}</td>
                         <td style={{ ...TD }}>
                           <select
-                            value={editingRates[emp] !== undefined ? editingRates[emp] : rate}
+                            value={editingRates[emp] !== undefined ? editingRates[emp] : savedRate}
                             onChange={e => {
                               const val = Number(e.target.value);
                               setEditingRates(prev => ({ ...prev, [emp]: val }));
@@ -452,16 +458,17 @@ export default function WorkSchedule() {
                 </thead>
                 <tbody>
                   {EMPLOYEES['Менеджеры'].map(emp => {
-                    const tot     = monthTotal(emp);
-                    const rate    = salaryRates[emp] || 0;
-                    const base    = Math.round(tot * rate);
+                    const tot        = monthTotal(emp);
+                    const savedRate  = salaryRates.find(r => r.employee_name === emp && r.month === month && r.year === year)?.hourly_rate || 0;
+                    const rate       = editingRates[emp] !== undefined && editingRates[emp] !== '' ? Number(editingRates[emp]) : savedRate;
+                    const base       = Math.round(tot * rate);
                     const empClients = salaryClients.filter(c => c.manager_name === emp);
-                    const revenue = empClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
-                    const plan    = managerPlans[emp] || 0;
-                    const bonusPct = plan > 0 && revenue >= plan ? 0.06 : 0.05;
-                    const bonus   = Math.round(revenue * bonusPct);
-                    const total   = base + bonus;
-                    const inputVal = editingRates[emp] !== undefined ? editingRates[emp] : (rate || '');
+                    const revenue    = empClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
+                    const plan       = managerPlans[emp] || 0;
+                    const bonusPct   = plan > 0 && revenue >= plan ? 0.06 : 0.05;
+                    const bonus      = Math.round(revenue * bonusPct);
+                    const total      = base + bonus;
+                    const inputVal   = editingRates[emp] !== undefined ? editingRates[emp] : (savedRate || '');
                     return (
                       <tr key={emp}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
@@ -516,16 +523,17 @@ export default function WorkSchedule() {
                 </thead>
                 <tbody>
                   {EMPLOYEES['Аккаунты'].map(emp => {
-                    const tot  = monthTotal(emp);
-                    const rate = salaryRates[emp] || 0;
-                    const base = Math.round(tot * rate);
+                    const tot        = monthTotal(emp);
+                    const savedRate  = salaryRates.find(r => r.employee_name === emp && r.month === month && r.year === year)?.hourly_rate || 0;
+                    const rate       = editingRates[emp] !== undefined && editingRates[emp] !== '' ? Number(editingRates[emp]) : savedRate;
+                    const base       = Math.round(tot * rate);
                     const regClients   = salaryClients.filter(c => c.registered_by === emp);
                     const regBonus     = Math.round(regClients.reduce((s, c) => s + (c.payment_amount || 0) * regBonusPct(c.payment_method), 0));
                     const renewClients = salaryClients.filter(c => c.manager_name === emp);
                     const renewRevenue = renewClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
                     const renewBonus   = Math.round(renewRevenue * renewalBonusPct(renewRevenue));
                     const total        = base + regBonus + renewBonus;
-                    const inputVal = editingRates[emp] !== undefined ? editingRates[emp] : (rate || '');
+                    const inputVal     = editingRates[emp] !== undefined ? editingRates[emp] : (savedRate || '');
                     return (
                       <tr key={emp}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
