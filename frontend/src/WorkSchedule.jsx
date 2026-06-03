@@ -59,7 +59,11 @@ function calcHours(start, end) {
   if (!start || !end) return 0;
   const [sh, sm] = start.split(":").map(Number);
   const [eh, em] = end.split(":").map(Number);
-  const h = (eh + em / 60) - (sh + sm / 60);
+  const startMins = sh * 60 + sm;
+  const endMins = eh * 60 + em;
+  let h = (endMins - startMins) / 60;
+  if (h <= 0) return 0;
+  if (startMins < 15 * 60 && endMins > 14 * 60) h -= 1;
   return h > 0 ? Math.round(h * 10) / 10 : 0;
 }
 
