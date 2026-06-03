@@ -204,7 +204,7 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                             </div>
                           </div>
                         ))}
-                        {!isFull&&(role==="manager"||role==="admin")&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
+                        {!isFull&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
                         {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
                       </td>
                     );
