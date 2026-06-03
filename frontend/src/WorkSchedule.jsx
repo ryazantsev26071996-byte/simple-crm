@@ -94,7 +94,7 @@ export default function WorkSchedule() {
   const [modalForm, setModalForm] = React.useState({});
   const [saving, setSaving] = React.useState(false);
 
-  const [salaryRates,   setSalaryRates]   = React.useState({});
+  const [salaryRates,   setSalaryRates]   = React.useState([]);
   const [editingRates,  setEditingRates]  = React.useState({});
   const [salaryClients, setSalaryClients] = React.useState([]);
   const [managerPlans,  setManagerPlans]  = React.useState({});
@@ -144,7 +144,7 @@ export default function WorkSchedule() {
       const planMap = {};
       (plans || []).forEach(p => { planMap[p.employee_name] = p.plan_amount; });
       setManagerPlans(planMap);
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error('loadSalaryData error:', e); }
     setSalaryLoading(false);
   }
 
