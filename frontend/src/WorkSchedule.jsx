@@ -404,7 +404,7 @@ export default function WorkSchedule() {
                     const p1  = sumPeriod(emp, 10, month, year, 25, month, year);
                     const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 10, month, year);
                     const tot = monthTotal(emp);
-                    const savedRate = salaryRates.find(r => r.employee_name === emp && r.month === month && r.year === year)?.hourly_rate || 250;
+                    const savedRate = salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || 250;
                     const rate   = editingRates[emp] !== undefined ? Number(editingRates[emp]) : savedRate;
                     const salary = Math.round(tot * rate);
                     return (
@@ -459,7 +459,7 @@ export default function WorkSchedule() {
                 <tbody>
                   {EMPLOYEES['Менеджеры'].map(emp => {
                     const tot        = monthTotal(emp);
-                    const savedRate  = salaryRates.find(r => r.employee_name === emp && r.month === month && r.year === year)?.hourly_rate || 0;
+                    const savedRate  = salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || 0;
                     const rate       = editingRates[emp] !== undefined && editingRates[emp] !== '' ? Number(editingRates[emp]) : savedRate;
                     const base       = Math.round(tot * rate);
                     const empClients = salaryClients.filter(c => c.manager_name === emp);
@@ -468,7 +468,7 @@ export default function WorkSchedule() {
                     const bonusPct   = plan > 0 && revenue >= plan ? 0.06 : 0.05;
                     const bonus      = Math.round(revenue * bonusPct);
                     const total      = base + bonus;
-                    const inputVal   = editingRates[emp] !== undefined ? editingRates[emp] : (savedRate || '');
+                    const inputVal   = editingRates[emp] !== undefined ? editingRates[emp] : (salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || '');
                     return (
                       <tr key={emp}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
@@ -524,7 +524,7 @@ export default function WorkSchedule() {
                 <tbody>
                   {EMPLOYEES['Аккаунты'].map(emp => {
                     const tot        = monthTotal(emp);
-                    const savedRate  = salaryRates.find(r => r.employee_name === emp && r.month === month && r.year === year)?.hourly_rate || 0;
+                    const savedRate  = salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || 0;
                     const rate       = editingRates[emp] !== undefined && editingRates[emp] !== '' ? Number(editingRates[emp]) : savedRate;
                     const base       = Math.round(tot * rate);
                     const regClients   = salaryClients.filter(c => c.registered_by === emp);
@@ -533,7 +533,7 @@ export default function WorkSchedule() {
                     const renewRevenue = renewClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
                     const renewBonus   = Math.round(renewRevenue * renewalBonusPct(renewRevenue));
                     const total        = base + regBonus + renewBonus;
-                    const inputVal     = editingRates[emp] !== undefined ? editingRates[emp] : (savedRate || '');
+                    const inputVal     = editingRates[emp] !== undefined ? editingRates[emp] : (salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || '');
                     return (
                       <tr key={emp}
                         onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
