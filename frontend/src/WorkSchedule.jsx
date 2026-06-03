@@ -105,7 +105,8 @@ export default function WorkSchedule() {
     for (const names of Object.values(EMPLOYEES)) {
       for (const emp of names) {
         const ent = data[`${dateStr}_${emp}`];
-        form[emp] = { checked: !!ent, start: ent?.start_time || "10:00", end: ent?.end_time || "21:00" };
+        const defaultStart = EMPLOYEE_ROLE[emp] === "Аккаунты" ? "11:00" : "10:00";
+        form[emp] = { checked: !!ent, start: ent?.start_time || defaultStart, end: ent?.end_time || "21:00" };
       }
     }
     setModalForm(form);
@@ -323,7 +324,7 @@ export default function WorkSchedule() {
                   {role}
                 </div>
                 {names.map(emp => {
-                  const f = modalForm[emp] || { checked: false, start: "10:00", end: "21:00" };
+                  const f = modalForm[emp] || { checked: false, start: EMPLOYEE_ROLE[emp] === "Аккаунты" ? "11:00" : "10:00", end: "21:00" };
                   const hours = calcHours(f.start, f.end);
                   return (
                     <div key={emp} style={{
