@@ -1,4 +1,5 @@
 import React from "react";
+import { useAuth } from "./AuthContext";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -67,23 +68,49 @@ function calcHours(start, end) {
   return h > 0 ? Math.round(h * 10) / 10 : 0;
 }
 
+function renewalBonusPct(rev) {
+  if (rev >= 420000) return 0.06;
+  if (rev >= 320000) return 0.05;
+  if (rev >= 200000) return 0.04;
+  return 0.03;
+}
+
+function regBonusPct(pm) {
+  if (!pm) return 0.02;
+  return pm.toLowerCase().includes('рассрочк') ? 0.01 : 0.02;
+}
+
 const TH = { padding: "6px 10px", background: "#f0f4ff", border: "1px solid #dde", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" };
 const TD = { padding: "5px 10px", border: "1px solid #eee", fontSize: 12 };
 
 export default function WorkSchedule() {
   const now = new Date();
+  const { user } = useAuth();
   const [month,  setMonth]  = React.useState(now.getMonth() + 1);
   const [year,   setYear]   = React.useState(now.getFullYear());
   const [data,   setData]   = React.useState({});
   const [loading, setLoading] = React.useState(false);
-  const [modal,  setModal]  = React.useState(null); // { date: "YYYY-MM-DD" }
+  const [modal,  setModal]  = React.useState(null);
   const [modalForm, setModalForm] = React.useState({});
   const [saving, setSaving] = React.useState(false);
+
+  const [salaryRates,   setSalaryRates]   = React.useState({});
+  const [editingRates,  setEditingRates]  = React.useState({});
+  const [salaryClients, setSalaryClients] = React.useState([]);
+  const [managerPlans,  setManagerPlans]  = React.useState({});
+  const [salaryLoading, setSalaryLoading] = React.useState(false);
 
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear  = month === 1 ? year - 1 : year;
 
   React.useEffect(() => { load(); }, [month, year]);
+
+  React.useEffect(() => {
+    if (user?.email === 'crm@artschool.ru') {
+      setEditingRates({});
+      loadSalaryData();
+    }
+  }, [month, year, user?.email]);
 
   async function load() {
     setLoading(true);
@@ -97,6 +124,41 @@ export default function WorkSchedule() {
       setData(map);
     } catch (e) { console.error(e); }
     setLoading(false);
+  }
+
+  async function loadSalaryData() {
+    setSalaryLoading(true);
+    try {
+      const rates = await apiFetch(`salary_rates?month=eq.${month}&year=eq.${year}`);
+      const rateMap = {};
+      (rates || []).forEach(r => { rateMap[r.employee_name] = r.hourly_rate; });
+      setSalaryRates(rateMap);
+
+      const daysInMonthVal = new Date(year, month, 0).getDate();
+      const monthStart = dateFmt(year, month, 1);
+      const monthEnd   = dateFmt(year, month, daysInMonthVal);
+      const clients = await apiFetch(
+        `clients?contract_date=gte.${monthStart}&contract_date=lte.${monthEnd}&select=id,name,manager_name,registered_by,payment_method,payment_amount`
+      );
+      setSalaryClients(clients || []);
+
+      const plans = await apiFetch(`manager_plans?month=eq.${month}&year=eq.${year}`);
+      const planMap = {};
+      (plans || []).forEach(p => { planMap[p.employee_name] = p.plan_amount; });
+      setManagerPlans(planMap);
+    } catch (e) { console.error(e); }
+    setSalaryLoading(false);
+  }
+
+  async function saveRate(emp, rate) {
+    try {
+      await apiFetch(`salary_rates?on_conflict=employee_name,month,year`, {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: JSON.stringify({ employee_name: emp, month, year, hourly_rate: Number(rate) }),
+      });
+      setSalaryRates(prev => ({ ...prev, [emp]: Number(rate) }));
+    } catch (e) { console.error(e); }
   }
 
   function openDay(day) {
@@ -266,7 +328,7 @@ export default function WorkSchedule() {
       </div>
 
       {/* Totals */}
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 32 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Итоги по периодам</div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
@@ -308,6 +370,196 @@ export default function WorkSchedule() {
           </table>
         </div>
       </div>
+
+      {/* Salary section — admin only */}
+      {user?.email === 'crm@artschool.ru' && (
+        <div style={{ marginBottom: 32 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            Зарплата — {MONTH_NAMES[month - 1]} {year}
+            {salaryLoading && <span style={{ fontSize: 11, color: '#888', fontWeight: 400 }}>Загрузка...</span>}
+          </div>
+
+          {/* Педагоги */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ROLE_COLOR['Педагоги'], textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Педагоги</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...TH, minWidth: 110 }}>Сотрудник</th>
+                    <th style={{ ...TH, minWidth: 80, textAlign: 'center' }}>Часов 10–25</th>
+                    <th style={{ ...TH, minWidth: 80, textAlign: 'center' }}>Часов 26–10</th>
+                    <th style={{ ...TH, minWidth: 70, textAlign: 'center' }}>Всего ч.</th>
+                    <th style={{ ...TH, minWidth: 120 }}>Ставка ₽/ч</th>
+                    <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Итого</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {EMPLOYEES['Педагоги'].map(emp => {
+                    const p1  = sumPeriod(emp, 10, month, year, 25, month, year);
+                    const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 10, month, year);
+                    const tot = monthTotal(emp);
+                    const rate   = salaryRates[emp] || 250;
+                    const salary = Math.round(tot * rate);
+                    return (
+                      <tr key={emp}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                        <td style={{ ...TD, fontWeight: 500 }}>{emp}</td>
+                        <td style={{ ...TD, textAlign: 'center', color: p1 > 0 ? '#333' : '#ccc' }}>{p1 > 0 ? p1 : '—'}</td>
+                        <td style={{ ...TD, textAlign: 'center', color: p2 > 0 ? '#333' : '#ccc' }}>{p2 > 0 ? p2 : '—'}</td>
+                        <td style={{ ...TD, textAlign: 'center', fontWeight: 600 }}>{tot > 0 ? tot : '—'}</td>
+                        <td style={{ ...TD }}>
+                          <select
+                            value={editingRates[emp] !== undefined ? editingRates[emp] : rate}
+                            onChange={e => {
+                              const val = Number(e.target.value);
+                              setEditingRates(prev => ({ ...prev, [emp]: val }));
+                              saveRate(emp, val);
+                            }}
+                            style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }}>
+                            <option value={250}>250 ₽/ч</option>
+                            <option value={270}>270 ₽/ч</option>
+                          </select>
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: tot > 0 ? '#2a9d8f' : '#ccc' }}>
+                          {tot > 0 ? `${salary.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Менеджеры */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ROLE_COLOR['Менеджеры'], textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Менеджеры</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...TH, minWidth: 110 }}>Сотрудник</th>
+                    <th style={{ ...TH, minWidth: 70, textAlign: 'center' }}>Часов</th>
+                    <th style={{ ...TH, minWidth: 100 }}>Ставка ₽/ч</th>
+                    <th style={{ ...TH, minWidth: 90, textAlign: 'right' }}>Оклад</th>
+                    <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Выручка</th>
+                    <th style={{ ...TH, minWidth: 60, textAlign: 'center' }}>%</th>
+                    <th style={{ ...TH, minWidth: 90, textAlign: 'right' }}>Бонус</th>
+                    <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Итого</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {EMPLOYEES['Менеджеры'].map(emp => {
+                    const tot     = monthTotal(emp);
+                    const rate    = salaryRates[emp] || 0;
+                    const base    = Math.round(tot * rate);
+                    const empClients = salaryClients.filter(c => c.manager_name === emp);
+                    const revenue = empClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
+                    const plan    = managerPlans[emp] || 0;
+                    const bonusPct = plan > 0 && revenue >= plan ? 0.06 : 0.05;
+                    const bonus   = Math.round(revenue * bonusPct);
+                    const total   = base + bonus;
+                    const inputVal = editingRates[emp] !== undefined ? editingRates[emp] : (rate || '');
+                    return (
+                      <tr key={emp}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                        <td style={{ ...TD, fontWeight: 500 }}>{emp}</td>
+                        <td style={{ ...TD, textAlign: 'center', fontWeight: 600 }}>{tot > 0 ? tot : '—'}</td>
+                        <td style={{ ...TD }}>
+                          <input type="number" value={inputVal}
+                            onChange={e => setEditingRates(prev => ({ ...prev, [emp]: e.target.value }))}
+                            onBlur={e => { if (e.target.value) saveRate(emp, e.target.value); }}
+                            placeholder="₽/ч"
+                            style={{ width: 72, padding: '2px 6px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }} />
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', color: base > 0 ? '#333' : '#ccc' }}>
+                          {base > 0 ? `${base.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', color: revenue > 0 ? '#333' : '#ccc' }}>
+                          {revenue > 0 ? `${revenue.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'center', color: plan > 0 && revenue >= plan ? '#2a9' : '#888' }}>
+                          {revenue > 0 ? `${bonusPct * 100}%` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', color: bonus > 0 ? '#333' : '#ccc' }}>
+                          {bonus > 0 ? `${bonus.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: total > 0 ? '#e67e22' : '#ccc' }}>
+                          {total > 0 ? `${total.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Аккаунты */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: ROLE_COLOR['Аккаунты'], textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>Аккаунты</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...TH, minWidth: 110 }}>Сотрудник</th>
+                    <th style={{ ...TH, minWidth: 70, textAlign: 'center' }}>Часов</th>
+                    <th style={{ ...TH, minWidth: 100 }}>Ставка ₽/ч</th>
+                    <th style={{ ...TH, minWidth: 90, textAlign: 'right' }}>Оклад</th>
+                    <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Бонус рег.</th>
+                    <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Бонус прод.</th>
+                    <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Итого</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {EMPLOYEES['Аккаунты'].map(emp => {
+                    const tot  = monthTotal(emp);
+                    const rate = salaryRates[emp] || 0;
+                    const base = Math.round(tot * rate);
+                    const regClients   = salaryClients.filter(c => c.registered_by === emp);
+                    const regBonus     = Math.round(regClients.reduce((s, c) => s + (c.payment_amount || 0) * regBonusPct(c.payment_method), 0));
+                    const renewClients = salaryClients.filter(c => c.manager_name === emp);
+                    const renewRevenue = renewClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
+                    const renewBonus   = Math.round(renewRevenue * renewalBonusPct(renewRevenue));
+                    const total        = base + regBonus + renewBonus;
+                    const inputVal = editingRates[emp] !== undefined ? editingRates[emp] : (rate || '');
+                    return (
+                      <tr key={emp}
+                        onMouseEnter={e => e.currentTarget.style.background = '#fafcff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                        <td style={{ ...TD, fontWeight: 500 }}>{emp}</td>
+                        <td style={{ ...TD, textAlign: 'center', fontWeight: 600 }}>{tot > 0 ? tot : '—'}</td>
+                        <td style={{ ...TD }}>
+                          <input type="number" value={inputVal}
+                            onChange={e => setEditingRates(prev => ({ ...prev, [emp]: e.target.value }))}
+                            onBlur={e => { if (e.target.value) saveRate(emp, e.target.value); }}
+                            placeholder="₽/ч"
+                            style={{ width: 72, padding: '2px 6px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }} />
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', color: base > 0 ? '#333' : '#ccc' }}>
+                          {base > 0 ? `${base.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', color: regBonus > 0 ? '#333' : '#ccc' }}>
+                          {regBonus > 0 ? `${regBonus.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', color: renewBonus > 0 ? '#333' : '#ccc' }}>
+                          {renewBonus > 0 ? `${renewBonus.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                        <td style={{ ...TD, textAlign: 'right', fontWeight: 700, color: total > 0 ? '#4a90e2' : '#ccc' }}>
+                          {total > 0 ? `${total.toLocaleString('ru-RU')} ₽` : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Day modal */}
       {modal && (
