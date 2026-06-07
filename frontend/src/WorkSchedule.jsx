@@ -136,7 +136,7 @@ export default function WorkSchedule() {
       const monthStart = dateFmt(year, month, 1);
       const monthEnd   = dateFmt(year, month, daysInMonthVal);
       const clients = await apiFetch(
-        `clients?contract_date=gte.${monthStart}&contract_date=lte.${monthEnd}&select=id,name,manager_name,registered_by,payment_method,payment_amount`
+        `clients?contract_date=gte.${monthStart}&contract_date=lte.${monthEnd}&select=id,name,manager_name,registered_by,payment_method,amount_paid`
       );
       setSalaryClients(clients || []);
 
@@ -149,11 +149,12 @@ export default function WorkSchedule() {
   }
 
   async function saveRate(emp, rate) {
+    const payload = { employee_name: emp, employee_role: EMPLOYEE_ROLE[emp] || 'Педагоги', month, year, hourly_rate: Number(rate) };
     try {
       await apiFetch(`salary_rates?on_conflict=employee_name,month,year`, {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ employee_name: emp, month, year, hourly_rate: Number(rate) }),
+        body: JSON.stringify(payload),
       });
       setSalaryRates(prev => {
         const exists = prev.some(r => r.employee_name === emp && r.month === month && r.year === year);
@@ -161,7 +162,7 @@ export default function WorkSchedule() {
           return prev.map(r => r.employee_name === emp && r.month === month && r.year === year
             ? { ...r, hourly_rate: Number(rate) } : r);
         }
-        return [...prev, { employee_name: emp, month, year, hourly_rate: Number(rate) }];
+        return [...prev, { ...payload }];
       });
     } catch (e) { console.error(e); }
   }
@@ -463,7 +464,7 @@ export default function WorkSchedule() {
                     const rate       = editingRates[emp] !== undefined && editingRates[emp] !== '' ? Number(editingRates[emp]) : savedRate;
                     const base       = Math.round(tot * rate);
                     const empClients = salaryClients.filter(c => c.manager_name === emp);
-                    const revenue    = empClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
+                    const revenue    = empClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
                     const plan       = managerPlans[emp] || 0;
                     const bonusPct   = plan > 0 && revenue >= plan ? 0.06 : 0.05;
                     const bonus      = Math.round(revenue * bonusPct);
@@ -529,9 +530,9 @@ export default function WorkSchedule() {
                     const rate       = editingRates[emp] !== undefined && editingRates[emp] !== '' ? Number(editingRates[emp]) : savedRate;
                     const base       = Math.round(tot * rate);
                     const regClients   = salaryClients.filter(c => c.registered_by === emp);
-                    const regBonus     = Math.round(regClients.reduce((s, c) => s + (c.payment_amount || 0) * regBonusPct(c.payment_method), 0));
+                    const regBonus     = Math.round(regClients.reduce((s, c) => s + (c.amount_paid || 0) * regBonusPct(c.payment_method), 0));
                     const renewClients = salaryClients.filter(c => c.manager_name === emp);
-                    const renewRevenue = renewClients.reduce((s, c) => s + (c.payment_amount || 0), 0);
+                    const renewRevenue = renewClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
                     const renewBonus   = Math.round(renewRevenue * renewalBonusPct(renewRevenue));
                     const total        = base + regBonus + renewBonus;
                     const inputVal     = editingRates[emp] !== undefined ? editingRates[emp] : (salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || '');
