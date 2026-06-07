@@ -2,6 +2,18 @@ import React from "react";
 import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
+    const raw = localStorage.getItem(key);
+    if (raw) { const p = JSON.parse(raw); if (p?.access_token) return p.access_token; }
+  } catch {}
+  return null;
+}
+
 function getInitials(name) {
   if (!name) return "?";
   return name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
@@ -33,7 +45,17 @@ export default function TeamOnline() {
 
   async function upsertPresence() {
     if (!user) return;
-    await supabase.from("user_presence").upsert({ user_id: user.id, last_seen: new Date().toISOString() }, { onConflict: "user_id" });
+    const token = await getToken();
+    await fetch(`${SUPABASE_URL}/rest/v1/user_presence`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({ user_id: user.id, last_seen: new Date().toISOString() }),
+    });
   }
 
   async function fetchData() {
