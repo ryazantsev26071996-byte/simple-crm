@@ -106,10 +106,7 @@ export default function WorkSchedule() {
   React.useEffect(() => { load(); }, [month, year]);
 
   React.useEffect(() => {
-    if (user?.email === 'crm@artschool.ru') {
-      setEditingRates({});
-      loadSalaryData();
-    }
+    if (user?.email === 'crm@artschool.ru') loadSalaryData();
   }, [month, year, user?.email]);
 
   async function load() {
@@ -131,6 +128,9 @@ export default function WorkSchedule() {
     try {
       const rates = await apiFetch(`salary_rates?month=eq.${month}&year=eq.${year}`);
       setSalaryRates(rates || []);
+      const loaded = {};
+      (rates || []).forEach(r => { loaded[r.employee_name] = r.hourly_rate; });
+      setEditingRates(loaded);
 
       const daysInMonthVal = new Date(year, month, 0).getDate();
       const monthStart = dateFmt(year, month, 1);
@@ -479,6 +479,7 @@ export default function WorkSchedule() {
                           <input type="number" value={inputVal}
                             onChange={e => setEditingRates(prev => ({ ...prev, [emp]: e.target.value }))}
                             onBlur={e => { if (e.target.value) saveRate(emp, e.target.value); }}
+                            onKeyDown={e => { if (e.key === 'Enter' && e.target.value) { saveRate(emp, e.target.value); e.target.blur(); } }}
                             placeholder="₽/ч"
                             style={{ width: 72, padding: '2px 6px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }} />
                         </td>
@@ -544,6 +545,7 @@ export default function WorkSchedule() {
                           <input type="number" value={inputVal}
                             onChange={e => setEditingRates(prev => ({ ...prev, [emp]: e.target.value }))}
                             onBlur={e => { if (e.target.value) saveRate(emp, e.target.value); }}
+                            onKeyDown={e => { if (e.key === 'Enter' && e.target.value) { saveRate(emp, e.target.value); e.target.blur(); } }}
                             placeholder="₽/ч"
                             style={{ width: 72, padding: '2px 6px', borderRadius: 4, border: '1px solid #ddd', fontSize: 12 }} />
                         </td>
