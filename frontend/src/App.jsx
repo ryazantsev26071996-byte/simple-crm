@@ -39,6 +39,9 @@ export default function App() {
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [showMerge, setShowMerge] = React.useState(false);
+  const [allTasks, setAllTasks] = React.useState([]);
+  const [showTaskBell, setShowTaskBell] = React.useState(false);
+  const bellRef = React.useRef(null);
   const [listSearch, setListSearch] = React.useState("");
   const [sortField, setSortField] = React.useState("name");
   const [sortDir, setSortDir] = React.useState("asc");
@@ -50,6 +53,47 @@ export default function App() {
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
+
+  React.useEffect(() => {
+    if (!user) return;
+    loadAllTasks();
+    const interval = setInterval(loadAllTasks, 60000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    if (!showTaskBell) return;
+    function handleClick(e) {
+      if (bellRef.current && !bellRef.current.contains(e.target)) setShowTaskBell(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showTaskBell]);
+
+  async function loadAllTasks() {
+    const { data } = await supabase.from('tasks').select('*').eq('completed', false);
+    if (data) setAllTasks(data);
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const taskBadges = React.useMemo(() => {
+    const map = {};
+    allTasks.forEach(t => {
+      if (!map[t.client_id]) map[t.client_id] = { count: 0, color: '#4a90e2' };
+      map[t.client_id].count++;
+      if (t.due_date) {
+        if (t.due_date < today) map[t.client_id].color = '#e53935';
+        else if (t.due_date === today && map[t.client_id].color !== '#e53935') map[t.client_id].color = '#e67e22';
+      }
+    });
+    return map;
+  }, [allTasks, today]);
+
+  const pendingTasks = React.useMemo(() =>
+    allTasks.filter(t => t.due_date && t.due_date <= today)
+      .sort((a, b) => a.due_date.localeCompare(b.due_date)),
+  [allTasks, today]);
 
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
@@ -143,6 +187,49 @@ export default function App() {
           {!isMobile && role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍 Дубли</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
+          <div ref={bellRef} style={{ position: 'relative' }}>
+            <button onClick={() => setShowTaskBell(v => !v)}
+              style={{ fontSize: 16, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', position: 'relative', lineHeight: 1 }}>
+              🔔
+              {pendingTasks.length > 0 && (
+                <span style={{ position: 'absolute', top: -2, right: -2, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>
+                  {pendingTasks.length}
+                </span>
+              )}
+            </button>
+            {showTaskBell && (
+              <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'white', border: '1px solid #eee', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 500, width: 320, maxHeight: 400, overflowY: 'auto' }}>
+                <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', fontWeight: 600, fontSize: 13 }}>
+                  Задачи на сегодня и просроченные
+                </div>
+                {pendingTasks.length === 0 ? (
+                  <div style={{ padding: '16px 14px', color: '#aaa', fontSize: 13, textAlign: 'center' }}>Нет срочных задач</div>
+                ) : pendingTasks.map(task => {
+                  const clientObj = clients.find(c => c.id === task.client_id);
+                  const isOverdue = task.due_date < today;
+                  return (
+                    <div key={task.id}
+                      onClick={() => { if (clientObj) { setSelectedId(clientObj.id); setView('kanban'); } setShowTaskBell(false); }}
+                      style={{ padding: '8px 14px', borderBottom: '1px solid #f8f8f8', cursor: clientObj ? 'pointer' : 'default', background: 'white' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                      <div style={{ fontSize: 12, color: clientObj ? '#4a90e2' : '#aaa', fontWeight: 500, marginBottom: 2 }}>
+                        {clientObj?.name || 'Клиент удалён'}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#333' }}>{task.text}</div>
+                      <div style={{ fontSize: 11, marginTop: 2, display: 'flex', gap: 8 }}>
+                        {task.assigned_to && <span style={{ color: '#aaa' }}>{task.assigned_to}</span>}
+                        <span style={{ color: isOverdue ? '#e53935' : '#e67e22', fontWeight: 500 }}>
+                          {isOverdue ? 'Просрочено: ' : 'Сегодня: '}
+                          {new Date(task.due_date + 'T00:00:00').toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           {isMobile && <button onClick={() => setShowMobileMenu(true)} style={{ fontSize: 22, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', color: '#333' }}>☰</button>}
           {!isMobile && <button onClick={() => supabase.auth.signOut()} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer' }}>Выйти</button>}
         </div>
@@ -207,6 +294,7 @@ export default function App() {
 
           {!loadingClients && view === 'kanban' && role !== 'teacher' && (
             <KanbanBoard clients={clients} role={role} onClientSelect={setSelectedId}
+              taskBadges={taskBadges}
               onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => setSelectedId(id), 50); }}
               onAddClient={() => setView('list')}
               onClientCreated={async (payload) => {

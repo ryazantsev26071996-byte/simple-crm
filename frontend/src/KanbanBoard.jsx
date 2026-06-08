@@ -42,7 +42,7 @@ function ClientFormInline({ onSubmit, onOpenClient }) {
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated }) {
+export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated, taskBadges = {} }) {
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [filterMonth, setFilterMonth] = useState('all')
@@ -165,7 +165,7 @@ function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile 
         )}
       </div>
       <div style={{ overflowY: 'auto', flex: 1, padding: 8 }}>
-        {clients.map(client => <Card key={client.id} client={client} onClientSelect={onClientSelect} />)}
+        {clients.map(client => <Card key={client.id} client={client} onClientSelect={onClientSelect} taskBadge={taskBadges[client.id]} />)}
       </div>
     </div>
   )
@@ -196,7 +196,7 @@ function formatPhone(phone) {
   return phone
 }
 
-function Card({ client, onClientSelect }) {
+function Card({ client, onClientSelect, taskBadge }) {
   const isNew = !client.viewed_at && client.created_at &&
     (Date.now() - new Date(client.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000;
   return (
@@ -206,10 +206,17 @@ function Card({ client, onClientSelect }) {
       onClick={() => onClientSelect(client.id)}
       style={{ position: 'relative', background: 'white', borderRadius: 6, padding: '8px 10px', marginBottom: 6, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', fontSize: 13 }}
     >
-      {isNew && (
-        <span style={{ position: 'absolute', top: 6, right: 6, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, lineHeight: 1.2 }}>NEW</span>
-      )}
-      <div style={{ fontWeight: 500, marginBottom: 2 }}>{client.name}</div>
+      <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 3, alignItems: 'center' }}>
+        {taskBadge && (
+          <span style={{ background: taskBadge.color, color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, lineHeight: 1.2 }}>
+            {taskBadge.count}
+          </span>
+        )}
+        {isNew && (
+          <span style={{ background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, lineHeight: 1.2 }}>NEW</span>
+        )}
+      </div>
+      <div style={{ fontWeight: 500, marginBottom: 2, paddingRight: taskBadge || isNew ? 36 : 0 }}>{client.name}</div>
       {client.phone && <div style={{ color: '#888', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderContact(client.phone)}</div>}
       {client.subscription && (
         <div style={{ marginTop: 4, fontSize: 11, background: '#f0f7ff', color: '#4a90e2', borderRadius: 4, padding: '2px 6px', display: 'inline-block' }}>

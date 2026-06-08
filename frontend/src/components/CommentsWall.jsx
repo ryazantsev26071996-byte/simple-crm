@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from "../supabase";
+import TasksBlock from "./TasksBlock.jsx";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -225,6 +226,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {client?.id && <TasksBlock clientId={client.id} />}
       <div style={{ flexShrink: 0, borderBottom: '1px solid #eee', paddingBottom: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontWeight: 500, fontSize: 14 }}>Комментарии</div>
