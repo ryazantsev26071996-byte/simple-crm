@@ -1,4 +1,7 @@
 import React from "react";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 import ClientForm from "./components/ClientForm.jsx";
 import CommentsWall from "./components/CommentsWall.jsx";
 import { KanbanBoard } from "./KanbanBoard.jsx";
@@ -58,6 +61,28 @@ export default function App() {
     if (!user) return;
     loadAllTasks();
     const interval = setInterval(loadAllTasks, 60000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    if (!user) return;
+    async function updatePresence() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/user_presence`, {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({ user_id: user.id, last_seen: new Date().toISOString() }),
+      });
+    }
+    updatePresence();
+    const interval = setInterval(updatePresence, 30000);
     return () => clearInterval(interval);
   }, [user?.id]);
 
