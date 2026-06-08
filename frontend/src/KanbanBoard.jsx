@@ -197,13 +197,18 @@ function formatPhone(phone) {
 }
 
 function Card({ client, onClientSelect }) {
+  const isNew = !client.viewed_at && client.created_at &&
+    (Date.now() - new Date(client.created_at).getTime()) < 7 * 24 * 60 * 60 * 1000;
   return (
     <div
       draggable
       onDragStart={e => e.dataTransfer.setData('clientId', client.id)}
       onClick={() => onClientSelect(client.id)}
-      style={{ background: 'white', borderRadius: 6, padding: '8px 10px', marginBottom: 6, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', fontSize: 13 }}
+      style={{ position: 'relative', background: 'white', borderRadius: 6, padding: '8px 10px', marginBottom: 6, cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', fontSize: 13 }}
     >
+      {isNew && (
+        <span style={{ position: 'absolute', top: 6, right: 6, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, lineHeight: 1.2 }}>NEW</span>
+      )}
       <div style={{ fontWeight: 500, marginBottom: 2 }}>{client.name}</div>
       {client.phone && <div style={{ color: '#888', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderContact(client.phone)}</div>}
       {client.subscription && (

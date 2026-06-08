@@ -91,6 +91,16 @@ export default function App() {
       .catch(err => { setError(err.message); setLoadingComments(false); });
   }, [selectedId, user?.id]);
 
+  React.useEffect(() => {
+    if (!selectedId) return;
+    const client = clients.find(c => c.id === selectedId);
+    if (!client || client.viewed_at) return;
+    const now = new Date().toISOString();
+    supabase.from('clients').update({ viewed_at: now }).eq('id', selectedId).then(() => {
+      setClients(prev => prev.map(c => c.id === selectedId ? { ...c, viewed_at: now } : c));
+    });
+  }, [selectedId]);
+
   async function reloadClients() {
     setLoadingClients(true);
     const list = await getClients({ role, name: authorName });
