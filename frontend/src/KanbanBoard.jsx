@@ -116,6 +116,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
             onDrop={(id, newStage) => onStageChange(id, newStage)}
             totalAmount={getStageTotalAmount(stage)}
             isMobile={isMobile}
+            taskBadges={taskBadges}
           />
         ))}
       </div>
@@ -141,7 +142,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
   );
 }
 
-function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile }) {
+function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile, taskBadges = {} }) {
   const [over, setOver] = useState(false)
   const bg = over ? '#e8f4ff' : '#f5f5f5'
   const colWidth = isMobile ? 280 : 200
