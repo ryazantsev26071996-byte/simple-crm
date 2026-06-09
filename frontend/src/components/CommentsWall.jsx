@@ -165,6 +165,20 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
 
       const lessonText = (client?.is_unlimited || !isActiveStudent) ? '' : ` [списано занятий: ${lessons}]`;
       await onCreate(datePrefix + message + lessonText);
+      if (!client?.viewed_at) {
+        const token = await getToken();
+        await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client.id}`, {
+          method: 'PATCH',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify({ viewed_at: new Date().toISOString() }),
+        });
+        if (onClientUpdate) onClientUpdate({ ...client, viewed_at: new Date().toISOString() });
+      }
       if (onCommentsChange) try { await onCommentsChange(); } catch {}
       setMessage("");
       setLessons(0);
