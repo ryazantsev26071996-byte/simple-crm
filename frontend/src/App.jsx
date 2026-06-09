@@ -171,7 +171,21 @@ export default function App() {
     if (!id) return;
     const now = new Date().toISOString();
     setClients(prev => prev.map(c => c.id === id ? { ...c, viewed_at: now } : c));
-    supabase.from('clients').update({ viewed_at: now }).eq('id', id).catch(() => {});
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${id}`, {
+        method: 'PATCH',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify({ viewed_at: now }),
+      });
+    } catch {}
   }
 
   async function reloadClients() {
