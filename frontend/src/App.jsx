@@ -51,6 +51,7 @@ import Analytics from "./Analytics.jsx";
 import Events from "./Events.jsx";
 import WorkSchedule from "./WorkSchedule.jsx";
 import { MergeDuplicates } from "./MergeDuplicates.jsx";
+import Tasks from "./Tasks.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -150,9 +151,18 @@ export default function App() {
       .sort((a, b) => a.due_date.localeCompare(b.due_date)),
   [allTasks, today]);
 
+  const myTasksBadge = React.useMemo(() => {
+    const isAdmin = user?.email === 'crm@artschool.ru';
+    return allTasks.filter(t => {
+      if (!t.due_date || t.due_date > today) return false;
+      if (!isAdmin && t.assigned_to !== authorName) return false;
+      return true;
+    }).length;
+  }, [allTasks, today, user?.email, authorName]);
+
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
-  const VIEW_NAMES = { kanban: 'Канбан', list: 'Список', trial: 'Пробные', schedule: 'Занятия', analytics: 'Аналитика', grafik: 'График', students: 'Ученики' };
+  const VIEW_NAMES = { kanban: 'Канбан', list: 'Список', trial: 'Пробные', schedule: 'Занятия', analytics: 'Аналитика', grafik: 'График', students: 'Ученики', tasks: 'Задачи' };
 
   const availableTabs = [
     ...(role === 'manager' || role === 'admin' ? [
@@ -168,6 +178,7 @@ export default function App() {
       { key: 'analytics', label: 'Аналитика' },
     ] : []),
     { key: 'students', label: 'Ученики' },
+    { key: 'tasks', label: 'Задачи' },
   ];
 
 
@@ -239,6 +250,11 @@ export default function App() {
                 <button className="tabBtn" onClick={() => setView('grafik')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'grafik' ? '#7c3aed' : 'white', color: view === 'grafik' ? 'white' : '#7c3aed', cursor: 'pointer' }}>График</button>
               </>}
               <button className="tabBtn" onClick={() => setView('students')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'students' ? '#4a90e2' : 'white', color: view === 'students' ? 'white' : '#333', cursor: 'pointer' }}>Ученики</button>
+              <button className="tabBtn" onClick={() => setView('tasks')}
+                style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'tasks' ? '#7c3aed' : 'white', color: view === 'tasks' ? 'white' : '#7c3aed', cursor: 'pointer', position: 'relative' }}>
+                Задачи
+                {myTasksBadge > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{myTasksBadge}</span>}
+              </button>
             </div>
           </div>
         )}
@@ -348,6 +364,11 @@ export default function App() {
           )}
 
           {loadingClients && <div style={{ padding: 16, color: '#888', fontSize: 13 }}>Загрузка клиентов...</div>}
+
+          {view === 'tasks' && (
+            <Tasks user={user} profile={profile}
+              onClientSelect={(id) => { handleClientSelect(id); setView('kanban'); }} />
+          )}
 
           {!loadingClients && view === 'students' && (
             <TeacherView clients={clients} onClientSelect={handleClientSelect} />
