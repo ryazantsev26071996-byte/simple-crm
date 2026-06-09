@@ -166,15 +166,13 @@ export default function App() {
       .catch(err => { setError(err.message); setLoadingComments(false); });
   }, [selectedId, user?.id]);
 
-  React.useEffect(() => {
-    if (!selectedId) return;
-    const client = clients.find(c => c.id === selectedId);
-    if (!client) return;
+  async function handleClientSelect(id) {
+    setSelectedId(id);
+    if (!id) return;
     const now = new Date().toISOString();
-    supabase.from('clients').update({ viewed_at: now }).eq('id', selectedId).then(() => {
-      setClients(prev => prev.map(c => c.id === selectedId ? { ...c, viewed_at: now } : c));
-    });
-  }, [selectedId]);
+    setClients(prev => prev.map(c => c.id === id ? { ...c, viewed_at: now } : c));
+    supabase.from('clients').update({ viewed_at: now }).eq('id', id).catch(() => {});
+  }
 
   async function reloadClients() {
     setLoadingClients(true);
@@ -240,7 +238,7 @@ export default function App() {
                   const isOverdue = task.due_date < today;
                   return (
                     <div key={task.id}
-                      onClick={() => { if (clientObj) { setSelectedId(clientObj.id); setView('kanban'); } setShowTaskBell(false); }}
+                      onClick={() => { if (clientObj) { handleClientSelect(clientObj.id); setView('kanban'); } setShowTaskBell(false); }}
                       style={{ padding: '8px 14px', borderBottom: '1px solid #f8f8f8', cursor: clientObj ? 'pointer' : 'default', background: 'white' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
                       onMouseLeave={e => e.currentTarget.style.background = 'white'}>
@@ -310,7 +308,7 @@ export default function App() {
                   try {
                     const newClient = await createClient({ role, name: authorName }, payload);
                     setClients((prev) => [newClient, ...prev]);
-                    setSelectedId(newClient.id);
+                    handleClientSelect(newClient.id);
                   } catch (err) { setError(err.message); alert(err.message); }
                 }}
               />
@@ -320,18 +318,18 @@ export default function App() {
           {loadingClients && <div style={{ padding: 16, color: '#888', fontSize: 13 }}>Загрузка клиентов...</div>}
 
           {!loadingClients && view === 'students' && (
-            <TeacherView clients={clients} onClientSelect={setSelectedId} />
+            <TeacherView clients={clients} onClientSelect={handleClientSelect} />
           )}
 
           {!loadingClients && view === 'kanban' && role !== 'teacher' && (
-            <KanbanBoard clients={clients} role={role} onClientSelect={setSelectedId}
+            <KanbanBoard clients={clients} role={role} onClientSelect={handleClientSelect}
               taskBadges={taskBadges}
-              onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => setSelectedId(id), 50); }}
+              onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => handleClientSelect(id), 50); }}
               onAddClient={() => setView('list')}
               onClientCreated={async (payload) => {
                 const newClient = await createClient({ role, name: authorName }, payload);
                 setClients(prev => [newClient, ...prev]);
-                setSelectedId(newClient.id);
+                handleClientSelect(newClient.id);
               }}
             />
           )}
@@ -385,7 +383,7 @@ export default function App() {
                     const freezeLeft = (c.freeze_days_total||0)-(c.freeze_days_used||0);
                     const endDate = c.subscription_end_with_freeze || c.subscription_end;
                     return (
-                      <tr key={c.id} onClick={() => setSelectedId(c.id)}
+                      <tr key={c.id} onClick={() => handleClientSelect(c.id)}
                         style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>
                         <td style={{ padding: '8px 12px', fontWeight: 500, position: 'sticky', left: 0, zIndex: 1, background: c.id === selectedId ? '#f0f7ff' : 'white', borderRight: '1px solid #eee' }}>{c.name}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{c.stage || '—'}</td>
