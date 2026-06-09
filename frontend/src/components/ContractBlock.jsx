@@ -17,8 +17,32 @@ async function getToken() {
   return data.session?.access_token
 }
 
+async function apiFetch(path, options = {}) {
+  const token = await getToken()
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...options.headers,
+    },
+  })
+  if (res.status === 204) return null
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.message || JSON.stringify(data))
+  return data
+}
+
 const PAYMENT_METHODS = ['Наличные', 'Карта', 'Рассрочка школы', 'Рассрочка банка', 'Перевод']
 const BROKERS = ['Совкомбанк', 'Тинькофф', 'Сбер', 'ПСБ', 'Альфа', 'Хоум', 'Другой']
+
+const CONTRACT_FIELDS = [
+  'contract_number', 'contract_date', 'payment_date', 'manager_name', 'registered_by',
+  'payment_method', 'broker', 'contract_amount', 'amount_paid', 'installment_term',
+  'bank_application_number', 'bank_contract_number', 'requisites',
+]
 
 export default function ContractBlock({ client, onUpdate, role }) {
   const [editing, setEditing] = React.useState(false)
@@ -39,6 +63,10 @@ export default function ContractBlock({ client, onUpdate, role }) {
     requisites: client?.requisites || "",
   })
   const [saving, setSaving] = React.useState(false)
+  const [archiving, setArchiving] = React.useState(false)
+  const [history, setHistory] = React.useState([])
+  const [historyOpen, setHistoryOpen] = React.useState(false)
+  const [expandedIds, setExpandedIds] = React.useState(new Set())
 
   React.useEffect(() => {
     setForm({
@@ -57,7 +85,15 @@ export default function ContractBlock({ client, onUpdate, role }) {
       bank_contract_number: client?.bank_contract_number || "",
       requisites: client?.requisites || "",
     })
+    if (client?.id) loadHistory(client.id)
   }, [client?.id])
+
+  async function loadHistory(id) {
+    try {
+      const data = await apiFetch(`contract_history?client_id=eq.${id}&order=saved_at.desc`)
+      setHistory(data || [])
+    } catch {}
+  }
 
   async function handleSave() {
     setSaving(true)
@@ -100,6 +136,55 @@ export default function ContractBlock({ client, onUpdate, role }) {
     }
   }
 
+  async function handleNewContract() {
+    if (!window.confirm('Сохранить текущий договор в историю и начать новый?')) return
+    setArchiving(true)
+    try {
+      await apiFetch('contract_history', {
+        method: 'POST',
+        body: JSON.stringify({
+          client_id: client.id,
+          contract_number: client.contract_number || null,
+          contract_date: client.contract_date || null,
+          payment_date: client.payment_date || null,
+          manager_name: client.manager_name || null,
+          registered_by: client.registered_by || null,
+          payment_method: client.payment_method || null,
+          broker: client.broker || null,
+          contract_amount: client.contract_amount || null,
+          amount_paid: client.amount_paid || null,
+          installment_term: client.installment_term || null,
+          bank_application_number: client.bank_application_number || null,
+          bank_contract_number: client.bank_contract_number || null,
+          requisites: client.requisites || null,
+          saved_at: new Date().toISOString(),
+        }),
+      })
+
+      const nullFields = Object.fromEntries(CONTRACT_FIELDS.map(f => [f, null]))
+      const result = await apiFetch(`clients?id=eq.${client.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(nullFields),
+      })
+      const updated = Array.isArray(result) ? result[0] : result
+      if (onUpdate && updated) onUpdate(updated)
+      await loadHistory(client.id)
+      setHistoryOpen(true)
+    } catch(err) {
+      alert(err.message)
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  function toggleExpanded(id) {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
   const inputStyle = {
     width: '100%', padding: '6px 10px', borderRadius: 6,
     border: '1px solid #e0e0e0', fontSize: 13,
@@ -110,136 +195,209 @@ export default function ContractBlock({ client, onUpdate, role }) {
   const isInstallment = form.payment_method === 'Рассрочка банка'
 
   return (
-    <div style={{ marginTop: 12, padding: '12px 14px', background: '#f8f9ff', borderRadius: 10, border: '1px solid #e8eaf6' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: '#4a90e2' }}>📋 Договор и оплата</div>
-        {!editing ? (
-          <button onClick={() => setEditing(true)}
-            style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: '1px solid #4a90e2', background: 'white', color: '#4a90e2', cursor: 'pointer' }}>
-            ✏️ Редактировать
-          </button>
-        ) : (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleSave} disabled={saving}
-              style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: 'none', background: '#4a90e2', color: 'white', cursor: 'pointer' }}>
-              {saving ? 'Сохранение...' : '💾 Сохранить'}
-            </button>
-            <button onClick={() => { setEditing(false); }}
-              style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>
-              Отмена
-            </button>
+    <>
+      <div style={{ marginTop: 12, padding: '12px 14px', background: '#f8f9ff', borderRadius: 10, border: '1px solid #e8eaf6' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: '#4a90e2' }}>📋 Договор и оплата</div>
+          {!editing ? (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setEditing(true)}
+                style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: '1px solid #4a90e2', background: 'white', color: '#4a90e2', cursor: 'pointer' }}>
+                ✏️ Редактировать
+              </button>
+              <button onClick={handleNewContract} disabled={archiving}
+                style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: '1px solid #e67e22', background: 'white', color: '#e67e22', cursor: archiving ? 'default' : 'pointer', opacity: archiving ? 0.6 : 1 }}>
+                {archiving ? '...' : '🔄 Новый договор'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={handleSave} disabled={saving}
+                style={{ fontSize: 12, padding: '3px 12px', borderRadius: 6, border: 'none', background: '#4a90e2', color: 'white', cursor: 'pointer' }}>
+                {saving ? 'Сохранение...' : '💾 Сохранить'}
+              </button>
+              <button onClick={() => { setEditing(false); }}
+                style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer' }}>
+                Отмена
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
+          <div>
+            <div style={labelStyle}>Номер договора</div>
+            <input style={inputStyle} value={form.contract_number} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, contract_number: e.target.value }))}
+              placeholder={editing ? "251" : "Не заполнено"} />
           </div>
-        )}
+          <div>
+            <div style={labelStyle}>Дата договора</div>
+            <input style={inputStyle} type={editing ? "date" : "text"} value={form.contract_date} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, contract_date: e.target.value }))}
+              placeholder={editing ? "" : "Не заполнено"} />
+          </div>
+          <div>
+            <div style={labelStyle}>Дата оплаты</div>
+            <input style={inputStyle} type={editing ? "date" : "text"} value={form.payment_date} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))}
+              placeholder={editing ? "" : "Не заполнено"} />
+          </div>
+          <div>
+            <div style={labelStyle}>Email</div>
+            <input style={inputStyle} value={form.email} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+              placeholder={editing ? "email@mail.ru" : "Не заполнено"} />
+          </div>
+          <div>
+            <div style={labelStyle}>Менеджер</div>
+            <input style={inputStyle} value={form.manager_name} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, manager_name: e.target.value }))}
+              placeholder={editing ? "ФИО менеджера" : "Не заполнено"} />
+          </div>
+          <div>
+            <div style={labelStyle}>Кто оформил</div>
+            {editing ? (
+              <select style={inputStyle} value={form.registered_by}
+                onChange={e => setForm(f => ({ ...f, registered_by: e.target.value }))}>
+                <option value="">— выбрать —</option>
+                {["Арина","Вероника","Салампи","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+            ) : (
+              <input style={inputStyle} value={form.registered_by} readOnly placeholder="Не заполнено" />
+            )}
+          </div>
+          <div>
+            <div style={labelStyle}>Способ оплаты</div>
+            {editing ? (
+              <select style={inputStyle} value={form.payment_method}
+                onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
+                <option value="">— выбрать —</option>
+                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            ) : (
+              <input style={inputStyle} value={form.payment_method} readOnly placeholder="Не заполнено" />
+            )}
+          </div>
+          <div>
+            <div style={labelStyle}>Сумма по договору</div>
+            <input style={inputStyle} type={editing ? "number" : "text"} value={form.contract_amount} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, contract_amount: e.target.value }))}
+              placeholder={editing ? "0" : "Не заполнено"} />
+          </div>
+          <div>
+            <div style={labelStyle}>Сколько пришло</div>
+            <input style={inputStyle} type={editing ? "number" : "text"} value={form.amount_paid} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, amount_paid: e.target.value }))}
+              placeholder={editing ? "0" : "Не заполнено"} />
+          </div>
+          {isInstallment && (
+            <>
+              <div>
+                <div style={labelStyle}>Брокер</div>
+                {editing ? (
+                  <select style={inputStyle} value={form.broker}
+                    onChange={e => setForm(f => ({ ...f, broker: e.target.value }))}>
+                    <option value="">— выбрать —</option>
+                    {BROKERS.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                ) : (
+                  <input style={inputStyle} value={form.broker} readOnly placeholder="Не заполнено" />
+                )}
+              </div>
+              <div>
+                <div style={labelStyle}>Срок рассрочки (мес)</div>
+                <input style={inputStyle} type={editing ? "number" : "text"} value={form.installment_term} readOnly={!editing}
+                  onChange={e => setForm(f => ({ ...f, installment_term: e.target.value }))}
+                  placeholder={editing ? "12" : "Не заполнено"} />
+              </div>
+              <div>
+                <div style={labelStyle}>Номер заявки в банке</div>
+                <input style={inputStyle} value={form.bank_application_number} readOnly={!editing}
+                  onChange={e => setForm(f => ({ ...f, bank_application_number: e.target.value }))}
+                  placeholder={editing ? "Номер заявки" : "Не заполнено"} />
+              </div>
+              <div>
+                <div style={labelStyle}>Номер договора в банке</div>
+                <input style={inputStyle} value={form.bank_contract_number} readOnly={!editing}
+                  onChange={e => setForm(f => ({ ...f, bank_contract_number: e.target.value }))}
+                  placeholder={editing ? "Номер договора" : "Не заполнено"} />
+              </div>
+            </>
+          )}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={labelStyle}>Реквизиты</div>
+            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.requisites} readOnly={!editing}
+              onChange={e => setForm(f => ({ ...f, requisites: e.target.value }))}
+              placeholder={editing ? "Реквизиты для возврата..." : "Не заполнено"} />
+          </div>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
-        <div>
-          <div style={labelStyle}>Номер договора</div>
-          <input style={inputStyle} value={form.contract_number} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, contract_number: e.target.value }))}
-            placeholder={editing ? "251" : "Не заполнено"} />
-        </div>
-        <div>
-          <div style={labelStyle}>Дата договора</div>
-          <input style={inputStyle} type={editing ? "date" : "text"} value={form.contract_date} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, contract_date: e.target.value }))}
-            placeholder={editing ? "" : "Не заполнено"} />
-        </div>
-        <div>
-          <div style={labelStyle}>Дата оплаты</div>
-          <input style={inputStyle} type={editing ? "date" : "text"} value={form.payment_date} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, payment_date: e.target.value }))}
-            placeholder={editing ? "" : "Не заполнено"} />
-        </div>
-        <div>
-          <div style={labelStyle}>Email</div>
-          <input style={inputStyle} value={form.email} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-            placeholder={editing ? "email@mail.ru" : "Не заполнено"} />
-        </div>
-        <div>
-          <div style={labelStyle}>Менеджер</div>
-          <input style={inputStyle} value={form.manager_name} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, manager_name: e.target.value }))}
-            placeholder={editing ? "ФИО менеджера" : "Не заполнено"} />
-        </div>
-        <div>
-          <div style={labelStyle}>Кто оформил</div>
-          {editing ? (
-            <select style={inputStyle} value={form.registered_by}
-              onChange={e => setForm(f => ({ ...f, registered_by: e.target.value }))}>
-              <option value="">— выбрать —</option>
-              {["Арина","Вероника","Салампи","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-          ) : (
-            <input style={inputStyle} value={form.registered_by} readOnly placeholder="Не заполнено" />
+      {history.length > 0 && (
+        <div style={{ marginTop: 8, padding: '10px 14px', background: '#fffbf0', borderRadius: 10, border: '1px solid #f5e9c8' }}>
+          <button onClick={() => setHistoryOpen(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0, width: '100%', textAlign: 'left' }}>
+            <span style={{ fontWeight: 600, fontSize: 13, color: '#b7791f' }}>📋 История договоров</span>
+            <span style={{ fontSize: 11, background: '#e9a23b', color: 'white', borderRadius: 10, padding: '1px 6px', fontWeight: 600 }}>{history.length}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#b7791f' }}>{historyOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {historyOpen && (
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {history.map(h => {
+                const expanded = expandedIds.has(h.id)
+                const savedDate = h.saved_at ? new Date(h.saved_at).toLocaleDateString('ru-RU') : '—'
+                return (
+                  <div key={h.id} style={{ background: 'white', borderRadius: 8, border: '1px solid #f0e0b0', overflow: 'hidden' }}>
+                    <button onClick={() => toggleExpanded(h.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: 12 }}>
+                        <span style={{ color: '#888' }}>Сохранён: <strong style={{ color: '#555' }}>{savedDate}</strong></span>
+                        {h.contract_number && <span style={{ color: '#888' }}>Договор: <strong style={{ color: '#555' }}>№{h.contract_number}</strong></span>}
+                        {h.manager_name && <span style={{ color: '#888' }}>Менеджер: <strong style={{ color: '#555' }}>{h.manager_name}</strong></span>}
+                        {h.amount_paid != null && <span style={{ color: '#888' }}>Оплата: <strong style={{ color: '#2a9' }}>{Number(h.amount_paid).toLocaleString('ru-RU')} ₽</strong></span>}
+                        {h.payment_method && <span style={{ color: '#888' }}>{h.payment_method}</span>}
+                      </div>
+                      <span style={{ fontSize: 11, color: '#b7791f', flexShrink: 0 }}>{expanded ? '▲' : '▼'}</span>
+                    </button>
+
+                    {expanded && (
+                      <div style={{ padding: '0 12px 12px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 8, borderTop: '1px solid #f5e9c8' }}>
+                        {[
+                          ['Номер договора', h.contract_number],
+                          ['Дата договора', h.contract_date ? new Date(h.contract_date).toLocaleDateString('ru-RU') : null],
+                          ['Дата оплаты', h.payment_date ? new Date(h.payment_date).toLocaleDateString('ru-RU') : null],
+                          ['Менеджер', h.manager_name],
+                          ['Кто оформил', h.registered_by],
+                          ['Способ оплаты', h.payment_method],
+                          ['Сумма по договору', h.contract_amount != null ? Number(h.contract_amount).toLocaleString('ru-RU') + ' ₽' : null],
+                          ['Сколько пришло', h.amount_paid != null ? Number(h.amount_paid).toLocaleString('ru-RU') + ' ₽' : null],
+                          ['Брокер', h.broker],
+                          ['Срок рассрочки', h.installment_term ? h.installment_term + ' мес' : null],
+                          ['Заявка в банке', h.bank_application_number],
+                          ['Договор в банке', h.bank_contract_number],
+                        ].filter(([, v]) => v).map(([label, value]) => (
+                          <div key={label} style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 10, color: '#aaa', fontWeight: 500, marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 12, color: '#444' }}>{value}</div>
+                          </div>
+                        ))}
+                        {h.requisites && (
+                          <div style={{ gridColumn: '1 / -1', marginTop: 8 }}>
+                            <div style={{ fontSize: 10, color: '#aaa', fontWeight: 500, marginBottom: 2 }}>Реквизиты</div>
+                            <div style={{ fontSize: 12, color: '#444', whiteSpace: 'pre-wrap' }}>{h.requisites}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
-        <div>
-          <div style={labelStyle}>Способ оплаты</div>
-          {editing ? (
-            <select style={inputStyle} value={form.payment_method}
-              onChange={e => setForm(f => ({ ...f, payment_method: e.target.value }))}>
-              <option value="">— выбрать —</option>
-              {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          ) : (
-            <input style={inputStyle} value={form.payment_method} readOnly placeholder="Не заполнено" />
-          )}
-        </div>
-        <div>
-          <div style={labelStyle}>Сумма по договору</div>
-          <input style={inputStyle} type={editing ? "number" : "text"} value={form.contract_amount} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, contract_amount: e.target.value }))}
-            placeholder={editing ? "0" : "Не заполнено"} />
-        </div>
-        <div>
-          <div style={labelStyle}>Сколько пришло</div>
-          <input style={inputStyle} type={editing ? "number" : "text"} value={form.amount_paid} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, amount_paid: e.target.value }))}
-            placeholder={editing ? "0" : "Не заполнено"} />
-        </div>
-        {isInstallment && (
-          <>
-            <div>
-              <div style={labelStyle}>Брокер</div>
-              {editing ? (
-                <select style={inputStyle} value={form.broker}
-                  onChange={e => setForm(f => ({ ...f, broker: e.target.value }))}>
-                  <option value="">— выбрать —</option>
-                  {BROKERS.map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
-              ) : (
-                <input style={inputStyle} value={form.broker} readOnly placeholder="Не заполнено" />
-              )}
-            </div>
-            <div>
-              <div style={labelStyle}>Срок рассрочки (мес)</div>
-              <input style={inputStyle} type={editing ? "number" : "text"} value={form.installment_term} readOnly={!editing}
-                onChange={e => setForm(f => ({ ...f, installment_term: e.target.value }))}
-                placeholder={editing ? "12" : "Не заполнено"} />
-            </div>
-            <div>
-              <div style={labelStyle}>Номер заявки в банке</div>
-              <input style={inputStyle} value={form.bank_application_number} readOnly={!editing}
-                onChange={e => setForm(f => ({ ...f, bank_application_number: e.target.value }))}
-                placeholder={editing ? "Номер заявки" : "Не заполнено"} />
-            </div>
-            <div>
-              <div style={labelStyle}>Номер договора в банке</div>
-              <input style={inputStyle} value={form.bank_contract_number} readOnly={!editing}
-                onChange={e => setForm(f => ({ ...f, bank_contract_number: e.target.value }))}
-                placeholder={editing ? "Номер договора" : "Не заполнено"} />
-            </div>
-          </>
-        )}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <div style={labelStyle}>Реквизиты</div>
-          <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.requisites} readOnly={!editing}
-            onChange={e => setForm(f => ({ ...f, requisites: e.target.value }))}
-            placeholder={editing ? "Реквизиты для возврата..." : "Не заполнено"} />
-        </div>
-      </div>
-    </div>
+      )}
+    </>
   )
 }
