@@ -67,19 +67,21 @@ export default function App() {
   React.useEffect(() => {
     if (!user) return;
     async function updatePresence() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-      await fetch(`${SUPABASE_URL}/rest/v1/user_presence`, {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Prefer: 'resolution=merge-duplicates',
-        },
-        body: JSON.stringify({ user_id: user.id, last_seen: new Date().toISOString() }),
-      });
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+        await fetch(`${SUPABASE_URL}/rest/v1/user_presence`, {
+          method: 'POST',
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Prefer: 'resolution=merge-duplicates',
+          },
+          body: JSON.stringify({ user_id: user.id, last_seen: new Date().toISOString() }),
+        });
+      } catch {}
     }
     updatePresence();
     const interval = setInterval(updatePresence, 30000);
@@ -149,6 +151,10 @@ export default function App() {
     getClients({ role, name: authorName })
       .then(list => { setClients(list); setLoadingClients(false); })
       .catch(err => { setError(err.message); setLoadingClients(false); });
+    const interval = setInterval(() => {
+      getClients({ role, name: authorName }).then(list => setClients(list)).catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
   }, [user?.id, role]);
 
   React.useEffect(() => {
@@ -163,7 +169,7 @@ export default function App() {
   React.useEffect(() => {
     if (!selectedId) return;
     const client = clients.find(c => c.id === selectedId);
-    if (!client || client.viewed_at) return;
+    if (!client) return;
     const now = new Date().toISOString();
     supabase.from('clients').update({ viewed_at: now }).eq('id', selectedId).then(() => {
       setClients(prev => prev.map(c => c.id === selectedId ? { ...c, viewed_at: now } : c));
