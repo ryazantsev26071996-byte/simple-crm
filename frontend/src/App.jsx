@@ -2,6 +2,34 @@ import React from "react";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+async function getToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
+    const raw = localStorage.getItem(key);
+    if (raw) { const p = JSON.parse(raw); if (p?.access_token) return p.access_token; }
+  } catch {}
+  return null;
+}
+
+async function apiFetch(path, options = {}) {
+  const token = await getToken();
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+      ...options.headers,
+    },
+  });
+  if (res.status === 204 || res.status === 200) return null;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+  return data;
+}
+
 import ClientForm from "./components/ClientForm.jsx";
 import CommentsWall from "./components/CommentsWall.jsx";
 import { KanbanBoard } from "./KanbanBoard.jsx";
@@ -168,24 +196,14 @@ export default function App() {
 
   async function handleClientSelect(id) {
     setSelectedId(id);
-    if (!id) return;
     const now = new Date().toISOString();
     setClients(prev => prev.map(c => c.id === id ? { ...c, viewed_at: now } : c));
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-      await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${id}`, {
+      await apiFetch(`clients?id=eq.${id}`, {
         method: 'PATCH',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          Prefer: 'return=minimal',
-        },
         body: JSON.stringify({ viewed_at: now }),
       });
-    } catch {}
+    } catch(e) { console.error('[viewed] patch failed:', e); }
   }
 
   async function reloadClients() {
