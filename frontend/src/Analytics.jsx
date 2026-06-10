@@ -54,15 +54,15 @@ function sumRows(rows) {
   );
 }
 
-function SpeedometerGauge({ manager, pct, revenue, plan, salesCount, daysLeft }) {
+function SpeedometerGauge({ manager, pct: percentage, revenue, plan, salesCount, workDaysLeft, daysLeft, avgCheck, showPhrase }) {
   const noPlan = !plan;
-  const clampedPct = Math.max(0, Math.min(pct, 100));
+  const clampedPct = Math.max(0, Math.min(percentage || 0, 100));
 
   function zoneColor(p) {
-    if (p >= 100) return "#f59e0b";
-    if (p >= 80)  return "#22c55e";
-    if (p >= 50)  return "#f59e0b";
-    return "#ef4444";
+    if (p >= 100) return "#f1c40f";
+    if (p >= 80)  return "#27ae60";
+    if (p >= 50)  return "#f39c12";
+    return "#e74c3c";
   }
 
   function phrase(p) {
@@ -73,52 +73,43 @@ function SpeedometerGauge({ manager, pct, revenue, plan, salesCount, daysLeft })
     return "Месяц только начинается — хорошее время набрать темп 📈";
   }
 
-  const fill = zoneColor(pct);
+  const fill = zoneColor(clampedPct);
   const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
-  const perDay = daysLeft > 0 && remaining > 0 ? Math.ceil(remaining / daysLeft) : 0;
+  const effectiveDays = workDaysLeft > 0 ? workDaysLeft : (daysLeft || 0);
+  const perDay = effectiveDays > 0 && remaining > 0 ? Math.ceil(remaining / effectiveDays) : 0;
+  const remainingSales = avgCheck > 0 && remaining > 0 ? Math.ceil(remaining / avgCheck) : 0;
 
-  const angleRad = (180 - (clampedPct * 180 / 100)) * (Math.PI / 180);
-  const endX = +(100 + 80 * Math.cos(angleRad)).toFixed(2);
-  const endY = +(100 - 80 * Math.sin(angleRad)).toFixed(2);
-  const largeArc = clampedPct > 50 ? 1 : 0;
-
-  const needleX = +(100 + 70 * Math.cos(angleRad)).toFixed(2);
-  const needleY = +(100 - 70 * Math.sin(angleRad)).toFixed(2);
+  const angle = Math.PI - (clampedPct / 100) * Math.PI;
+  const ex = +(100 + 80 * Math.cos(angle)).toFixed(2);
+  const ey = +(100 - 80 * Math.sin(angle)).toFixed(2);
+  const large = clampedPct > 50 ? 1 : 0;
+  const needleX = +(100 + 65 * Math.cos(angle)).toFixed(2);
+  const needleY = +(100 - 65 * Math.sin(angle)).toFixed(2);
 
   return (
     <div style={{ background: "white", borderRadius: 16, padding: "18px 20px", border: "1px solid #e8eaf6", boxShadow: "0 4px 16px rgba(74,144,226,0.08)", flex: 1, minWidth: 220, maxWidth: 340 }}>
       <div style={{ fontWeight: 700, fontSize: 16, textAlign: "center", color: "#333", marginBottom: 2 }}>{manager}</div>
 
-      <svg viewBox="0 0 200 110" style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
-        {/* Background arc */}
-        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#e5e7eb" strokeWidth={16} strokeLinecap="round" />
-
-        {/* Progress arc */}
+      <svg viewBox="0 0 200 120" style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
+        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#eee" strokeWidth={18} strokeLinecap="round" />
         {clampedPct > 0 && (
-          <path d={`M 20,100 A 80,80 0 ${largeArc},1 ${endX},${endY}`} fill="none" stroke={fill} strokeWidth={16} strokeLinecap="round" />
+          <path d={`M 20,100 A 80,80 0 ${large},1 ${ex},${ey}`} fill="none" stroke={fill} strokeWidth={18} strokeLinecap="round" />
         )}
-
-        {/* Needle */}
         <line x1={100} y1={100} x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round" />
         <circle cx={100} cy={100} r={5} fill="#1e293b" />
-
-        {/* Percentage text */}
         <text x={100} y={85} textAnchor="middle" fontSize={24} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
-          {noPlan ? "—" : `${Math.round(pct)}%`}
+          {noPlan ? "—" : `${Math.round(percentage)}%`}
         </text>
-
-        {/* Revenue/plan text */}
         <text x={100} y={98} textAnchor="middle" fontSize={10} fill="#9ca3af">
           {revenue.toLocaleString("ru-RU")} / {noPlan ? "—" : plan.toLocaleString("ru-RU")} ₽
         </text>
       </svg>
 
-      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 14px", margin: "10px 2px 8px" }}>
         {[
           ["Осталось до плана", noPlan ? "—" : remaining === 0 ? "✓ Выполнен" : remaining.toLocaleString("ru-RU") + " ₽", !noPlan && remaining === 0 ? "#22c55e" : "#374151"],
-          ["Дней до конца месяца", daysLeft, "#374151"],
           ["Нужно в день", perDay > 0 ? perDay.toLocaleString("ru-RU") + " ₽" : "—", "#374151"],
+          ["Осталось продаж", remainingSales > 0 ? `≈ ${remainingSales} продаж` : remaining === 0 ? "✓" : "—", "#374151"],
           ["Продаж", salesCount, "#374151"],
         ].map(([label, val, col]) => (
           <div key={label}>
@@ -128,10 +119,11 @@ function SpeedometerGauge({ manager, pct, revenue, plan, salesCount, daysLeft })
         ))}
       </div>
 
-      {/* Motivational phrase */}
-      <div style={{ fontSize: 11, color: "#6b7280", padding: "7px 10px", background: "#f8faff", borderRadius: 8, lineHeight: 1.5 }}>
-        {noPlan ? "Установите план в разделе «Менеджеры»" : phrase(pct)}
-      </div>
+      {showPhrase !== false && (
+        <div style={{ fontSize: 11, color: "#6b7280", padding: "7px 10px", background: "#f8faff", borderRadius: 8, lineHeight: 1.5 }}>
+          {noPlan ? "Установите план в разделе «Менеджеры»" : phrase(percentage)}
+        </div>
+      )}
     </div>
   );
 }
@@ -148,6 +140,7 @@ export default function Analytics() {
   const [trials,  setTrials]  = React.useState([]);
   const [lessons, setLessons] = React.useState([]);
   const [plans,   setPlans]   = React.useState([]);
+  const [workSchedule, setWorkSchedule] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
   const [editPlan, setEditPlan] = React.useState({});
@@ -203,12 +196,13 @@ export default function Analytics() {
       const start = dateFmt(year, month, 1);
       const end   = dateFmt(year, month, daysInMonth);
       const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
-      const [leadsData, salesData, tr, le, pl] = await Promise.all([
+      const [leadsData, salesData, tr, le, pl, ws] = await Promise.all([
         apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
         apiFetch(`clients?stage=in.(продажа,ученик)&select=*&order=created_at.desc&limit=500`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*&limit=1000`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
+        apiFetch(`work_schedule?date=gte.${start}&date=lte.${end}&select=*`).catch(() => []),
       ]);
       const leads = Array.isArray(leadsData) ? leadsData : [];
       const sales = (Array.isArray(salesData) ? salesData : []).filter(c => {
@@ -221,6 +215,7 @@ export default function Analytics() {
       setTrials(Array.isArray(tr) ? tr : []);
       setLessons(Array.isArray(le) ? le : []);
       setPlans(Array.isArray(pl) ? pl : []);
+      setWorkSchedule(Array.isArray(ws) ? ws : []);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -339,6 +334,19 @@ export default function Analytics() {
     return new Date(year, month, 0).getDate() - now.getDate();
   }, [month, year]);
 
+  function managerWorkDaysLeft(managerName) {
+    if (workSchedule.length === 0) return 0;
+    const todayStr = dateFmt(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    return workSchedule.filter(ws => ws.manager_name === managerName && (ws.hours || 0) > 0 && ws.date >= todayStr).length;
+  }
+
+  const schoolWorkDaysLeft = React.useMemo(() => {
+    if (workSchedule.length === 0) return daysLeft;
+    const todayStr = dateFmt(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const dates = new Set(workSchedule.filter(ws => (ws.hours || 0) > 0 && ws.date >= todayStr).map(ws => ws.date));
+    return dates.size > 0 ? dates.size : daysLeft;
+  }, [workSchedule, daysLeft]);
+
   const myManagerName = role === "manager"
     ? MANAGERS.find(m => authorName === m || authorName.toLowerCase().startsWith(m.toLowerCase()))
     : null;
@@ -396,6 +404,12 @@ export default function Analytics() {
   const uniqueTrialSlots   = new Set(trials.filter(t => t.attended).map(t => `${t.date}_${t.time}`)).size;
   const avgPerSlot         = uniqueTrialSlots ? (monthSum.attended / uniqueTrialSlots).toFixed(1) : "—";
 
+  const schoolRevenue    = MANAGERS.reduce((s, m) => s + mgStats(m).revenue, 0);
+  const schoolPlanTotal  = MANAGERS.reduce((s, m) => s + mgStats(m).plan, 0);
+  const schoolSalesCount = MANAGERS.reduce((s, m) => s + mgStats(m).salesCount, 0);
+  const schoolAvgCheck   = schoolSalesCount > 0 ? Math.round(schoolRevenue / schoolSalesCount) : 0;
+  const schoolPct        = schoolPlanTotal > 0 ? schoolRevenue / schoolPlanTotal * 100 : 0;
+
   const TH  = { padding: "4px 8px", background: "#f0f4ff", border: "1px solid #dde", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" };
   const TD  = { padding: "3px 8px", border: "1px solid #eee", fontSize: 11 };
   const TDt = { padding: "4px 8px", border: "1px solid #dde", fontSize: 11, fontWeight: 600, background: "#eef2ff" };
@@ -440,13 +454,13 @@ export default function Analytics() {
       {/* ── Manager speedometer dashboard (own gauge only) ── */}
       {role === "manager" && myManagerName && (() => {
         const s = mgStats(myManagerName);
-        const pct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
+        const mgPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
         return (
           <div style={{ marginBottom: 24 }}>
             <div style={{ fontWeight: 600, fontSize: 13, color: "#4a90e2", marginBottom: 12 }}>
               Мой план — {MONTH_NAMES[month - 1]} {year}
             </div>
-            <SpeedometerGauge manager={myManagerName} pct={pct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} daysLeft={daysLeft} />
+            <SpeedometerGauge manager={myManagerName} pct={mgPct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} workDaysLeft={managerWorkDaysLeft(myManagerName)} daysLeft={daysLeft} avgCheck={s.avgCheck} />
           </div>
         );
       })()}
@@ -576,11 +590,24 @@ export default function Analytics() {
           <div style={{ fontWeight: 600, fontSize: 13, color: "#4a90e2", marginBottom: 12 }}>
             Дашборд — {MONTH_NAMES[month - 1]} {year}
           </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+            <SpeedometerGauge
+              manager="🏫 Школа"
+              pct={schoolPct}
+              revenue={schoolRevenue}
+              plan={schoolPlanTotal}
+              salesCount={schoolSalesCount}
+              workDaysLeft={schoolWorkDaysLeft}
+              daysLeft={daysLeft}
+              avgCheck={schoolAvgCheck}
+              showPhrase={false}
+            />
+          </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             {MANAGERS.map(manager => {
               const s = mgStats(manager);
-              const pct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
-              return <SpeedometerGauge key={manager} manager={manager} pct={pct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} daysLeft={daysLeft} />;
+              const mgPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
+              return <SpeedometerGauge key={manager} manager={manager} pct={mgPct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} workDaysLeft={managerWorkDaysLeft(manager)} daysLeft={daysLeft} avgCheck={s.avgCheck} />;
             })}
           </div>
         </div>
