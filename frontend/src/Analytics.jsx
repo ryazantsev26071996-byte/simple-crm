@@ -54,7 +54,7 @@ function sumRows(rows) {
   );
 }
 
-function SpeedometerGauge({ manager, pct: percentage, revenue, plan, salesCount, workDaysLeft, daysLeft, avgCheck, showPhrase }) {
+function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLeft, avgCheck, showPhrase }) {
   const noPlan = !plan;
   const clampedPct = Math.max(0, Math.min(percentage || 0, 100));
 
@@ -75,8 +75,7 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, salesCount,
 
   const fill = zoneColor(clampedPct);
   const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
-  const effectiveDays = workDaysLeft > 0 ? workDaysLeft : (daysLeft || 0);
-  const perDay = effectiveDays > 0 && remaining > 0 ? Math.ceil(remaining / effectiveDays) : 0;
+  const perDay = workDaysLeft > 0 && remaining > 0 ? Math.ceil(remaining / workDaysLeft) : 0;
   const remainingSales = avgCheck > 0 && remaining > 0 ? Math.ceil(remaining / avgCheck) : 0;
 
   const angle = Math.PI - (clampedPct / 100) * Math.PI;
@@ -97,20 +96,22 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, salesCount,
         )}
         <line x1={100} y1={100} x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round" />
         <circle cx={100} cy={100} r={5} fill="#1e293b" />
-        <text x={100} y={85} textAnchor="middle" fontSize={24} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
+        <text x={100} y={84} textAnchor="middle" fontSize={26} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
           {noPlan ? "—" : `${Math.round(percentage)}%`}
-        </text>
-        <text x={100} y={98} textAnchor="middle" fontSize={10} fill="#9ca3af">
-          {revenue.toLocaleString("ru-RU")} / {noPlan ? "—" : plan.toLocaleString("ru-RU")} ₽
         </text>
       </svg>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 14px", margin: "10px 2px 8px" }}>
+      <div style={{ textAlign: "center", fontSize: 13, fontWeight: 600, color: "#374151", margin: "-4px 0 10px" }}>
+        {revenue.toLocaleString("ru-RU")} ₽
+        <span style={{ color: "#9ca3af", fontWeight: 400 }}> / {noPlan ? "—" : plan.toLocaleString("ru-RU") + " ₽"}</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 14px", margin: "0 2px 8px" }}>
         {[
           ["Осталось до плана", noPlan ? "—" : remaining === 0 ? "✓ Выполнен" : remaining.toLocaleString("ru-RU") + " ₽", !noPlan && remaining === 0 ? "#22c55e" : "#374151"],
-          ["Нужно в день", perDay > 0 ? perDay.toLocaleString("ru-RU") + " ₽" : "—", "#374151"],
-          ["Осталось продаж", remainingSales > 0 ? `≈ ${remainingSales} продаж` : remaining === 0 ? "✓" : "—", "#374151"],
-          ["Продаж", salesCount, "#374151"],
+          ["Нужно в день",      perDay > 0 ? perDay.toLocaleString("ru-RU") + " ₽" : "—", "#374151"],
+          ["≈ продаж до плана", remainingSales > 0 ? `≈ ${remainingSales}` : remaining === 0 ? "✓" : "—", "#374151"],
+          ["Рабочих дней",      workDaysLeft > 0 ? workDaysLeft : "—", "#374151"],
         ].map(([label, val, col]) => (
           <div key={label}>
             <div style={{ fontSize: 10, color: "#9ca3af" }}>{label}</div>
@@ -202,7 +203,7 @@ export default function Analytics() {
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*&limit=1000`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
-        apiFetch(`work_schedule?date=gte.${start}&date=lte.${end}&select=*`).catch(() => []),
+        apiFetch(`work_schedule?date=gte.${dateFmt(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate())}&date=lte.${end}&hours=gt.0&select=employee_name,date,hours`).catch(() => []),
       ]);
       const leads = Array.isArray(leadsData) ? leadsData : [];
       const sales = (Array.isArray(salesData) ? salesData : []).filter(c => {
@@ -335,17 +336,15 @@ export default function Analytics() {
   }, [month, year]);
 
   function managerWorkDaysLeft(managerName) {
-    if (workSchedule.length === 0) return 0;
-    const todayStr = dateFmt(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    return workSchedule.filter(ws => ws.manager_name === managerName && (ws.hours || 0) > 0 && ws.date >= todayStr).length;
+    return workSchedule.filter(ws => ws.employee_name === managerName).length;
   }
 
   const schoolWorkDaysLeft = React.useMemo(() => {
-    if (workSchedule.length === 0) return daysLeft;
-    const todayStr = dateFmt(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    const dates = new Set(workSchedule.filter(ws => (ws.hours || 0) > 0 && ws.date >= todayStr).map(ws => ws.date));
-    return dates.size > 0 ? dates.size : daysLeft;
-  }, [workSchedule, daysLeft]);
+    const dates = new Set(
+      workSchedule.filter(ws => MANAGERS.some(m => ws.employee_name === m)).map(ws => ws.date)
+    );
+    return dates.size;
+  }, [workSchedule]);
 
   const myManagerName = role === "manager"
     ? MANAGERS.find(m => authorName === m || authorName.toLowerCase().startsWith(m.toLowerCase()))
@@ -460,7 +459,7 @@ export default function Analytics() {
             <div style={{ fontWeight: 600, fontSize: 13, color: "#4a90e2", marginBottom: 12 }}>
               Мой план — {MONTH_NAMES[month - 1]} {year}
             </div>
-            <SpeedometerGauge manager={myManagerName} pct={mgPct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} workDaysLeft={managerWorkDaysLeft(myManagerName)} daysLeft={daysLeft} avgCheck={s.avgCheck} />
+            <SpeedometerGauge manager={myManagerName} pct={mgPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(myManagerName)} avgCheck={s.avgCheck} />
           </div>
         );
       })()}
@@ -596,9 +595,7 @@ export default function Analytics() {
               pct={schoolPct}
               revenue={schoolRevenue}
               plan={schoolPlanTotal}
-              salesCount={schoolSalesCount}
               workDaysLeft={schoolWorkDaysLeft}
-              daysLeft={daysLeft}
               avgCheck={schoolAvgCheck}
               showPhrase={false}
             />
@@ -607,7 +604,7 @@ export default function Analytics() {
             {MANAGERS.map(manager => {
               const s = mgStats(manager);
               const mgPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
-              return <SpeedometerGauge key={manager} manager={manager} pct={mgPct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} workDaysLeft={managerWorkDaysLeft(manager)} daysLeft={daysLeft} avgCheck={s.avgCheck} />;
+              return <SpeedometerGauge key={manager} manager={manager} pct={mgPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(manager)} avgCheck={s.avgCheck} />;
             })}
           </div>
         </div>
