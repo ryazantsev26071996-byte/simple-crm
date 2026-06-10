@@ -58,7 +58,7 @@ function sumRows(rows) {
 function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLeft, avgCheck, showPhrase }) {
   const noPlan = !plan;
   const actualPct = percentage || 0;
-  const arcPct = Math.max(0, Math.min(actualPct, 99.99)); // cap at 99.99 to avoid degenerate arc at exactly 100%
+  const arcPct = Math.max(0.5, Math.min(actualPct, 99.5));
 
   function zoneColor(p) {
     if (p >= 100) return "#f1c40f";
