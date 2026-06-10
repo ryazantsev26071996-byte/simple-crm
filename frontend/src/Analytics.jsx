@@ -54,6 +54,118 @@ function sumRows(rows) {
   );
 }
 
+function SpeedometerGauge({ manager, pct, revenue, plan, salesCount, daysLeft }) {
+  const W = 200, H = 110, cx = 100, cy = 100, R = 80, SW = 14;
+
+  const [displayPct, setDisplayPct] = React.useState(0);
+  React.useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setDisplayPct(pct)));
+    return () => cancelAnimationFrame(id);
+  }, [pct]);
+
+  const gaugePct = Math.max(0, Math.min(displayPct, 110));
+
+  function pt(p) {
+    const θ = Math.PI * (1 - p / 100);
+    return [+(cx + R * Math.cos(θ)).toFixed(2), +(cy - R * Math.sin(θ)).toFixed(2)];
+  }
+
+  function arc(p1, p2) {
+    if (p2 - p1 < 0.01) return "";
+    const [x1, y1] = pt(p1), [x2, y2] = pt(p2);
+    return `M ${x1} ${y1} A ${R} ${R} 0 ${p2 - p1 >= 50 ? 1 : 0} 0 ${x2} ${y2}`;
+  }
+
+  function zoneColor(p) {
+    if (p >= 100) return "#f59e0b";
+    if (p >= 80)  return "#22c55e";
+    if (p >= 50)  return "#f59e0b";
+    return "#ef4444";
+  }
+
+  function phrase(p) {
+    if (p >= 100) return "План выполнен! Отличная работа в этом месяце 🏆";
+    if (p >= 80)  return "Финишная прямая — совсем немного осталось ⚡";
+    if (p >= 50)  return "Больше половины выполнено! Отличный результат 🔥";
+    if (p >= 20)  return "Хороший старт! Держим темп 🚀";
+    return "Месяц только начинается — хорошее время набрать темп 📈";
+  }
+
+  const noPlan = !plan;
+  const fill = zoneColor(pct);
+  const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
+  const perDay = daysLeft > 0 && remaining > 0 ? Math.ceil(remaining / daysLeft) : 0;
+  const needleAngle = 180 * (gaugePct / 100) - 180;
+
+  return (
+    <div style={{ background: "white", borderRadius: 16, padding: "18px 20px", border: "1px solid #e8eaf6", boxShadow: "0 4px 16px rgba(74,144,226,0.08)", flex: 1, minWidth: 220, maxWidth: 340 }}>
+      <div style={{ fontWeight: 700, fontSize: 16, textAlign: "center", color: "#333", marginBottom: 2 }}>{manager}</div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
+        {/* Light zone background arcs */}
+        <path d={arc(0, 50)}   fill="none" stroke="#fecaca" strokeWidth={SW} strokeLinecap="butt" />
+        <path d={arc(50, 80)}  fill="none" stroke="#fef3c7" strokeWidth={SW} strokeLinecap="butt" />
+        <path d={arc(80, 100)} fill="none" stroke="#bbf7d0" strokeWidth={SW} strokeLinecap="butt" />
+
+        {/* Zone boundary ticks */}
+        {[50, 80].map(mark => {
+          const θ = Math.PI * (1 - mark / 100);
+          const cos = Math.cos(θ), sin = Math.sin(θ);
+          return (
+            <line key={mark}
+              x1={+(cx + (R - SW / 2 - 2) * cos).toFixed(2)} y1={+(cy - (R - SW / 2 - 2) * sin).toFixed(2)}
+              x2={+(cx + (R + SW / 2 + 2) * cos).toFixed(2)} y2={+(cy - (R + SW / 2 + 2) * sin).toFixed(2)}
+              stroke="white" strokeWidth={2.5} />
+          );
+        })}
+
+        {/* Progress fill */}
+        {gaugePct > 0.1 && (
+          <path d={arc(0, Math.min(gaugePct, 100))} fill="none" stroke={fill} strokeWidth={SW} strokeLinecap="round" />
+        )}
+        {gaugePct > 100 && (
+          <path d={arc(100, gaugePct)} fill="none" stroke="#f59e0b" strokeWidth={SW} strokeLinecap="round" />
+        )}
+
+        {/* Needle */}
+        <line x1={cx} y1={cy} x2={cx + R - 12} y2={cy}
+          stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round"
+          style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${needleAngle}deg)`, transition: "transform 1.2s cubic-bezier(0.34,1.56,0.64,1)" }} />
+        <circle cx={cx} cy={cy} r={6}   fill="#1e293b" />
+        <circle cx={cx} cy={cy} r={3.5} fill="white" />
+
+        {/* Percentage + sub-label */}
+        <text x={cx} y={cy - 26} textAnchor="middle" fontSize={noPlan ? 12 : 22} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
+          {noPlan ? "Нет плана" : `${Math.round(pct)}%`}
+        </text>
+        <text x={cx} y={cy - 10} textAnchor="middle" fontSize={8} fill="#9ca3af">
+          {revenue.toLocaleString("ru-RU")} / {noPlan ? "—" : plan.toLocaleString("ru-RU")} ₽
+        </text>
+      </svg>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 14px", margin: "10px 2px 8px" }}>
+        {[
+          ["Осталось до плана", noPlan ? "—" : remaining === 0 ? "✓ Выполнен" : remaining.toLocaleString("ru-RU") + " ₽", !noPlan && remaining === 0 ? "#22c55e" : "#374151"],
+          ["Дней до конца месяца", daysLeft, "#374151"],
+          ["Нужно в день", perDay > 0 ? perDay.toLocaleString("ru-RU") + " ₽" : "—", "#374151"],
+          ["Продаж", salesCount, "#374151"],
+        ].map(([label, val, col]) => (
+          <div key={label}>
+            <div style={{ fontSize: 10, color: "#9ca3af" }}>{label}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: col }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Motivational phrase */}
+      <div style={{ fontSize: 11, color: "#6b7280", padding: "7px 10px", background: "#f8faff", borderRadius: 8, lineHeight: 1.5 }}>
+        {noPlan ? "Установите план в разделе «Менеджеры»" : phrase(pct)}
+      </div>
+    </div>
+  );
+}
+
 export default function Analytics() {
   const { profile, user } = useAuth();
   const role = profile?.role || "teacher";
@@ -249,6 +361,18 @@ export default function Analytics() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
+  const daysLeft = React.useMemo(() => {
+    const now = new Date();
+    const ny = now.getFullYear(), nm = now.getMonth() + 1;
+    if (year < ny || (year === ny && month < nm)) return 0;
+    if (year > ny || (year === ny && month > nm)) return new Date(year, month, 0).getDate();
+    return new Date(year, month, 0).getDate() - now.getDate();
+  }, [month, year]);
+
+  const myManagerName = role === "manager"
+    ? MANAGERS.find(m => authorName === m || authorName.toLowerCase().startsWith(m.toLowerCase()))
+    : null;
+
   const dailyRows = React.useMemo(() => days.map(d => {
     const ds = dateFmt(year, month, d);
     const newL = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === ds);
@@ -342,6 +466,20 @@ export default function Analytics() {
       </div>
 
       {showTeam && <TeamOnline />}
+
+      {/* ── Manager speedometer dashboard (own gauge only) ── */}
+      {role === "manager" && myManagerName && (() => {
+        const s = mgStats(myManagerName);
+        const pct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
+        return (
+          <div style={{ marginBottom: 24 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: "#4a90e2", marginBottom: 12 }}>
+              Мой план — {MONTH_NAMES[month - 1]} {year}
+            </div>
+            <SpeedometerGauge manager={myManagerName} pct={pct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} daysLeft={daysLeft} />
+          </div>
+        );
+      })()}
 
       {/* ── Daily + Managers side by side ── */}
       <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? 16 : 24, alignItems: isMobile ? "stretch" : "flex-start", marginBottom: 28 }}>
@@ -462,6 +600,22 @@ export default function Analytics() {
 
       </div> {/* end flexShrink daily */}
       <div style={{ flex: 1, minWidth: 0 }}>
+      {/* ── Admin speedometer dashboard ── */}
+      {role === "admin" && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "#4a90e2", marginBottom: 12 }}>
+            Дашборд — {MONTH_NAMES[month - 1]} {year}
+          </div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {MANAGERS.map(manager => {
+              const s = mgStats(manager);
+              const pct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
+              return <SpeedometerGauge key={manager} manager={manager} pct={pct} revenue={s.revenue} plan={s.plan} salesCount={s.salesCount} daysLeft={daysLeft} />;
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Managers ── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Менеджеры</div>
