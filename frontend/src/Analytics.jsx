@@ -55,48 +55,80 @@ function sumRows(rows) {
   );
 }
 
-function SpeedometerGauge({ percentage, revenue, plan }) {
-  const pct = Math.min(Math.max(percentage || 0, 0), 100);
-  const color = pct < 50 ? '#e74c3c' : pct < 80 ? '#f39c12' : pct < 100 ? '#27ae60' : '#f1c40f';
+function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLeft, avgCheck, showPhrase }) {
+  const noPlan = !plan;
+  const actualPct = percentage || 0;
+  const arcPct = Math.max(0, Math.min(actualPct, 99.99)); // cap at 99.99 to avoid degenerate arc at exactly 100%
 
-  // Semicircle: starts at left (180deg) goes to right (0deg)
-  // pct=0 -> needle at left, pct=100 -> needle at right
-  const angleRad = Math.PI * (1 - pct / 100);
-  const cx = 100, cy = 95, r = 70;
-  const ex = cx + r * Math.cos(Math.PI - angleRad);
-  const ey = cy - r * Math.sin(Math.PI - angleRad);
-  const needleX = cx + 60 * Math.cos(Math.PI - angleRad);
-  const needleY = cy - 60 * Math.sin(Math.PI - angleRad);
-  const largeArc = pct > 50 ? 1 : 0;
+  function zoneColor(p) {
+    if (p >= 100) return "#f1c40f";
+    if (p >= 80)  return "#27ae60";
+    if (p >= 50)  return "#f39c12";
+    return "#e74c3c";
+  }
 
-  const startX = cx - r; // left point (0%)
-  const startY = cy;
-  const endX = cx + r;   // right point (100%)
-  const endY = cy;
+  function phrase(p) {
+    if (p >= 100) return "План выполнен! Отличная работа в этом месяце 🏆";
+    if (p >= 80)  return "Финишная прямая — совсем немного осталось ⚡";
+    if (p >= 50)  return "Больше половины выполнено! Отличный результат 🔥";
+    if (p >= 20)  return "Хороший старт! Держим темп 🚀";
+    return "Месяц только начинается — хорошее время набрать темп 📈";
+  }
+
+  const fill = zoneColor(actualPct); // color based on actual %, so >100% shows gold
+  const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
+  const perDay = workDaysLeft > 0 && remaining > 0 ? Math.ceil(remaining / workDaysLeft) : 0;
+  const remainingSales = avgCheck > 0 && remaining > 0 ? Math.ceil(remaining / avgCheck) : 0;
+
+  // Use arcPct (capped) for SVG geometry; actual percentage shown in text
+  const angle = Math.PI - (arcPct / 100) * Math.PI;
+  const ex = +(100 + 80 * Math.cos(angle)).toFixed(2);
+  const ey = +(100 - 80 * Math.sin(angle)).toFixed(2);
+  const large = arcPct > 50 ? 1 : 0;
+  const needleX = +(100 + 65 * Math.cos(angle)).toFixed(2);
+  const needleY = +(100 - 65 * Math.sin(angle)).toFixed(2);
 
   return (
-    <svg viewBox="0 0 200 110" width="200" height="110">
-      {/* Background arc */}
-      <path d={`M ${startX},${startY} A ${r},${r} 0 0,1 ${endX},${endY}`}
-        stroke="#e8e8e8" strokeWidth="14" fill="none" strokeLinecap="round"/>
-      {/* Progress arc */}
-      {pct > 0 && (
-        <path d={`M ${startX},${startY} A ${r},${r} 0 ${largeArc},1 ${ex},${ey}`}
-          stroke={color} strokeWidth="14" fill="none" strokeLinecap="round"/>
+    <div style={{ background: "white", borderRadius: 16, padding: "18px 20px", border: "1px solid #e8eaf6", boxShadow: "0 4px 16px rgba(74,144,226,0.08)", flex: 1, minWidth: 220, maxWidth: 340 }}>
+      <div style={{ fontWeight: 700, fontSize: 16, textAlign: "center", color: "#333", marginBottom: 2 }}>{manager}</div>
+
+      <svg viewBox="0 0 200 120" style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
+        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#eee" strokeWidth={18} strokeLinecap="round" />
+        {arcPct > 0 && (
+          <path d={`M 20,100 A 80,80 0 ${large},1 ${ex},${ey}`} fill="none" stroke={fill} strokeWidth={18} strokeLinecap="round" />
+        )}
+        <line x1={100} y1={100} x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round" />
+        <circle cx={100} cy={100} r={5} fill="#1e293b" />
+        <text x={100} y={84} textAnchor="middle" fontSize={26} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
+          {noPlan ? "—" : `${Math.round(percentage)}%`}
+        </text>
+      </svg>
+
+      <div style={{ textAlign: "center", fontSize: 13, fontWeight: 600, color: "#374151", margin: "-4px 0 10px" }}>
+        {revenue.toLocaleString("ru-RU")} ₽
+        <span style={{ color: "#9ca3af", fontWeight: 400 }}> / {noPlan ? "—" : plan.toLocaleString("ru-RU") + " ₽"}</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 14px", margin: "0 2px 8px" }}>
+        {[
+          ["Осталось до плана", noPlan ? "—" : remaining === 0 ? "✓ Выполнен" : remaining.toLocaleString("ru-RU") + " ₽", !noPlan && remaining === 0 ? "#22c55e" : "#374151"],
+          ["Нужно в день",      perDay > 0 ? perDay.toLocaleString("ru-RU") + " ₽" : "—", "#374151"],
+          ["≈ продаж до плана", remainingSales > 0 ? `≈ ${remainingSales}` : remaining === 0 ? "✓" : "—", "#374151"],
+          ["Рабочих дней",      workDaysLeft > 0 ? workDaysLeft : "—", "#374151"],
+        ].map(([label, val, col]) => (
+          <div key={label}>
+            <div style={{ fontSize: 10, color: "#9ca3af" }}>{label}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: col }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {showPhrase !== false && (
+        <div style={{ fontSize: 11, color: "#6b7280", padding: "7px 10px", background: "#f8faff", borderRadius: 8, lineHeight: 1.5 }}>
+          {noPlan ? "Установите план в разделе «Менеджеры»" : phrase(percentage)}
+        </div>
       )}
-      {/* Needle */}
-      <line x1={cx} y1={cy} x2={needleX} y2={needleY}
-        stroke="#333" strokeWidth="2.5" strokeLinecap="round"/>
-      <circle cx={cx} cy={cy} r="4" fill="#333"/>
-      {/* Percentage text */}
-      <text x={cx} y={cy - 10} textAnchor="middle" fontSize="22" fontWeight="bold" fill={color}>
-        {Math.round(percentage || 0)}%
-      </text>
-      {/* Revenue/plan */}
-      <text x={cx} y={cy + 14} textAnchor="middle" fontSize="9" fill="#888">
-        {(revenue||0).toLocaleString('ru-RU')} ₽ / {(plan||0).toLocaleString('ru-RU')} ₽
-      </text>
-    </svg>
+    </div>
   );
 }
 
@@ -493,7 +525,7 @@ export default function Analytics() {
             <div style={{ fontWeight: 600, fontSize: 13, color: "#4a90e2", marginBottom: 12 }}>
               Мой план — {MONTH_NAMES[month - 1]} {year}
             </div>
-            <SpeedometerGauge percentage={mgPct} revenue={s.revenue} plan={s.plan} />
+            <SpeedometerGauge manager={myManagerName} pct={mgPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(myManagerName)} avgCheck={s.avgCheck} />
           </div>
         );
       })()}
@@ -624,13 +656,21 @@ export default function Analytics() {
             Дашборд — {MONTH_NAMES[month - 1]} {year}
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
-            <SpeedometerGauge percentage={schoolPct} revenue={schoolRevenue} plan={schoolPlanTotal} />
+            <SpeedometerGauge
+              manager="🏫 Школа"
+              pct={schoolPct}
+              revenue={schoolRevenue}
+              plan={schoolPlanTotal}
+              workDaysLeft={schoolWorkDaysLeft}
+              avgCheck={schoolAvgCheck}
+              showPhrase={false}
+            />
           </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             {MANAGERS.map(manager => {
               const s = mgStats(manager);
               const mgPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
-              return <SpeedometerGauge key={manager} percentage={mgPct} revenue={s.revenue} plan={s.plan} />;
+              return <SpeedometerGauge key={manager} manager={manager} pct={mgPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(manager)} avgCheck={s.avgCheck} />;
             })}
           </div>
         </div>
