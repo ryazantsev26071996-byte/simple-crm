@@ -84,7 +84,7 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLef
   const angle = Math.PI - (arcPct / 100) * Math.PI;
   const ex = +(100 + 80 * Math.cos(angle)).toFixed(2);
   const ey = +(100 - 80 * Math.sin(angle)).toFixed(2);
-  const large = arcPct > 50 ? 1 : 0;
+  const large = 0;
   const needleX = +(100 + 65 * Math.cos(angle)).toFixed(2);
   const needleY = +(100 - 65 * Math.sin(angle)).toFixed(2);
 
