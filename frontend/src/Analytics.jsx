@@ -671,14 +671,6 @@ export default function Analytics() {
               return <SpeedometerGauge key={manager} manager={manager} pct={mgPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(manager)} avgCheck={s.avgCheck} />;
             })}
           </div>
-          <div style={{ fontWeight: 600, fontSize: 12, color: "#888", margin: "16px 0 8px" }}>Аккаунт-менеджеры</div>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            {ACCOUNT_MANAGERS.map(name => {
-              const s = amStats(name);
-              const amPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
-              return <SpeedometerGauge key={name} manager={name} pct={amPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(name)} avgCheck={s.avgCheck} />;
-            })}
-          </div>
         </div>
       )}
 
