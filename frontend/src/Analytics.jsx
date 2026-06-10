@@ -130,6 +130,47 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLef
   );
 }
 
+function MiniProgressCard({ label, revenue, plan, workDaysLeft }) {
+  const noPlan = !plan;
+  const pctVal = noPlan ? 0 : Math.min(revenue / plan * 100, 100);
+  const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
+  const perDay = workDaysLeft > 0 && remaining > 0 ? Math.ceil(remaining / workDaysLeft) : 0;
+
+  function barColor(p) {
+    if (p >= 100) return "#f1c40f";
+    if (p >= 80)  return "#27ae60";
+    if (p >= 50)  return "#f39c12";
+    return "#e74c3c";
+  }
+  const fill = barColor(pctVal);
+
+  return (
+    <div style={{ background: "white", borderRadius: 12, padding: "14px 16px", border: "1px solid #e8eaf6", boxShadow: "0 2px 8px rgba(74,144,226,0.06)", flex: 1, minWidth: 210, maxWidth: 300 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, color: "#374151", marginBottom: 8 }}>{label}</div>
+      <div style={{ background: "#f0f0f0", borderRadius: 6, height: 10, marginBottom: 5, overflow: "hidden" }}>
+        <div style={{ width: `${pctVal}%`, height: "100%", background: fill, borderRadius: 6 }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 11, color: "#9ca3af" }}>{noPlan ? "Нет плана" : plan.toLocaleString("ru-RU") + " ₽"}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: noPlan ? "#aaa" : fill }}>{noPlan ? "—" : Math.round(pctVal) + "%"}</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+        {[
+          ["Выполнено",   revenue.toLocaleString("ru-RU") + " ₽"],
+          ["Осталось",    noPlan ? "—" : remaining === 0 ? "✓" : remaining.toLocaleString("ru-RU") + " ₽"],
+          ["Рабочих дней", workDaysLeft > 0 ? workDaysLeft : "—"],
+          ["Нужно в день", perDay > 0 ? perDay.toLocaleString("ru-RU") + " ₽" : "—"],
+        ].map(([l, v]) => (
+          <div key={l}>
+            <div style={{ fontSize: 10, color: "#9ca3af" }}>{l}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Analytics() {
   const { profile, user } = useAuth();
   const role = profile?.role || "teacher";
@@ -390,27 +431,31 @@ export default function Analytics() {
   }
 
   function amStats(name) {
-    const amTrials       = trials.filter(t => t.account_manager === name && !t.rescheduled);
-    const amAttended     = amTrials.filter(t => t.attended === true);
-    const amRenewals     = clients.filter(c => c.manager_name === name && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
+    const amTrials        = trials.filter(t => t.account_manager === name && !t.rescheduled);
+    const amAttended      = amTrials.filter(t => t.attended === true);
+    const amRenewals      = clients.filter(c => c.manager_name === name && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
     const amRegistrations = clients.filter(c => ["ученик","продажа"].includes(c.stage) && c.registered_by === name);
-    const renewalRevenue = amRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
-    const regSum         = amRegistrations.reduce((s, c) => s + (c.amount_paid || 0), 0);
-    const revenue        = renewalRevenue + regSum;
-    const plan           = plans.find(p => p.manager_name === name)?.plan || 0;
-    const actions        = amRenewals.length + amRegistrations.length;
+    const renewalRevenue  = amRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const regSum          = amRegistrations.reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const revenue         = renewalRevenue + regSum;
+    const renewalPlan     = plans.find(p => p.manager_name === `${name}_продления`)?.plan || 0;
+    const regPlan         = plans.find(p => p.manager_name === `${name}_оформления`)?.plan || 0;
+    const plan            = renewalPlan + regPlan;
+    const actions         = amRenewals.length + amRegistrations.length;
     return {
-      trials:             amTrials.length,
-      attended:           amAttended.length,
-      renewals:           amRenewals,
+      trials:            amTrials.length,
+      attended:          amAttended.length,
+      renewals:          amRenewals,
       renewalRevenue,
       regSum,
       revenue,
+      renewalPlan,
+      regPlan,
       plan,
-      remaining:          Math.max(0, plan - revenue),
-      avgCheck:           actions > 0 ? Math.round(revenue / actions) : 0,
-      cvTrialToAttend:    pct(amAttended.length, amTrials.length),
-      cvAttendToRenewal:  pct(amRenewals.length, amAttended.length),
+      remaining:         Math.max(0, plan - revenue),
+      avgCheck:          actions > 0 ? Math.round(revenue / actions) : 0,
+      cvTrialToAttend:   pct(amAttended.length, amTrials.length),
+      cvAttendToRenewal: pct(amRenewals.length, amAttended.length),
     };
   }
 
@@ -711,47 +756,55 @@ export default function Analytics() {
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Аккаунт-менеджеры</div>
         {ACCOUNT_MANAGERS.map(name => {
           const s = amStats(name);
-          const planVal = editPlan[name] !== undefined ? editPlan[name] : (s.plan || "");
+          const wdl = managerWorkDaysLeft(name);
           return (
             <div key={name} style={{ marginBottom: 24, borderBottom: "1px solid #f0f0f0", paddingBottom: 20 }}>
               <div style={{ fontWeight: 600, fontSize: 14, color: "#4a90e2", marginBottom: 10 }}>{name}</div>
+
+              {/* Stat cards row */}
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
                 <StatCard label="Записано на ВУ"        value={s.trials} />
                 <StatCard label="Пришло на ВУ"          value={s.attended} />
                 <StatCard label="Продлений / продаж"    value={s.renewals.length} />
-                <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка (продления)</div>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>{s.renewalRevenue.toLocaleString("ru-RU")} ₽</div>
-                </div>
                 <StatCard label="CV записи → приход"    value={s.cvTrialToAttend} />
                 <StatCard label="CV приход → продление" value={s.cvAttendToRenewal} />
-                <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма оформлений</div>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>{s.regSum.toLocaleString("ru-RU")} ₽</div>
-                </div>
-                <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>План</div>
-                  {role === "admin" ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                      <input type="number" value={planVal}
-                        onChange={e => setEditPlan(p => ({...p, [name]: e.target.value}))}
-                        onBlur={() => editPlan[name] !== undefined && savePlan(name, editPlan[name])}
-                        onKeyDown={e => e.key === "Enter" && editPlan[name] !== undefined && savePlan(name, editPlan[name])}
-                        style={{ width: 90, padding: "3px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13 }}
-                      />
-                      <span style={{ fontSize: 12, color: "#888" }}>₽</span>
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>{s.plan ? s.plan.toLocaleString("ru-RU") + " ₽" : "—"}</div>
-                  )}
-                </div>
-                <div style={{ background: s.plan && s.remaining <= 0 ? "#f0fff4" : "#fff8f0", borderRadius: 8, padding: "10px 14px", border: `1px solid ${s.plan && s.remaining <= 0 ? "#a5d6a7" : "#ffd0a0"}`, minWidth: 160 }}>
-                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Осталось до плана</div>
-                  <div style={{ fontSize: 16, fontWeight: 600, color: s.plan && s.remaining <= 0 ? "#2a9" : "#e67e22" }}>
-                    {s.plan ? (s.remaining <= 0 ? "✓ Выполнен" : s.remaining.toLocaleString("ru-RU") + " ₽") : "—"}
-                  </div>
-                </div>
               </div>
+
+              {/* Plan inputs */}
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                {([
+                  [`${name}_продления`,  "План продлений",  s.renewalPlan],
+                  [`${name}_оформления`, "План оформлений", s.regPlan],
+                ]).map(([key, label, planValue]) => {
+                  const editVal = editPlan[key] !== undefined ? editPlan[key] : (planValue || "");
+                  return (
+                    <div key={key} style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 160 }}>
+                      <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>{label}</div>
+                      {role === "admin" ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <input type="number" value={editVal}
+                            onChange={e => setEditPlan(p => ({...p, [key]: e.target.value}))}
+                            onBlur={() => editPlan[key] !== undefined && savePlan(key, editPlan[key])}
+                            onKeyDown={e => e.key === "Enter" && editPlan[key] !== undefined && savePlan(key, editPlan[key])}
+                            style={{ width: 90, padding: "3px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13 }}
+                          />
+                          <span style={{ fontSize: 12, color: "#888" }}>₽</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 15, fontWeight: 600 }}>{planValue ? planValue.toLocaleString("ru-RU") + " ₽" : "—"}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Mini progress cards */}
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+                <MiniProgressCard label="Продления"  revenue={s.renewalRevenue} plan={s.renewalPlan} workDaysLeft={wdl} />
+                <MiniProgressCard label="Оформления" revenue={s.regSum}         plan={s.regPlan}     workDaysLeft={wdl} />
+              </div>
+
+              {/* Renewals table */}
               {s.renewals.length > 0 && (
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
