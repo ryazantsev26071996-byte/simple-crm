@@ -55,26 +55,8 @@ function sumRows(rows) {
 }
 
 function SpeedometerGauge({ manager, pct, revenue, plan, salesCount, daysLeft }) {
-  const W = 200, H = 110, cx = 100, cy = 100, R = 80, SW = 14;
-
-  const [displayPct, setDisplayPct] = React.useState(0);
-  React.useEffect(() => {
-    const id = requestAnimationFrame(() => requestAnimationFrame(() => setDisplayPct(pct)));
-    return () => cancelAnimationFrame(id);
-  }, [pct]);
-
-  const gaugePct = Math.max(0, Math.min(displayPct, 110));
-
-  function pt(p) {
-    const θ = Math.PI * (1 - p / 100);
-    return [+(cx + R * Math.cos(θ)).toFixed(2), +(cy - R * Math.sin(θ)).toFixed(2)];
-  }
-
-  function arc(p1, p2) {
-    if (p2 - p1 < 0.01) return "";
-    const [x1, y1] = pt(p1), [x2, y2] = pt(p2);
-    return `M ${x1} ${y1} A ${R} ${R} 0 ${p2 - p1 >= 50 ? 1 : 0} 0 ${x2} ${y2}`;
-  }
+  const noPlan = !plan;
+  const clampedPct = Math.max(0, Math.min(pct, 100));
 
   function zoneColor(p) {
     if (p >= 100) return "#f59e0b";
@@ -91,54 +73,42 @@ function SpeedometerGauge({ manager, pct, revenue, plan, salesCount, daysLeft })
     return "Месяц только начинается — хорошее время набрать темп 📈";
   }
 
-  const noPlan = !plan;
   const fill = zoneColor(pct);
   const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
   const perDay = daysLeft > 0 && remaining > 0 ? Math.ceil(remaining / daysLeft) : 0;
-  const needleAngle = 180 * (gaugePct / 100) - 180;
+
+  const angleRad = (180 - (clampedPct * 180 / 100)) * (Math.PI / 180);
+  const endX = +(100 + 80 * Math.cos(angleRad)).toFixed(2);
+  const endY = +(100 - 80 * Math.sin(angleRad)).toFixed(2);
+  const largeArc = clampedPct > 50 ? 1 : 0;
+
+  const needleX = +(100 + 70 * Math.cos(angleRad)).toFixed(2);
+  const needleY = +(100 - 70 * Math.sin(angleRad)).toFixed(2);
 
   return (
     <div style={{ background: "white", borderRadius: 16, padding: "18px 20px", border: "1px solid #e8eaf6", boxShadow: "0 4px 16px rgba(74,144,226,0.08)", flex: 1, minWidth: 220, maxWidth: 340 }}>
       <div style={{ fontWeight: 700, fontSize: 16, textAlign: "center", color: "#333", marginBottom: 2 }}>{manager}</div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
-        {/* Light zone background arcs */}
-        <path d={arc(0, 50)}   fill="none" stroke="#fecaca" strokeWidth={SW} strokeLinecap="butt" />
-        <path d={arc(50, 80)}  fill="none" stroke="#fef3c7" strokeWidth={SW} strokeLinecap="butt" />
-        <path d={arc(80, 100)} fill="none" stroke="#bbf7d0" strokeWidth={SW} strokeLinecap="butt" />
+      <svg viewBox="0 0 200 110" style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
+        {/* Background arc */}
+        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#e5e7eb" strokeWidth={16} strokeLinecap="round" />
 
-        {/* Zone boundary ticks */}
-        {[50, 80].map(mark => {
-          const θ = Math.PI * (1 - mark / 100);
-          const cos = Math.cos(θ), sin = Math.sin(θ);
-          return (
-            <line key={mark}
-              x1={+(cx + (R - SW / 2 - 2) * cos).toFixed(2)} y1={+(cy - (R - SW / 2 - 2) * sin).toFixed(2)}
-              x2={+(cx + (R + SW / 2 + 2) * cos).toFixed(2)} y2={+(cy - (R + SW / 2 + 2) * sin).toFixed(2)}
-              stroke="white" strokeWidth={2.5} />
-          );
-        })}
-
-        {/* Progress fill */}
-        {gaugePct > 0.1 && (
-          <path d={arc(0, Math.min(gaugePct, 100))} fill="none" stroke={fill} strokeWidth={SW} strokeLinecap="round" />
-        )}
-        {gaugePct > 100 && (
-          <path d={arc(100, gaugePct)} fill="none" stroke="#f59e0b" strokeWidth={SW} strokeLinecap="round" />
+        {/* Progress arc */}
+        {clampedPct > 0 && (
+          <path d={`M 20,100 A 80,80 0 ${largeArc},1 ${endX},${endY}`} fill="none" stroke={fill} strokeWidth={16} strokeLinecap="round" />
         )}
 
         {/* Needle */}
-        <line x1={cx} y1={cy} x2={cx + R - 12} y2={cy}
-          stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round"
-          style={{ transformOrigin: `${cx}px ${cy}px`, transform: `rotate(${needleAngle}deg)`, transition: "transform 1.2s cubic-bezier(0.34,1.56,0.64,1)" }} />
-        <circle cx={cx} cy={cy} r={6}   fill="#1e293b" />
-        <circle cx={cx} cy={cy} r={3.5} fill="white" />
+        <line x1={100} y1={100} x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round" />
+        <circle cx={100} cy={100} r={5} fill="#1e293b" />
 
-        {/* Percentage + sub-label */}
-        <text x={cx} y={cy - 26} textAnchor="middle" fontSize={noPlan ? 12 : 22} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
-          {noPlan ? "Нет плана" : `${Math.round(pct)}%`}
+        {/* Percentage text */}
+        <text x={100} y={85} textAnchor="middle" fontSize={24} fontWeight="700" fill={noPlan ? "#aaa" : fill}>
+          {noPlan ? "—" : `${Math.round(pct)}%`}
         </text>
-        <text x={cx} y={cy - 10} textAnchor="middle" fontSize={8} fill="#9ca3af">
+
+        {/* Revenue/plan text */}
+        <text x={100} y={98} textAnchor="middle" fontSize={10} fill="#9ca3af">
           {revenue.toLocaleString("ru-RU")} / {noPlan ? "—" : plan.toLocaleString("ru-RU")} ₽
         </text>
       </svg>
