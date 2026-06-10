@@ -93,9 +93,9 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLef
       <div style={{ fontWeight: 700, fontSize: 16, textAlign: "center", color: "#333", marginBottom: 2 }}>{manager}</div>
 
       <svg viewBox="0 0 200 120" style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
-        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#eee" strokeWidth={18} strokeLinecap="butt" />
+        <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#eee" strokeWidth={12} strokeLinecap="butt" />
         {arcPct > 0 && (
-          <path d={`M 20,100 A 80,80 0 ${large},1 ${ex},${ey}`} fill="none" stroke={fill} strokeWidth={18} strokeLinecap="butt" />
+          <path d={`M 20,100 A 80,80 0 ${large},1 ${ex},${ey}`} fill="none" stroke={fill} strokeWidth={12} strokeLinecap="butt" />
         )}
         <line x1={100} y1={100} x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round" />
         <circle cx={100} cy={100} r={5} fill="#1e293b" />
