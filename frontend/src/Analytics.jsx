@@ -8,6 +8,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const MANAGERS = ["Салампи", "Татьяна"];
+const ACCOUNT_MANAGERS = ["Арина", "Вероника"];
 const STAGES = ["новая заявка","записан на пробное","на следующий месяц","был не купил","не пришел","дожимать","продажа","ученик","бронь","тест-драйв","пробный месяц","рассылка","на МК или ОД","корявый лид","расторжение","кончился абонемент"];
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKS = [
@@ -388,12 +389,30 @@ export default function Analytics() {
     };
   }
 
-  const arinaTrials    = trials.filter(t => t.account_manager === "Арина" && !t.rescheduled);
-  const arinaAttended  = arinaTrials.filter(t => t.attended === true);
-  const arinaRenewals  = clients.filter(c => c.manager_name === "Арина" && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
-  const arinaRevenue   = arinaRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
-  const registrationClients = clients.filter(c => ["ученик","продажа"].includes(c.stage) && (c.registered_by === "Арина" || c.registered_by === "Вероника"));
-  const registrationSum = registrationClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
+  function amStats(name) {
+    const amTrials       = trials.filter(t => t.account_manager === name && !t.rescheduled);
+    const amAttended     = amTrials.filter(t => t.attended === true);
+    const amRenewals     = clients.filter(c => c.manager_name === name && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
+    const amRegistrations = clients.filter(c => ["ученик","продажа"].includes(c.stage) && c.registered_by === name);
+    const renewalRevenue = amRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const regSum         = amRegistrations.reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const revenue        = renewalRevenue + regSum;
+    const plan           = plans.find(p => p.manager_name === name)?.plan || 0;
+    const actions        = amRenewals.length + amRegistrations.length;
+    return {
+      trials:             amTrials.length,
+      attended:           amAttended.length,
+      renewals:           amRenewals,
+      renewalRevenue,
+      regSum,
+      revenue,
+      plan,
+      remaining:          Math.max(0, plan - revenue),
+      avgCheck:           actions > 0 ? Math.round(revenue / actions) : 0,
+      cvTrialToAttend:    pct(amAttended.length, amTrials.length),
+      cvAttendToRenewal:  pct(amRenewals.length, amAttended.length),
+    };
+  }
 
   const totalSales   = salesClients.length;
   const totalRevenue = salesClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
@@ -607,6 +626,14 @@ export default function Analytics() {
               return <SpeedometerGauge key={manager} manager={manager} pct={mgPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(manager)} avgCheck={s.avgCheck} />;
             })}
           </div>
+          <div style={{ fontWeight: 600, fontSize: 12, color: "#888", margin: "16px 0 8px" }}>Аккаунт-менеджеры</div>
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {ACCOUNT_MANAGERS.map(name => {
+              const s = amStats(name);
+              const amPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
+              return <SpeedometerGauge key={name} manager={name} pct={amPct} revenue={s.revenue} plan={s.plan} workDaysLeft={managerWorkDaysLeft(name)} avgCheck={s.avgCheck} />;
+            })}
+          </div>
         </div>
       )}
 
@@ -679,45 +706,76 @@ export default function Analytics() {
         })}
       </div>
 
-      {/* ── Арина: account manager ── */}
+      {/* ── Account managers ── */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>Аккаунт-менеджер — Арина</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-          <StatCard label="Записано на ВУ"       value={arinaTrials.length} />
-          <StatCard label="Пришло на ВУ"         value={arinaAttended.length} />
-          <StatCard label="Продлений / продаж"   value={arinaRenewals.length} />
-          <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка (продления)</div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{arinaRevenue.toLocaleString("ru-RU")} ₽</div>
-          </div>
-          <StatCard label="CV записи → приход"    value={pct(arinaAttended.length, arinaTrials.length)} />
-          <StatCard label="CV приход → продление" value={pct(arinaRenewals.length, arinaAttended.length)} />
-          <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
-            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма оформлений</div>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{registrationSum.toLocaleString("ru-RU")} ₽</div>
-          </div>
-        </div>
-        {arinaRenewals.length > 0 && (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
-              <thead>
-                <tr>{["Клиент","Сумма","Оплата","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {arinaRenewals.map(c => (
-                  <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
-                    onMouseLeave={e => e.currentTarget.style.background = "white"}>
-                    <td style={TD}>{c.name}</td>
-                    <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
-                    <td style={TD}>{c.payment_method || "—"}</td>
-                    <td style={TD}>{c.stage}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Аккаунт-менеджеры</div>
+        {ACCOUNT_MANAGERS.map(name => {
+          const s = amStats(name);
+          const planVal = editPlan[name] !== undefined ? editPlan[name] : (s.plan || "");
+          return (
+            <div key={name} style={{ marginBottom: 24, borderBottom: "1px solid #f0f0f0", paddingBottom: 20 }}>
+              <div style={{ fontWeight: 600, fontSize: 14, color: "#4a90e2", marginBottom: 10 }}>{name}</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+                <StatCard label="Записано на ВУ"        value={s.trials} />
+                <StatCard label="Пришло на ВУ"          value={s.attended} />
+                <StatCard label="Продлений / продаж"    value={s.renewals.length} />
+                <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка (продления)</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{s.renewalRevenue.toLocaleString("ru-RU")} ₽</div>
+                </div>
+                <StatCard label="CV записи → приход"    value={s.cvTrialToAttend} />
+                <StatCard label="CV приход → продление" value={s.cvAttendToRenewal} />
+                <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Сумма оформлений</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{s.regSum.toLocaleString("ru-RU")} ₽</div>
+                </div>
+                <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>План</div>
+                  {role === "admin" ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <input type="number" value={planVal}
+                        onChange={e => setEditPlan(p => ({...p, [name]: e.target.value}))}
+                        onBlur={() => editPlan[name] !== undefined && savePlan(name, editPlan[name])}
+                        onKeyDown={e => e.key === "Enter" && editPlan[name] !== undefined && savePlan(name, editPlan[name])}
+                        style={{ width: 90, padding: "3px 8px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13 }}
+                      />
+                      <span style={{ fontSize: 12, color: "#888" }}>₽</span>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>{s.plan ? s.plan.toLocaleString("ru-RU") + " ₽" : "—"}</div>
+                  )}
+                </div>
+                <div style={{ background: s.plan && s.remaining <= 0 ? "#f0fff4" : "#fff8f0", borderRadius: 8, padding: "10px 14px", border: `1px solid ${s.plan && s.remaining <= 0 ? "#a5d6a7" : "#ffd0a0"}`, minWidth: 160 }}>
+                  <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Осталось до плана</div>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: s.plan && s.remaining <= 0 ? "#2a9" : "#e67e22" }}>
+                    {s.plan ? (s.remaining <= 0 ? "✓ Выполнен" : s.remaining.toLocaleString("ru-RU") + " ₽") : "—"}
+                  </div>
+                </div>
+              </div>
+              {s.renewals.length > 0 && (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%", maxWidth: 700 }}>
+                    <thead>
+                      <tr>{["Клиент","Сумма","Оплата","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
+                    </thead>
+                    <tbody>
+                      {s.renewals.map(c => (
+                        <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
+                          onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                          <td style={TD}>{c.name}</td>
+                          <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
+                          <td style={TD}>{c.payment_method || "—"}</td>
+                          <td style={TD}>{c.stage}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       </div> {/* end flex right column */}
       </div> {/* end flex container */}
