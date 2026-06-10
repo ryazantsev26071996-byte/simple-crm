@@ -57,7 +57,8 @@ function sumRows(rows) {
 
 function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLeft, avgCheck, showPhrase }) {
   const noPlan = !plan;
-  const clampedPct = Math.max(0, Math.min(percentage || 0, 100));
+  const actualPct = percentage || 0;
+  const arcPct = Math.max(0, Math.min(actualPct, 99.99)); // cap at 99.99 to avoid degenerate arc at exactly 100%
 
   function zoneColor(p) {
     if (p >= 100) return "#f1c40f";
@@ -74,15 +75,16 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLef
     return "Месяц только начинается — хорошее время набрать темп 📈";
   }
 
-  const fill = zoneColor(clampedPct);
+  const fill = zoneColor(actualPct); // color based on actual %, so >100% shows gold
   const remaining = noPlan ? 0 : Math.max(0, plan - revenue);
   const perDay = workDaysLeft > 0 && remaining > 0 ? Math.ceil(remaining / workDaysLeft) : 0;
   const remainingSales = avgCheck > 0 && remaining > 0 ? Math.ceil(remaining / avgCheck) : 0;
 
-  const angle = Math.PI - (clampedPct / 100) * Math.PI;
+  // Use arcPct (capped) for SVG geometry; actual percentage shown in text
+  const angle = Math.PI - (arcPct / 100) * Math.PI;
   const ex = +(100 + 80 * Math.cos(angle)).toFixed(2);
   const ey = +(100 - 80 * Math.sin(angle)).toFixed(2);
-  const large = clampedPct > 50 ? 1 : 0;
+  const large = arcPct > 50 ? 1 : 0;
   const needleX = +(100 + 65 * Math.cos(angle)).toFixed(2);
   const needleY = +(100 - 65 * Math.sin(angle)).toFixed(2);
 
@@ -92,7 +94,7 @@ function SpeedometerGauge({ manager, pct: percentage, revenue, plan, workDaysLef
 
       <svg viewBox="0 0 200 120" style={{ display: "block", margin: "0 auto", width: "100%", maxWidth: 200 }}>
         <path d="M 20,100 A 80,80 0 0,1 180,100" fill="none" stroke="#eee" strokeWidth={18} strokeLinecap="round" />
-        {clampedPct > 0 && (
+        {arcPct > 0 && (
           <path d={`M 20,100 A 80,80 0 ${large},1 ${ex},${ey}`} fill="none" stroke={fill} strokeWidth={18} strokeLinecap="round" />
         )}
         <line x1={100} y1={100} x2={needleX} y2={needleY} stroke="#1e293b" strokeWidth={2.5} strokeLinecap="round" />
