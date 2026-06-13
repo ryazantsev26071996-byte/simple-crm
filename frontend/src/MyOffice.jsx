@@ -4,7 +4,6 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const ROLE_LABELS = { admin: "Администратор", manager: "Менеджер", teacher: "Педагог" };
-
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
 async function apiFetch(supabase, path, options = {}) {
@@ -43,15 +42,85 @@ function SectionTitle({ children }) {
 
 function TaskStatusBadge({ status }) {
   const map = {
-    done:        { label: "Выполнено",   bg: "#dcfce7", color: "#16a34a" },
-    in_progress: { label: "В работе",    bg: "#fef9c3", color: "#ca8a04" },
-    pending:     { label: "Ожидает",     bg: "#e0e7ff", color: "#4338ca" },
+    done:        { label: "Выполнено",  bg: "#dcfce7", color: "#16a34a" },
+    in_progress: { label: "В работе",   bg: "#fef9c3", color: "#ca8a04" },
+    pending:     { label: "Ожидает",    bg: "#e0e7ff", color: "#4338ca" },
   };
   const s = map[status] || { label: status, bg: "#f3f4f6", color: "#6b7280" };
   return (
     <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 10, background: s.bg, color: s.color }}>{s.label}</span>
   );
 }
+
+const navBtn = {
+  background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer",
+  padding: "2px 10px", fontSize: 18, color: "#4b5563", lineHeight: 1.4,
+};
+
+// ─── Employee Switcher ────────────────────────────────────────────────────────
+
+function EmployeeSwitcher({ employees, selectedId, onSelect, selfName }) {
+  return (
+    <Card style={{ marginBottom: 16, padding: "14px 20px" }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
+        Просмотр кабинета сотрудника
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <button
+          onClick={() => onSelect(null)}
+          style={{
+            padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid",
+            borderColor: selectedId === null ? "#7c3aed" : "#e5e7eb",
+            background: selectedId === null ? "#ede9fe" : "white",
+            color: selectedId === null ? "#7c3aed" : "#374151",
+          }}
+        >
+          Мой кабинет
+        </button>
+        {employees.map(emp => (
+          <button
+            key={emp.id}
+            onClick={() => onSelect(emp.id)}
+            style={{
+              padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid",
+              borderColor: selectedId === emp.id ? "#4a90e2" : "#e5e7eb",
+              background: selectedId === emp.id ? "#e0eeff" : "white",
+              color: selectedId === emp.id ? "#1d4ed8" : "#374151",
+            }}
+          >
+            {emp.full_name || "—"}
+            <span style={{ fontSize: 10, fontWeight: 400, color: selectedId === emp.id ? "#60a5fa" : "#9ca3af", marginLeft: 5 }}>
+              {ROLE_LABELS[emp.role] || emp.role}
+            </span>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+// ─── Profile Header ───────────────────────────────────────────────────────────
+
+function ProfileHeader({ name, role: empRole, email }) {
+  return (
+    <Card>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg,#4a90e2,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 22, flexShrink: 0 }}>
+          {(name || "?")[0].toUpperCase()}
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 18, color: "#1e293b" }}>{name || "—"}</div>
+          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>
+            {ROLE_LABELS[empRole] || empRole}
+            {email && <span> · {email}</span>}
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Work Schedule ────────────────────────────────────────────────────────────
 
 function WorkScheduleSection({ userName, supabase }) {
   const now = new Date();
@@ -73,12 +142,10 @@ function WorkScheduleSection({ userName, supabase }) {
   const totalHours = schedule.reduce((s, r) => s + (r.hours || 0), 0);
 
   function prevMonth() {
-    if (month === 1) { setMonth(12); setYear(y => y - 1); }
-    else setMonth(m => m - 1);
+    if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1);
   }
   function nextMonth() {
-    if (month === 12) { setMonth(1); setYear(y => y + 1); }
-    else setMonth(m => m + 1);
+    if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1);
   }
 
   return (
@@ -121,12 +188,9 @@ function WorkScheduleSection({ userName, supabase }) {
   );
 }
 
-const navBtn = {
-  background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer",
-  padding: "2px 10px", fontSize: 18, color: "#4b5563", lineHeight: 1.4,
-};
+// ─── Regulation ───────────────────────────────────────────────────────────────
 
-function RegulationSection({ userEmail, isAdmin, supabase }) {
+function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
   const [html, setHtml] = React.useState("");
   const [saved, setSaved] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
@@ -134,9 +198,15 @@ function RegulationSection({ userEmail, isAdmin, supabase }) {
   const [rowExists, setRowExists] = React.useState(false);
   const editorRef = React.useRef(null);
 
+  // Prefer email lookup; fall back to name lookup
+  const filterParam = employeeEmail
+    ? `employee_email=eq.${encodeURIComponent(employeeEmail)}`
+    : `employee_name=eq.${encodeURIComponent(employeeName)}`;
+
   React.useEffect(() => {
-    if (!userEmail) return;
-    apiFetch(supabase, `staff_regulations?employee_email=eq.${encodeURIComponent(userEmail)}&select=content`)
+    setLoading(true);
+    setSaved(true);
+    apiFetch(supabase, `staff_regulations?${filterParam}&select=content`)
       .then(rows => {
         const content = rows[0]?.content || "";
         setHtml(content);
@@ -145,22 +215,19 @@ function RegulationSection({ userEmail, isAdmin, supabase }) {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [userEmail]);
+  }, [filterParam]);
 
   async function handleSave() {
     setSaving(true);
     const content = editorRef.current?.innerHTML || "";
     try {
+      const body = employeeEmail
+        ? { employee_email: employeeEmail, content }
+        : { employee_name: employeeName, content };
       if (rowExists) {
-        await apiFetch(supabase, `staff_regulations?employee_email=eq.${encodeURIComponent(userEmail)}`, {
-          method: "PATCH",
-          body: JSON.stringify({ content }),
-        });
+        await apiFetch(supabase, `staff_regulations?${filterParam}`, { method: "PATCH", body: JSON.stringify({ content }) });
       } else {
-        await apiFetch(supabase, `staff_regulations`, {
-          method: "POST",
-          body: JSON.stringify({ employee_email: userEmail, content }),
-        });
+        await apiFetch(supabase, `staff_regulations`, { method: "POST", body: JSON.stringify(body) });
         setRowExists(true);
       }
       setSaved(true);
@@ -207,11 +274,7 @@ function RegulationSection({ userEmail, isAdmin, supabase }) {
             contentEditable
             suppressContentEditableWarning
             onInput={() => setSaved(false)}
-            style={{
-              minHeight: 220, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px",
-              fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none",
-              background: "#fafbff",
-            }}
+            style={{ minHeight: 220, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none", background: "#fafbff" }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
             <button onClick={handleSave} disabled={saving || saved}
@@ -222,15 +285,15 @@ function RegulationSection({ userEmail, isAdmin, supabase }) {
           </div>
         </>
       ) : (
-        html ? (
-          <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
-        ) : (
-          <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент ещё не заполнен</div>
-        )
+        html
+          ? <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
+          : <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент ещё не заполнен</div>
       )}
     </Card>
   );
 }
+
+// ─── Tasks ────────────────────────────────────────────────────────────────────
 
 function TasksSection({ userName, supabase }) {
   const [tasks, setTasks] = React.useState([]);
@@ -238,6 +301,7 @@ function TasksSection({ userName, supabase }) {
 
   React.useEffect(() => {
     if (!userName) return;
+    setLoading(true);
     apiFetch(supabase, `staff_tasks?assigned_to=eq.${encodeURIComponent(userName)}&order=due_date.asc.nullslast&select=id,title,description,due_date,status`)
       .then(rows => { setTasks(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -245,14 +309,12 @@ function TasksSection({ userName, supabase }) {
 
   function formatDate(str) {
     if (!str) return "—";
-    const d = new Date(str);
-    return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
+    return new Date(str).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" });
   }
 
-  const isOverdue = (str) => {
-    if (!str) return false;
-    return new Date(str) < new Date() && true;
-  };
+  function isOverdue(str) {
+    return str && new Date(str) < new Date();
+  }
 
   return (
     <Card>
@@ -284,24 +346,59 @@ function TasksSection({ userName, supabase }) {
   );
 }
 
+// ─── Root ─────────────────────────────────────────────────────────────────────
+
 export default function MyOffice({ userEmail, userName, role, supabase }) {
+  const isAdmin = role === "admin";
+  const [employees, setEmployees] = React.useState([]);
+  const [selectedId, setSelectedId] = React.useState(null); // null = viewing self
+
+  // Fetch all profiles for the switcher (admin only)
+  React.useEffect(() => {
+    if (!isAdmin) return;
+    apiFetch(supabase, "profiles?select=id,full_name,role,email&order=full_name.asc")
+      .then(rows => {
+        // Exclude self from the list (we show "Мой кабинет" separately)
+        // Keep all including self so we can look up email by id if needed
+        setEmployees(rows);
+      })
+      .catch(() => {});
+  }, [isAdmin]);
+
+  // Resolve viewed employee's data
+  const viewedProfile = selectedId ? employees.find(e => e.id === selectedId) : null;
+  const viewName  = viewedProfile?.full_name || userName;
+  const viewRole  = viewedProfile?.role || role;
+  const viewEmail = viewedProfile?.email || (selectedId ? null : userEmail);
+
+  // Other employees = all except the logged-in admin themselves
+  const otherEmployees = employees.filter(e => e.full_name !== userName);
+
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg,#4a90e2,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: 22, flexShrink: 0 }}>
-            {(userName || "?")[0].toUpperCase()}
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 18, color: "#1e293b" }}>{userName || "—"}</div>
-            <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{ROLE_LABELS[role] || role} · {userEmail}</div>
-          </div>
-        </div>
-      </Card>
 
-      <WorkScheduleSection userName={userName} supabase={supabase} />
-      <RegulationSection userEmail={userEmail} isAdmin={role === "admin"} supabase={supabase} />
-      <TasksSection userName={userName} supabase={supabase} />
+      {isAdmin && employees.length > 0 && (
+        <EmployeeSwitcher
+          employees={otherEmployees}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          selfName={userName}
+        />
+      )}
+
+      <ProfileHeader name={viewName} role={viewRole} email={viewEmail} />
+
+      {/* key forces remount (reset state) when switching employees */}
+      <WorkScheduleSection key={`ws-${viewName}`} userName={viewName} supabase={supabase} />
+      <RegulationSection
+        key={`reg-${viewEmail || viewName}`}
+        employeeEmail={viewEmail}
+        employeeName={viewName}
+        isAdmin={isAdmin}
+        supabase={supabase}
+      />
+      <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
+
     </div>
   );
 }
