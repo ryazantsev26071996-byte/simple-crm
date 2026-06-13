@@ -134,7 +134,7 @@ function WorkScheduleSection({ userName, supabase }) {
     setLoading(true);
     const start = dateFmt(year, month, 1);
     const end = dateFmt(year, month, new Date(year, month, 0).getDate());
-    apiFetch(supabase, `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours`)
+    apiFetch(supabase, `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours,start_time,end_time`)
       .then(rows => { setSchedule(rows); setLoading(false); })
       .catch(() => setLoading(false));
   }, [userName, month, year]);
@@ -151,7 +151,7 @@ function WorkScheduleSection({ userName, supabase }) {
   return (
     <Card>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <SectionTitle>📅 График работы</SectionTitle>
+        <SectionTitle>🕐 Мои смены</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={prevMonth} style={navBtn}>‹</button>
           <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 110, textAlign: "center" }}>{MONTH_NAMES[month - 1]} {year}</span>
@@ -172,7 +172,11 @@ function WorkScheduleSection({ userName, supabase }) {
                 <div key={row.date} style={{ background: "#f0f4ff", borderRadius: 10, padding: "8px 12px", minWidth: 72, textAlign: "center" }}>
                   <div style={{ fontSize: 10, color: "#6b7280", marginBottom: 2 }}>{dayName}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1e40af" }}>{d.getDate()}</div>
-                  <div style={{ fontSize: 11, color: "#374151", marginTop: 2 }}>{row.hours} ч</div>
+                  <div style={{ fontSize: 11, color: "#374151", marginTop: 2 }}>
+                    {row.start_time && row.end_time
+                      ? `${row.start_time.slice(0,5)}–${row.end_time.slice(0,5)}`
+                      : `${row.hours} ч`}
+                  </div>
                 </div>
               );
             })}
