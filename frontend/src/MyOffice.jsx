@@ -6,6 +6,15 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const ROLE_LABELS = { admin: "Администратор", manager: "Менеджер", teacher: "Педагог" };
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
+const TARGET_LABELS = { all: "Все", teacher: "Педагоги", manager: "Менеджеры", account_manager: "Аккаунт-менеджеры" };
+const TARGET_OPTIONS = ["all", "teacher", "manager", "account_manager"];
+const TARGET_COLORS = {
+  all:             { bg: "#e0e7ff", color: "#4338ca" },
+  teacher:         { bg: "#dcfce7", color: "#16a34a" },
+  manager:         { bg: "#fef9c3", color: "#ca8a04" },
+  account_manager: { bg: "#fce7f3", color: "#be185d" },
+};
+
 async function apiFetch(supabase, path, options = {}) {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
@@ -52,14 +61,83 @@ function TaskStatusBadge({ status }) {
   );
 }
 
+function TargetBadge({ target }) {
+  const c = TARGET_COLORS[target] || { bg: "#f3f4f6", color: "#6b7280" };
+  return (
+    <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 7px", borderRadius: 8, background: c.bg, color: c.color, whiteSpace: "nowrap" }}>
+      {TARGET_LABELS[target] || target}
+    </span>
+  );
+}
+
 const navBtn = {
   background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer",
   padding: "2px 10px", fontSize: 18, color: "#4b5563", lineHeight: 1.4,
 };
 
+// ─── Rich text toolbar (shared) ───────────────────────────────────────────────
+
+function RichToolbar({ editorRef, onInput }) {
+  function exec(cmd, val) {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val ?? null);
+    onInput?.();
+  }
+
+  const Btn = ({ onClick, children, title }) => (
+    <button
+      onMouseDown={e => { e.preventDefault(); onClick(); }}
+      title={title}
+      style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 13, color: "#374151", fontWeight: 600 }}
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+      <Btn onClick={() => exec("bold")}      title="Жирный"><b>Ж</b></Btn>
+      <Btn onClick={() => exec("italic")}    title="Курсив"><i>К</i></Btn>
+      <Btn onClick={() => exec("underline")} title="Подчёркнутый"><u>Ч</u></Btn>
+      <div style={{ width: 1, background: "#e5e7eb", margin: "0 2px" }} />
+      <Btn onClick={() => exec("fontSize", "2")} title="Мелкий">S</Btn>
+      <Btn onClick={() => exec("fontSize", "3")} title="Обычный">M</Btn>
+      <Btn onClick={() => exec("fontSize", "5")} title="Крупный">L</Btn>
+      <div style={{ width: 1, background: "#e5e7eb", margin: "0 2px" }} />
+      <Btn onClick={() => exec("insertUnorderedList")} title="Маркированный список">• Список</Btn>
+      <Btn onClick={() => exec("insertOrderedList")}   title="Нумерованный список">1. Список</Btn>
+    </div>
+  );
+}
+
+// ─── Modal overlay ────────────────────────────────────────────────────────────
+
+function Modal({ title, onClose, children, wide }) {
+  React.useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+    >
+      <div style={{ background: "white", borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.2)", width: "100%", maxWidth: wide ? 700 : 560, maxHeight: "90vh", overflow: "auto", padding: "24px 28px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, color: "#1e293b" }}>{title}</div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#9ca3af", lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ─── Employee Switcher ────────────────────────────────────────────────────────
 
-function EmployeeSwitcher({ employees, selectedId, onSelect, selfName }) {
+function EmployeeSwitcher({ employees, selectedId, onSelect }) {
   return (
     <Card style={{ marginBottom: 16, padding: "14px 20px" }}>
       <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
@@ -68,12 +146,7 @@ function EmployeeSwitcher({ employees, selectedId, onSelect, selfName }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         <button
           onClick={() => onSelect(null)}
-          style={{
-            padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid",
-            borderColor: selectedId === null ? "#7c3aed" : "#e5e7eb",
-            background: selectedId === null ? "#ede9fe" : "white",
-            color: selectedId === null ? "#7c3aed" : "#374151",
-          }}
+          style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", borderColor: selectedId === null ? "#7c3aed" : "#e5e7eb", background: selectedId === null ? "#ede9fe" : "white", color: selectedId === null ? "#7c3aed" : "#374151" }}
         >
           Мой кабинет
         </button>
@@ -81,12 +154,7 @@ function EmployeeSwitcher({ employees, selectedId, onSelect, selfName }) {
           <button
             key={emp.id}
             onClick={() => onSelect(emp.id)}
-            style={{
-              padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid",
-              borderColor: selectedId === emp.id ? "#4a90e2" : "#e5e7eb",
-              background: selectedId === emp.id ? "#e0eeff" : "white",
-              color: selectedId === emp.id ? "#1d4ed8" : "#374151",
-            }}
+            style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", borderColor: selectedId === emp.id ? "#4a90e2" : "#e5e7eb", background: selectedId === emp.id ? "#e0eeff" : "white", color: selectedId === emp.id ? "#1d4ed8" : "#374151" }}
           >
             {emp.full_name || "—"}
             <span style={{ fontSize: 10, fontWeight: 400, color: selectedId === emp.id ? "#60a5fa" : "#9ca3af", marginLeft: 5 }}>
@@ -174,7 +242,7 @@ function WorkScheduleSection({ userName, supabase }) {
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1e40af" }}>{d.getDate()}</div>
                   <div style={{ fontSize: 11, color: "#374151", marginTop: 2 }}>
                     {row.start_time && row.end_time
-                      ? `${row.start_time.slice(0,5)}–${row.end_time.slice(0,5)}`
+                      ? `${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}`
                       : `${row.hours} ч`}
                   </div>
                 </div>
@@ -202,7 +270,6 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
   const [rowExists, setRowExists] = React.useState(false);
   const editorRef = React.useRef(null);
 
-  // Prefer email lookup; fall back to name lookup
   const filterParam = employeeEmail
     ? `employee_email=eq.${encodeURIComponent(employeeEmail)}`
     : `employee_name=eq.${encodeURIComponent(employeeName)}`;
@@ -241,19 +308,6 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
     setSaving(false);
   }
 
-  function exec(cmd, val) {
-    editorRef.current?.focus();
-    document.execCommand(cmd, false, val);
-    setSaved(false);
-  }
-
-  const toolbarBtn = (onClick, label, title) => (
-    <button onMouseDown={e => { e.preventDefault(); onClick(); }} title={title}
-      style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 5, padding: "3px 9px", cursor: "pointer", fontSize: 13, color: "#374151", fontWeight: 600 }}>
-      {label}
-    </button>
-  );
-
   return (
     <Card>
       <SectionTitle>📋 Регламент</SectionTitle>
@@ -261,18 +315,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
         <div style={{ color: "#9ca3af", fontSize: 13 }}>Загрузка...</div>
       ) : isAdmin ? (
         <>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-            {toolbarBtn(() => exec("bold"), <b>Ж</b>, "Жирный")}
-            {toolbarBtn(() => exec("italic"), <i>К</i>, "Курсив")}
-            {toolbarBtn(() => exec("underline"), <u>Ч</u>, "Подчёркнутый")}
-            <div style={{ width: 1, background: "#e5e7eb", margin: "0 2px" }} />
-            {toolbarBtn(() => exec("fontSize", "2"), "S", "Мелкий")}
-            {toolbarBtn(() => exec("fontSize", "3"), "M", "Обычный")}
-            {toolbarBtn(() => exec("fontSize", "5"), "L", "Крупный")}
-            <div style={{ width: 1, background: "#e5e7eb", margin: "0 2px" }} />
-            {toolbarBtn(() => exec("insertUnorderedList"), "• Список", "Маркированный список")}
-            {toolbarBtn(() => exec("insertOrderedList"), "1. Список", "Нумерованный список")}
-          </div>
+          <RichToolbar editorRef={editorRef} onInput={() => setSaved(false)} />
           <div
             ref={editorRef}
             contentEditable
@@ -294,6 +337,213 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
           : <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент ещё не заполнен</div>
       )}
     </Card>
+  );
+}
+
+// ─── Instructions ─────────────────────────────────────────────────────────────
+
+function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
+  const [title, setTitle] = React.useState(instruction?.title || "");
+  const [target, setTarget] = React.useState(instruction?.target || "all");
+  const [saving, setSaving] = React.useState(false);
+  const editorRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (editorRef.current && instruction?.content) {
+      editorRef.current.innerHTML = instruction.content;
+    }
+  }, []);
+
+  async function handleSave() {
+    if (!title.trim()) { alert("Введите название инструкции"); return; }
+    setSaving(true);
+    const content = editorRef.current?.innerHTML || "";
+    try {
+      if (instruction?.id) {
+        await apiFetch(supabase, `instructions?id=eq.${instruction.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ title: title.trim(), target, content }),
+        });
+      } else {
+        await apiFetch(supabase, `instructions`, {
+          method: "POST",
+          body: JSON.stringify({ title: title.trim(), target, content }),
+        });
+      }
+      onSaved();
+    } catch(e) {
+      alert("Ошибка сохранения: " + e.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <Modal title={instruction?.id ? "Редактировать инструкцию" : "Новая инструкция"} onClose={onClose} wide>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 5 }}>Название</label>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Название инструкции..."
+          style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+        />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 5 }}>Кому</label>
+        <select
+          value={target}
+          onChange={e => setTarget(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 14, outline: "none", background: "white", cursor: "pointer" }}
+        >
+          {TARGET_OPTIONS.map(t => (
+            <option key={t} value={t}>{TARGET_LABELS[t]}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 5 }}>Содержание</label>
+        <RichToolbar editorRef={editorRef} />
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{ minHeight: 200, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none", background: "#fafbff" }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={handleSave} disabled={saving}
+          style={{ padding: "8px 22px", background: "#4a90e2", color: "white", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          {saving ? "Сохранение..." : "Сохранить"}
+        </button>
+        <button onClick={onClose}
+          style={{ padding: "8px 18px", background: "white", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+          Отмена
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function InstructionsSection({ isAdmin, viewPosition, supabase }) {
+  const [instructions, setInstructions] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [viewModal, setViewModal] = React.useState(null);
+  const [editModal, setEditModal] = React.useState(null); // null | {} (new) | {id,...} (edit)
+  const [hoveredId, setHoveredId] = React.useState(null);
+  const [deleting, setDeleting] = React.useState(null);
+
+  function fetchInstructions() {
+    setLoading(true);
+    let query;
+    if (isAdmin) {
+      query = "instructions?order=created_at.desc&select=id,title,target,content";
+    } else if (viewPosition) {
+      query = `instructions?or=(target.eq.all,target.eq.${encodeURIComponent(viewPosition)})&order=created_at.desc&select=id,title,target,content`;
+    } else {
+      query = "instructions?target=eq.all&order=created_at.desc&select=id,title,target,content";
+    }
+    apiFetch(supabase, query)
+      .then(rows => { setInstructions(rows); setLoading(false); })
+      .catch(() => setLoading(false));
+  }
+
+  React.useEffect(() => { fetchInstructions(); }, [isAdmin, viewPosition]);
+
+  async function handleDelete(id) {
+    if (!window.confirm("Удалить инструкцию?")) return;
+    setDeleting(id);
+    try {
+      await apiFetch(supabase, `instructions?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      fetchInstructions();
+    } catch(e) {
+      alert("Ошибка удаления: " + e.message);
+    }
+    setDeleting(null);
+  }
+
+  return (
+    <>
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <SectionTitle>📖 Инструкции</SectionTitle>
+          {isAdmin && (
+            <button
+              onClick={() => setEditModal({})}
+              style={{ padding: "6px 14px", background: "#4a90e2", color: "white", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}
+            >
+              ➕ Добавить
+            </button>
+          )}
+        </div>
+
+        {loading ? (
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>Загрузка...</div>
+        ) : instructions.length === 0 ? (
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>Нет инструкций</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+            {instructions.map(instr => (
+              <div
+                key={instr.id}
+                onMouseEnter={() => setHoveredId(instr.id)}
+                onMouseLeave={() => setHoveredId(null)}
+                style={{ position: "relative", background: "white", borderRadius: 12, border: "1px solid #e8eaf6", boxShadow: hoveredId === instr.id ? "0 4px 16px rgba(74,144,226,0.15)" : "0 2px 8px rgba(74,144,226,0.06)", transition: "box-shadow 0.15s", cursor: "pointer" }}
+              >
+                <div
+                  onClick={() => setViewModal(instr)}
+                  style={{ padding: "14px 14px 12px" }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 8, lineHeight: 1.3 }}>{instr.title}</div>
+                  <TargetBadge target={instr.target} />
+                </div>
+
+                {isAdmin && hoveredId === instr.id && (
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }}
+                  >
+                    <button
+                      onClick={() => setEditModal(instr)}
+                      title="Редактировать"
+                      style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDelete(instr.id)}
+                      disabled={deleting === instr.id}
+                      title="Удалить"
+                      style={{ background: "white", border: "1px solid #fecaca", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {viewModal && (
+        <Modal title={viewModal.title} onClose={() => setViewModal(null)} wide>
+          <TargetBadge target={viewModal.target} />
+          <div
+            dangerouslySetInnerHTML={{ __html: viewModal.content }}
+            style={{ marginTop: 16, fontSize: 14, lineHeight: 1.7, color: "#1e293b" }}
+          />
+        </Modal>
+      )}
+
+      {editModal !== null && (
+        <InstructionEditModal
+          instruction={editModal?.id ? editModal : null}
+          onClose={() => setEditModal(null)}
+          onSaved={() => { setEditModal(null); fetchInstructions(); }}
+          supabase={supabase}
+        />
+      )}
+    </>
   );
 }
 
@@ -355,27 +605,21 @@ function TasksSection({ userName, supabase }) {
 export default function MyOffice({ userEmail, userName, role, supabase }) {
   const isAdmin = role === "admin";
   const [employees, setEmployees] = React.useState([]);
-  const [selectedId, setSelectedId] = React.useState(null); // null = viewing self
+  const [selectedId, setSelectedId] = React.useState(null);
 
-  // Fetch all profiles for the switcher (admin only)
   React.useEffect(() => {
     if (!isAdmin) return;
-    apiFetch(supabase, "profiles?select=id,full_name,role,email&order=full_name.asc")
-      .then(rows => {
-        // Exclude self from the list (we show "Мой кабинет" separately)
-        // Keep all including self so we can look up email by id if needed
-        setEmployees(rows);
-      })
+    apiFetch(supabase, "profiles?select=id,full_name,role,email,position&order=full_name.asc")
+      .then(rows => setEmployees(rows))
       .catch(() => {});
   }, [isAdmin]);
 
-  // Resolve viewed employee's data
   const viewedProfile = selectedId ? employees.find(e => e.id === selectedId) : null;
-  const viewName  = viewedProfile?.full_name || userName;
-  const viewRole  = viewedProfile?.role || role;
-  const viewEmail = viewedProfile?.email || (selectedId ? null : userEmail);
+  const viewName     = viewedProfile?.full_name || userName;
+  const viewRole     = viewedProfile?.role || role;
+  const viewEmail    = viewedProfile?.email || (selectedId ? null : userEmail);
+  const viewPosition = viewedProfile?.position || null;
 
-  // Other employees = all except the logged-in admin themselves
   const otherEmployees = employees.filter(e => e.full_name !== userName);
 
   return (
@@ -386,13 +630,11 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
           employees={otherEmployees}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          selfName={userName}
         />
       )}
 
       <ProfileHeader name={viewName} role={viewRole} email={viewEmail} />
 
-      {/* key forces remount (reset state) when switching employees */}
       <WorkScheduleSection key={`ws-${viewName}`} userName={viewName} supabase={supabase} />
       <RegulationSection
         key={`reg-${viewEmail || viewName}`}
@@ -401,6 +643,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
         isAdmin={isAdmin}
         supabase={supabase}
       />
+      <InstructionsSection isAdmin={isAdmin} viewPosition={viewPosition} supabase={supabase} />
       <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
 
     </div>
