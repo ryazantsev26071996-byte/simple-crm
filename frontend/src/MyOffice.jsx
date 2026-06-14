@@ -306,6 +306,49 @@ function WorkScheduleSection({ userName, supabase }) {
 
 // ─── Regulation ───────────────────────────────────────────────────────────────
 
+function RegulationCard({ filePath, deleting, onOpen, onDelete, supabase }) {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <div
+      onClick={onOpen}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: "relative", display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: hovered ? "#f8faff" : "white", border: "1px solid #e8eaf6", borderRadius: 12,
+        padding: "14px 18px", cursor: "pointer",
+        boxShadow: hovered ? "0 4px 16px rgba(0,0,0,0.10)" : "0 2px 8px rgba(0,0,0,0.06)",
+        transition: "box-shadow 0.15s, background 0.15s",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 22 }}>📋</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>Регламент</span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {filePath && (
+          <button
+            onClick={e => { e.stopPropagation(); downloadStorageFile(supabase, "regulations", filePath); }}
+            title="Скачать .docx"
+            style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: "2px 4px", color: "#16a34a", lineHeight: 1 }}
+          >
+            📥
+          </button>
+        )}
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          disabled={deleting}
+          title="Удалить"
+          style={{ background: "none", border: "none", fontSize: 16, cursor: deleting ? "default" : "pointer", padding: "2px 4px", color: "#ef4444", lineHeight: 1, opacity: deleting ? 0.5 : 1 }}
+        >
+          🗑️
+        </button>
+        <span style={{ fontSize: 18, color: "#9ca3af", marginLeft: 4 }}>›</span>
+      </div>
+    </div>
+  );
+}
+
 const regActionBtn = (bg, color) => ({
   padding: "6px 14px", background: bg, color, border: "none", borderRadius: 8,
   cursor: "pointer", fontWeight: 600, fontSize: 13,
@@ -470,18 +513,13 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
 
         ) : isAdmin ? (
           hasContent ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <span style={{ background: "#dcfce7", color: "#16a34a", fontWeight: 700, fontSize: 13, padding: "5px 14px", borderRadius: 20 }}>
-                📋 Регламент сохранён
-              </span>
-              <button onClick={() => setShowModal(true)} style={regActionBtn("#e0e7ff", "#4338ca")}>
-                👁 Просмотреть
-              </button>
-              {filePath && <DownloadBtn supabase={supabase} bucket="regulations" filePath={filePath} />}
-              <button onClick={handleDelete} disabled={deleting} style={regActionBtn("#fff0f0", "#ef4444")}>
-                {deleting ? "Удаление..." : "🗑️ Удалить"}
-              </button>
-            </div>
+            <RegulationCard
+              filePath={filePath}
+              deleting={deleting}
+              onOpen={() => setShowModal(true)}
+              onDelete={handleDelete}
+              supabase={supabase}
+            />)
 
           ) : mode === "manual" ? (
             <>
@@ -527,10 +565,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
 
         ) : (
           hasContent ? (
-            <button onClick={() => setShowModal(true)}
-              style={{ background: "#dcfce7", color: "#16a34a", fontWeight: 700, fontSize: 13, padding: "7px 18px", borderRadius: 20, border: "none", cursor: "pointer" }}>
-              📋 Регламент
-            </button>
+            <RegulationCard onOpen={() => setShowModal(true)} />
           ) : (
             <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент не добавлен</div>
           )
