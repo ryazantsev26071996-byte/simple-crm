@@ -519,7 +519,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
               onOpen={() => setShowModal(true)}
               onDelete={handleDelete}
               supabase={supabase}
-            />)
+            />
 
           ) : mode === "manual" ? (
             <>
