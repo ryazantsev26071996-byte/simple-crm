@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.0",
+    "mammoth": "^1.12.0",
     "react": "*",
     "react-dom": "*",
     "xlsx": "^0.18.5"

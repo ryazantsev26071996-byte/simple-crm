@@ -306,129 +306,266 @@ function WorkScheduleSection({ userName, supabase }) {
 
 // ─── Regulation ───────────────────────────────────────────────────────────────
 
-function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
-  const [html, setHtml] = React.useState("");
-  const [saved, setSaved] = React.useState(true);
-  const [loading, setLoading] = React.useState(true);
-  const [saving, setSaving] = React.useState(false);
-  const [uploading, setUploading] = React.useState(false);
-  const [rowExists, setRowExists] = React.useState(false);
-  const [filePath, setFilePath] = React.useState(null);
-  const editorRef = React.useRef(null);
-  const fileInputRef = React.useRef(null);
+const regActionBtn = (bg, color) => ({
+  padding: "6px 14px", background: bg, color, border: "none", borderRadius: 8,
+  cursor: "pointer", fontWeight: 600, fontSize: 13,
+});
 
+function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, employees }) {
+  const [html, setHtml]           = React.useState("");
+  const [filePath, setFilePath]   = React.useState(null);
+  const [rowExists, setRowExists] = React.useState(false);
+  const [loading, setLoading]     = React.useState(true);
+  const [mode, setMode]           = React.useState(null); // null | 'manual'
+  const [saved, setSaved]         = React.useState(true);
+  const [saving, setSaving]       = React.useState(false);
+  const [converting, setConverting] = React.useState(false);
+  const [deleting, setDeleting]   = React.useState(false);
+  const [showModal, setShowModal] = React.useState(false);
+  const [allRegs, setAllRegs]     = React.useState([]);
+  const [copying, setCopying]     = React.useState(false);
+  const editorRef  = React.useRef(null);
+  const docxRef    = React.useRef(null);
+
+  const hasContent = html.trim().length > 0;
   const filterParam = employeeEmail
     ? `employee_email=eq.${encodeURIComponent(employeeEmail)}`
     : `employee_name=eq.${encodeURIComponent(employeeName)}`;
 
-  React.useEffect(() => {
+  function fetchRegulation() {
     setLoading(true);
-    setSaved(true);
-    setFilePath(null);
+    setMode(null);
     apiFetch(supabase, `staff_regulations?${filterParam}&select=content,file_path`)
       .then(rows => {
         const content = rows[0]?.content || "";
         setHtml(content);
         setRowExists(rows.length > 0);
         setFilePath(rows[0]?.file_path || null);
-        if (editorRef.current) editorRef.current.innerHTML = content;
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [filterParam]);
+  }
 
-  async function handleSave() {
+  function fetchAllRegs() {
+    apiFetch(supabase, "staff_regulations?select=employee_email,employee_name,content,file_path")
+      .then(rows => setAllRegs(rows.filter(r => r.content && r.content.trim().length > 0)))
+      .catch(() => {});
+  }
+
+  React.useEffect(() => {
+    fetchRegulation();
+    if (isAdmin) fetchAllRegs();
+  }, [filterParam, isAdmin]);
+
+  async function persistContent(content, fp) {
+    const base = employeeEmail
+      ? { employee_email: employeeEmail }
+      : { employee_name: employeeName };
+    if (rowExists) {
+      await apiFetch(supabase, `staff_regulations?${filterParam}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content, file_path: fp ?? null }),
+      });
+    } else {
+      await apiFetch(supabase, `staff_regulations`, {
+        method: "POST",
+        body: JSON.stringify({ ...base, content, file_path: fp ?? null }),
+      });
+      setRowExists(true);
+    }
+  }
+
+  async function handleManualSave() {
     setSaving(true);
     const content = editorRef.current?.innerHTML || "";
     try {
-      const body = employeeEmail
-        ? { employee_email: employeeEmail, content }
-        : { employee_name: employeeName, content };
-      if (rowExists) {
-        await apiFetch(supabase, `staff_regulations?${filterParam}`, { method: "PATCH", body: JSON.stringify({ content }) });
-      } else {
-        await apiFetch(supabase, `staff_regulations`, { method: "POST", body: JSON.stringify(body) });
-        setRowExists(true);
-      }
+      await persistContent(content, filePath);
+      setHtml(content);
+      setMode(null);
       setSaved(true);
+      fetchAllRegs();
     } catch(e) {
       alert("Ошибка сохранения: " + e.message);
     }
     setSaving(false);
   }
 
-  async function handleFileChange(e) {
+  async function handleDocxFile(e) {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploading(true);
+    e.target.value = "";
+    setConverting(true);
     try {
+      const mammoth = await import("mammoth/mammoth.browser");
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.default.convertToHtml({ arrayBuffer });
+      const convertedHtml = result.value;
+
       const identifier = (employeeEmail || employeeName).replace(/[^a-zA-Z0-9_\-@.]/g, "_");
       const storagePath = `regulations/${identifier}/${sanitizeFilename(file.name)}`;
       const { error: upErr } = await supabase.storage.from("regulations").upload(storagePath, file, { upsert: true });
       if (upErr) throw upErr;
 
-      if (rowExists) {
-        await apiFetch(supabase, `staff_regulations?${filterParam}`, { method: "PATCH", body: JSON.stringify({ file_path: storagePath }) });
-      } else {
-        const body = employeeEmail
-          ? { employee_email: employeeEmail, content: editorRef.current?.innerHTML || "", file_path: storagePath }
-          : { employee_name: employeeName, content: editorRef.current?.innerHTML || "", file_path: storagePath };
-        await apiFetch(supabase, `staff_regulations`, { method: "POST", body: JSON.stringify(body) });
-        setRowExists(true);
-      }
+      await persistContent(convertedHtml, storagePath);
+      setHtml(convertedHtml);
       setFilePath(storagePath);
+      fetchAllRegs();
     } catch(e) {
-      alert("Ошибка загрузки файла: " + e.message);
+      alert("Ошибка конвертации: " + e.message);
     }
-    // Reset input so same file can be re-uploaded
-    e.target.value = "";
-    setUploading(false);
+    setConverting(false);
   }
 
+  async function handleDelete() {
+    if (!window.confirm("Удалить регламент сотрудника?")) return;
+    setDeleting(true);
+    try {
+      if (filePath) await supabase.storage.from("regulations").remove([filePath]);
+      await apiFetch(supabase, `staff_regulations?${filterParam}`, {
+        method: "PATCH",
+        body: JSON.stringify({ content: "", file_path: null }),
+      });
+      setHtml("");
+      setFilePath(null);
+      fetchAllRegs();
+    } catch(e) {
+      alert("Ошибка удаления: " + e.message);
+    }
+    setDeleting(false);
+  }
+
+  function getRegName(reg) {
+    const emp = employees?.find(e => e.email === reg.employee_email || e.full_name === reg.employee_name);
+    return emp?.full_name || reg.employee_name || reg.employee_email || "Сотрудник";
+  }
+
+  async function handleCopy(reg) {
+    const name = getRegName(reg);
+    if (!window.confirm(`Скопировать регламент от «${name}»? Текущий регламент будет заменён.`)) return;
+    setCopying(true);
+    try {
+      await persistContent(reg.content, reg.file_path || null);
+      setHtml(reg.content);
+      setFilePath(reg.file_path || null);
+    } catch(e) {
+      alert("Ошибка копирования: " + e.message);
+    }
+    setCopying(false);
+  }
+
+  const copyOptions = allRegs.filter(r =>
+    r.employee_email !== employeeEmail || r.employee_name !== employeeName
+  ).filter(r =>
+    !(r.employee_email === employeeEmail && employeeEmail) &&
+    !(r.employee_name === employeeName && !employeeEmail)
+  );
+
   return (
-    <Card>
-      <SectionTitle>📋 Регламент</SectionTitle>
-      {loading ? (
-        <div style={{ color: "#9ca3af", fontSize: 13 }}>Загрузка...</div>
-      ) : isAdmin ? (
-        <>
-          <RichToolbar editorRef={editorRef} onInput={() => setSaved(false)} />
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={() => setSaved(false)}
-            style={{ minHeight: 220, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none", background: "#fafbff" }}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
-            <button onClick={handleSave} disabled={saving || saved}
-              style={{ padding: "7px 20px", background: saved ? "#e5e7eb" : "#4a90e2", color: saved ? "#9ca3af" : "white", border: "none", borderRadius: 8, cursor: saved ? "default" : "pointer", fontWeight: 600, fontSize: 13 }}>
-              {saving ? "Сохранение..." : saved ? "Сохранено" : "Сохранить"}
-            </button>
-            {!saved && <span style={{ fontSize: 12, color: "#f59e0b" }}>Есть несохранённые изменения</span>}
+    <>
+      <Card>
+        <SectionTitle>📋 Регламент</SectionTitle>
 
-            <input ref={fileInputRef} type="file" accept=".docx" style={{ display: "none" }} onChange={handleFileChange} />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              style={{ padding: "7px 14px", background: uploading ? "#f3f4f6" : "white", color: uploading ? "#9ca3af" : "#374151", border: "1px solid #e5e7eb", borderRadius: 8, cursor: uploading ? "default" : "pointer", fontWeight: 600, fontSize: 13 }}
+        {loading || converting ? (
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>{converting ? "Конвертируем файл..." : "Загрузка..."}</div>
+
+        ) : isAdmin ? (
+          hasContent ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span style={{ background: "#dcfce7", color: "#16a34a", fontWeight: 700, fontSize: 13, padding: "5px 14px", borderRadius: 20 }}>
+                📋 Регламент сохранён
+              </span>
+              <button onClick={() => setShowModal(true)} style={regActionBtn("#e0e7ff", "#4338ca")}>
+                👁 Просмотреть
+              </button>
+              {filePath && <DownloadBtn supabase={supabase} bucket="regulations" filePath={filePath} />}
+              <button onClick={handleDelete} disabled={deleting} style={regActionBtn("#fff0f0", "#ef4444")}>
+                {deleting ? "Удаление..." : "🗑️ Удалить"}
+              </button>
+            </div>
+
+          ) : mode === "manual" ? (
+            <>
+              <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 13, marginBottom: 10, padding: 0 }}>
+                ← Назад
+              </button>
+              <RichToolbar editorRef={editorRef} onInput={() => setSaved(false)} />
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => setSaved(false)}
+                style={{ minHeight: 220, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none", background: "#fafbff" }}
+              />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+                <button onClick={handleManualSave} disabled={saving}
+                  style={{ padding: "7px 20px", background: "#4a90e2", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
+                  {saving ? "Сохранение..." : "Сохранить"}
+                </button>
+                {!saved && <span style={{ fontSize: 12, color: "#f59e0b" }}>Несохранённые изменения</span>}
+              </div>
+            </>
+
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={() => { setMode("manual"); setTimeout(() => { if (editorRef.current) editorRef.current.innerHTML = ""; }, 0); }}
+                  style={{ flex: 1, padding: "20px 16px", background: "#f8faff", border: "2px solid #e0e7ff", borderRadius: 12, cursor: "pointer", textAlign: "center", fontWeight: 600, fontSize: 14, color: "#1d4ed8" }}
+                >
+                  ✏️ Написать вручную
+                </button>
+                <button
+                  onClick={() => docxRef.current?.click()}
+                  style={{ flex: 1, padding: "20px 16px", background: "#f0fdf4", border: "2px solid #bbf7d0", borderRadius: 12, cursor: "pointer", textAlign: "center", fontWeight: 600, fontSize: 14, color: "#16a34a" }}
+                >
+                  📎 Загрузить .docx
+                </button>
+              </div>
+              <input ref={docxRef} type="file" accept=".docx" style={{ display: "none" }} onChange={handleDocxFile} />
+            </>
+          )
+
+        ) : (
+          hasContent ? (
+            <button onClick={() => setShowModal(true)}
+              style={{ background: "#dcfce7", color: "#16a34a", fontWeight: 700, fontSize: 13, padding: "7px 18px", borderRadius: 20, border: "none", cursor: "pointer" }}>
+              📋 Регламент
+            </button>
+          ) : (
+            <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент не добавлен</div>
+          )
+        )}
+      </Card>
+
+      {isAdmin && copyOptions.length > 0 && (
+        <Card style={{ padding: "14px 20px", marginTop: -10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: "#6b7280", fontWeight: 600 }}>Скопировать регламент от:</span>
+            <select
+              defaultValue=""
+              onChange={e => {
+                const idx = parseInt(e.target.value, 10);
+                if (!isNaN(idx)) { handleCopy(copyOptions[idx]); e.target.value = ""; }
+              }}
+              disabled={copying}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: 13, background: "white", cursor: "pointer" }}
             >
-              {uploading ? "Загрузка..." : "📎 Прикрепить .docx"}
-            </button>
-
-            {filePath && (
-              <DownloadBtn supabase={supabase} bucket="regulations" filePath={filePath} />
-            )}
+              <option value="">— выбрать сотрудника —</option>
+              {copyOptions.map((reg, i) => (
+                <option key={i} value={i}>{getRegName(reg)}</option>
+              ))}
+            </select>
+            {copying && <span style={{ fontSize: 12, color: "#9ca3af" }}>Копирование...</span>}
           </div>
-        </>
-      ) : (
-        <>
-          {html
-            ? <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
-            : <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент ещё не заполнен</div>}
-        </>
+        </Card>
       )}
-    </Card>
+
+      {showModal && (
+        <Modal title={`${employeeName} — Регламент`} onClose={() => setShowModal(false)} wide>
+          <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -768,6 +905,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
         employeeName={viewName}
         isAdmin={isAdmin}
         supabase={supabase}
+        employees={employees}
       />
       <InstructionsSection isAdmin={isAdmin} viewPosition={viewPosition} supabase={supabase} />
       <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
