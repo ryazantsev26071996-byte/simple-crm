@@ -33,6 +33,21 @@ async function apiFetch(supabase, path, options = {}) {
   return text ? JSON.parse(text) : [];
 }
 
+async function downloadStorageFile(supabase, bucket, filePath) {
+  try {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(filePath, 60);
+    if (error) throw error;
+    const a = document.createElement("a");
+    a.href = data.signedUrl;
+    a.download = filePath.split("/").pop();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    alert("Ошибка скачивания: " + e.message);
+  }
+}
+
 function dateFmt(y, m, d) {
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
@@ -70,12 +85,36 @@ function TargetBadge({ target }) {
   );
 }
 
+function DownloadBtn({ supabase, bucket, filePath, style }) {
+  const [busy, setBusy] = React.useState(false);
+  const fileName = filePath?.split("/").pop() || "";
+
+  async function handleClick() {
+    setBusy(true);
+    await downloadStorageFile(supabase, bucket, filePath);
+    setBusy(false);
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, ...style }}>
+      <button
+        onClick={handleClick}
+        disabled={busy}
+        style={{ padding: "5px 12px", background: busy ? "#f3f4f6" : "#f0fdf4", color: busy ? "#9ca3af" : "#16a34a", border: "1px solid", borderColor: busy ? "#e5e7eb" : "#bbf7d0", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: busy ? "default" : "pointer", whiteSpace: "nowrap" }}
+      >
+        {busy ? "Загрузка..." : "⬇️ Скачать .docx"}
+      </button>
+      {fileName && <span style={{ fontSize: 11, color: "#9ca3af", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 160 }}>{fileName}</span>}
+    </div>
+  );
+}
+
 const navBtn = {
   background: "none", border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer",
   padding: "2px 10px", fontSize: 18, color: "#4b5563", lineHeight: 1.4,
 };
 
-// ─── Rich text toolbar (shared) ───────────────────────────────────────────────
+// ─── Rich text toolbar ────────────────────────────────────────────────────────
 
 function RichToolbar({ editorRef, onInput }) {
   function exec(cmd, val) {
@@ -267,8 +306,11 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
   const [saved, setSaved] = React.useState(true);
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
   const [rowExists, setRowExists] = React.useState(false);
+  const [filePath, setFilePath] = React.useState(null);
   const editorRef = React.useRef(null);
+  const fileInputRef = React.useRef(null);
 
   const filterParam = employeeEmail
     ? `employee_email=eq.${encodeURIComponent(employeeEmail)}`
@@ -277,11 +319,13 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
   React.useEffect(() => {
     setLoading(true);
     setSaved(true);
-    apiFetch(supabase, `staff_regulations?${filterParam}&select=content`)
+    setFilePath(null);
+    apiFetch(supabase, `staff_regulations?${filterParam}&select=content,file_path`)
       .then(rows => {
         const content = rows[0]?.content || "";
         setHtml(content);
         setRowExists(rows.length > 0);
+        setFilePath(rows[0]?.file_path || null);
         if (editorRef.current) editorRef.current.innerHTML = content;
         setLoading(false);
       })
@@ -308,6 +352,34 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
     setSaving(false);
   }
 
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const identifier = (employeeEmail || employeeName).replace(/[^a-zA-Z0-9_\-@.]/g, "_");
+      const storagePath = `regulations/${identifier}/${file.name}`;
+      const { error: upErr } = await supabase.storage.from("regulations").upload(storagePath, file, { upsert: true });
+      if (upErr) throw upErr;
+
+      if (rowExists) {
+        await apiFetch(supabase, `staff_regulations?${filterParam}`, { method: "PATCH", body: JSON.stringify({ file_path: storagePath }) });
+      } else {
+        const body = employeeEmail
+          ? { employee_email: employeeEmail, content: editorRef.current?.innerHTML || "", file_path: storagePath }
+          : { employee_name: employeeName, content: editorRef.current?.innerHTML || "", file_path: storagePath };
+        await apiFetch(supabase, `staff_regulations`, { method: "POST", body: JSON.stringify(body) });
+        setRowExists(true);
+      }
+      setFilePath(storagePath);
+    } catch(e) {
+      alert("Ошибка загрузки файла: " + e.message);
+    }
+    // Reset input so same file can be re-uploaded
+    e.target.value = "";
+    setUploading(false);
+  }
+
   return (
     <Card>
       <SectionTitle>📋 Регламент</SectionTitle>
@@ -323,18 +395,33 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
             onInput={() => setSaved(false)}
             style={{ minHeight: 220, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none", background: "#fafbff" }}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
             <button onClick={handleSave} disabled={saving || saved}
               style={{ padding: "7px 20px", background: saved ? "#e5e7eb" : "#4a90e2", color: saved ? "#9ca3af" : "white", border: "none", borderRadius: 8, cursor: saved ? "default" : "pointer", fontWeight: 600, fontSize: 13 }}>
               {saving ? "Сохранение..." : saved ? "Сохранено" : "Сохранить"}
             </button>
             {!saved && <span style={{ fontSize: 12, color: "#f59e0b" }}>Есть несохранённые изменения</span>}
+
+            <input ref={fileInputRef} type="file" accept=".docx" style={{ display: "none" }} onChange={handleFileChange} />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              style={{ padding: "7px 14px", background: uploading ? "#f3f4f6" : "white", color: uploading ? "#9ca3af" : "#374151", border: "1px solid #e5e7eb", borderRadius: 8, cursor: uploading ? "default" : "pointer", fontWeight: 600, fontSize: 13 }}
+            >
+              {uploading ? "Загрузка..." : "📎 Прикрепить .docx"}
+            </button>
+
+            {filePath && (
+              <DownloadBtn supabase={supabase} bucket="regulations" filePath={filePath} />
+            )}
           </div>
         </>
       ) : (
-        html
-          ? <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
-          : <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент ещё не заполнен</div>
+        <>
+          {html
+            ? <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
+            : <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент ещё не заполнен</div>}
+        </>
       )}
     </Card>
   );
@@ -346,7 +433,11 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
   const [title, setTitle] = React.useState(instruction?.title || "");
   const [target, setTarget] = React.useState(instruction?.target || "all");
   const [saving, setSaving] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const [pendingFile, setPendingFile] = React.useState(null);
+  const [existingFilePath] = React.useState(instruction?.file_path || null);
   const editorRef = React.useRef(null);
+  const fileInputRef = React.useRef(null);
 
   React.useEffect(() => {
     if (editorRef.current && instruction?.content) {
@@ -359,22 +450,39 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
     setSaving(true);
     const content = editorRef.current?.innerHTML || "";
     try {
-      if (instruction?.id) {
-        await apiFetch(supabase, `instructions?id=eq.${instruction.id}`, {
+      let savedId = instruction?.id;
+      if (savedId) {
+        await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
           method: "PATCH",
-          body: JSON.stringify({ title: title.trim(), target, content }),
+          body: JSON.stringify({ title: title.trim(), target: target, content }),
         });
       } else {
-        await apiFetch(supabase, `instructions`, {
+        const rows = await apiFetch(supabase, `instructions`, {
           method: "POST",
-          body: JSON.stringify({ title: title.trim(), target, content }),
+          body: JSON.stringify({ title: title.trim(), target: target, content }),
         });
+        savedId = rows[0]?.id;
       }
+
+      // Upload file after we have an id
+      if (pendingFile && savedId) {
+        setUploading(true);
+        const storagePath = `instructions/${savedId}/${pendingFile.name}`;
+        const { error: upErr } = await supabase.storage.from("instructions").upload(storagePath, pendingFile, { upsert: true });
+        if (upErr) throw upErr;
+        await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ file_path: storagePath }),
+        });
+        setUploading(false);
+      }
+
       onSaved();
     } catch(e) {
       alert("Ошибка сохранения: " + e.message);
+      setSaving(false);
+      setUploading(false);
     }
-    setSaving(false);
   }
 
   return (
@@ -400,7 +508,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
           ))}
         </select>
       </div>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 14 }}>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 5 }}>Содержание</label>
         <RichToolbar editorRef={editorRef} />
         <div
@@ -410,10 +518,26 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
           style={{ minHeight: 200, border: "1px solid #d1d5db", borderRadius: 10, padding: "12px 14px", fontSize: 14, lineHeight: 1.6, color: "#1e293b", outline: "none", background: "#fafbff" }}
         />
       </div>
+      <div style={{ marginBottom: 18 }}>
+        <label style={{ fontSize: 12, fontWeight: 600, color: "#6b7280", display: "block", marginBottom: 6 }}>Файл .docx</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <input ref={fileInputRef} type="file" accept=".docx" style={{ display: "none" }} onChange={e => { setPendingFile(e.target.files?.[0] || null); }} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{ padding: "6px 14px", background: "white", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+          >
+            📎 Выбрать .docx
+          </button>
+          {pendingFile && <span style={{ fontSize: 12, color: "#4a90e2" }}>📄 {pendingFile.name}</span>}
+          {!pendingFile && existingFilePath && (
+            <DownloadBtn supabase={supabase} bucket="instructions" filePath={existingFilePath} />
+          )}
+        </div>
+      </div>
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={handleSave} disabled={saving}
+        <button onClick={handleSave} disabled={saving || uploading}
           style={{ padding: "8px 22px", background: "#4a90e2", color: "white", border: "none", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-          {saving ? "Сохранение..." : "Сохранить"}
+          {saving || uploading ? "Сохранение..." : "Сохранить"}
         </button>
         <button onClick={onClose}
           style={{ padding: "8px 18px", background: "white", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
@@ -428,7 +552,7 @@ function InstructionsSection({ isAdmin, viewPosition, supabase }) {
   const [instructions, setInstructions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [viewModal, setViewModal] = React.useState(null);
-  const [editModal, setEditModal] = React.useState(null); // null | {} (new) | {id,...} (edit)
+  const [editModal, setEditModal] = React.useState(null);
   const [hoveredId, setHoveredId] = React.useState(null);
   const [deleting, setDeleting] = React.useState(null);
 
@@ -436,11 +560,11 @@ function InstructionsSection({ isAdmin, viewPosition, supabase }) {
     setLoading(true);
     let query;
     if (isAdmin) {
-      query = "instructions?order=created_at.desc&select=id,title,target,content";
+      query = "instructions?order=created_at.desc&select=id,title,target,content,file_path";
     } else if (viewPosition) {
-      query = `instructions?or=(target.eq.all,target.eq.${encodeURIComponent(viewPosition)})&order=created_at.desc&select=id,title,target,content`;
+      query = `instructions?or=(target.eq.all,target.eq.${encodeURIComponent(viewPosition)})&order=created_at.desc&select=id,title,target,content,file_path`;
     } else {
-      query = "instructions?target=eq.all&order=created_at.desc&select=id,title,target,content";
+      query = "instructions?target=eq.all&order=created_at.desc&select=id,title,target,content,file_path";
     }
     apiFetch(supabase, query)
       .then(rows => { setInstructions(rows); setLoading(false); })
@@ -487,34 +611,33 @@ function InstructionsSection({ isAdmin, viewPosition, supabase }) {
                 key={instr.id}
                 onMouseEnter={() => setHoveredId(instr.id)}
                 onMouseLeave={() => setHoveredId(null)}
-                style={{ position: "relative", background: "white", borderRadius: 12, border: "1px solid #e8eaf6", boxShadow: hoveredId === instr.id ? "0 4px 16px rgba(74,144,226,0.15)" : "0 2px 8px rgba(74,144,226,0.06)", transition: "box-shadow 0.15s", cursor: "pointer" }}
+                style={{ position: "relative", background: "white", borderRadius: 12, border: "1px solid #e8eaf6", boxShadow: hoveredId === instr.id ? "0 4px 16px rgba(74,144,226,0.15)" : "0 2px 8px rgba(74,144,226,0.06)", transition: "box-shadow 0.15s" }}
               >
-                <div
-                  onClick={() => setViewModal(instr)}
-                  style={{ padding: "14px 14px 12px" }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 8, lineHeight: 1.3 }}>{instr.title}</div>
-                  <TargetBadge target={instr.target} />
+                <div onClick={() => setViewModal(instr)} style={{ padding: "14px 14px 12px", cursor: "pointer" }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", marginBottom: 6, lineHeight: 1.3 }}>{instr.title}</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                    <TargetBadge target={instr.target} />
+                    {instr.file_path && <span style={{ fontSize: 10, color: "#9ca3af" }}>📎 .docx</span>}
+                  </div>
                 </div>
 
                 {isAdmin && hoveredId === instr.id && (
-                  <div
-                    onClick={e => e.stopPropagation()}
-                    style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }}
-                  >
-                    <button
-                      onClick={() => setEditModal(instr)}
-                      title="Редактировать"
-                      style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
+                  <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }}>
+                    {instr.file_path && (
+                      <button
+                        onClick={() => downloadStorageFile(supabase, "instructions", instr.file_path)}
+                        title="Скачать .docx"
+                        style={{ background: "white", border: "1px solid #bbf7d0", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        ⬇️
+                      </button>
+                    )}
+                    <button onClick={() => setEditModal(instr)} title="Редактировать"
+                      style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       ✏️
                     </button>
-                    <button
-                      onClick={() => handleDelete(instr.id)}
-                      disabled={deleting === instr.id}
-                      title="Удалить"
-                      style={{ background: "white", border: "1px solid #fecaca", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}
-                    >
+                    <button onClick={() => handleDelete(instr.id)} disabled={deleting === instr.id} title="Удалить"
+                      style={{ background: "white", border: "1px solid #fecaca", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       🗑️
                     </button>
                   </div>
@@ -527,11 +650,13 @@ function InstructionsSection({ isAdmin, viewPosition, supabase }) {
 
       {viewModal && (
         <Modal title={viewModal.title} onClose={() => setViewModal(null)} wide>
-          <TargetBadge target={viewModal.target} />
-          <div
-            dangerouslySetInnerHTML={{ __html: viewModal.content }}
-            style={{ marginTop: 16, fontSize: 14, lineHeight: 1.7, color: "#1e293b" }}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+            <TargetBadge target={viewModal.target} />
+            {viewModal.file_path && (
+              <DownloadBtn supabase={supabase} bucket="instructions" filePath={viewModal.file_path} />
+            )}
+          </div>
+          <div dangerouslySetInnerHTML={{ __html: viewModal.content }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
         </Modal>
       )}
 
@@ -626,11 +751,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
 
       {isAdmin && employees.length > 0 && (
-        <EmployeeSwitcher
-          employees={otherEmployees}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-        />
+        <EmployeeSwitcher employees={otherEmployees} selectedId={selectedId} onSelect={setSelectedId} />
       )}
 
       <ProfileHeader name={viewName} role={viewRole} email={viewEmail} />
