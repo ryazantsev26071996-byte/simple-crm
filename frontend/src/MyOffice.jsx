@@ -690,7 +690,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
   );
 }
 
-function InstructionsSection({ isAdmin, viewPosition, supabase }) {
+function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, supabase }) {
   const [instructions, setInstructions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [viewModal, setViewModal] = React.useState(null);
@@ -701,19 +701,24 @@ function InstructionsSection({ isAdmin, viewPosition, supabase }) {
   function fetchInstructions() {
     setLoading(true);
     let query;
-    if (isAdmin) {
+    if (isAdmin && isViewingSelf) {
+      // Admin on own cabinet: see everything
       query = "instructions?order=created_at.desc&select=id,title,target,content,file_path";
-    } else if (viewPosition) {
-      query = `instructions?or=(target.eq.all,target.eq.${encodeURIComponent(viewPosition)})&order=created_at.desc&select=id,title,target,content,file_path`;
     } else {
-      query = "instructions?target=eq.all&order=created_at.desc&select=id,title,target,content,file_path";
+      // Non-admin OR admin viewing another employee: filter by viewed person's role/position
+      const targets = ["all"];
+      if (viewRole === "teacher")  targets.push("teacher");
+      if (viewRole === "manager")  targets.push("manager");
+      if (viewPosition === "account_manager") targets.push("account_manager");
+      const orClause = targets.map(t => `target.eq.${t}`).join(",");
+      query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
     }
     apiFetch(supabase, query)
       .then(rows => { setInstructions(rows); setLoading(false); })
       .catch(() => setLoading(false));
   }
 
-  React.useEffect(() => { fetchInstructions(); }, [isAdmin, viewPosition]);
+  React.useEffect(() => { fetchInstructions(); }, [isAdmin, isViewingSelf, viewRole, viewPosition]);
 
   async function handleDelete(id) {
     if (!window.confirm("Удалить инструкцию?")) return;
@@ -907,7 +912,13 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
         supabase={supabase}
         employees={employees}
       />
-      <InstructionsSection isAdmin={isAdmin} viewPosition={viewPosition} supabase={supabase} />
+      <InstructionsSection
+        isAdmin={isAdmin}
+        isViewingSelf={selectedId === null}
+        viewRole={viewRole}
+        viewPosition={viewPosition}
+        supabase={supabase}
+      />
       <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
 
     </div>
