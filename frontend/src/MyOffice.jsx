@@ -33,6 +33,11 @@ async function apiFetch(supabase, path, options = {}) {
   return text ? JSON.parse(text) : [];
 }
 
+function sanitizeFilename(name) {
+  const map = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'yo',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};
+  return name.toLowerCase().split('').map(c => map[c] || c).join('').replace(/[^a-z0-9._-]/g, '_');
+}
+
 async function downloadStorageFile(supabase, bucket, filePath) {
   try {
     const { data, error } = await supabase.storage.from(bucket).createSignedUrl(filePath, 60);
@@ -358,7 +363,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase }) {
     setUploading(true);
     try {
       const identifier = (employeeEmail || employeeName).replace(/[^a-zA-Z0-9_\-@.]/g, "_");
-      const storagePath = `regulations/${identifier}/${file.name}`;
+      const storagePath = `regulations/${identifier}/${sanitizeFilename(file.name)}`;
       const { error: upErr } = await supabase.storage.from("regulations").upload(storagePath, file, { upsert: true });
       if (upErr) throw upErr;
 
@@ -467,7 +472,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
       // Upload file after we have an id
       if (pendingFile && savedId) {
         setUploading(true);
-        const storagePath = `instructions/${savedId}/${pendingFile.name}`;
+        const storagePath = `instructions/${savedId}/${sanitizeFilename(pendingFile.name)}`;
         const { error: upErr } = await supabase.storage.from("instructions").upload(storagePath, pendingFile, { upsert: true });
         if (upErr) throw upErr;
         await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
