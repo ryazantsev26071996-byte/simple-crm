@@ -745,6 +745,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
       query = "instructions?order=created_at.desc&select=id,title,target,content,file_path";
     } else {
       // Non-admin OR admin viewing another employee: filter by viewed person's role/position
+      console.log("viewPosition:", viewPosition, "viewRole:", viewRole);
       const targets = ["all"];
       if (viewRole === "teacher") targets.push("teacher");
       if (viewPosition === "accountmanager") {
@@ -942,6 +943,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   const viewRole     = viewedProfile?.role || role;
   const viewEmail    = viewedProfile?.email || (selectedId ? null : userEmail);
   const viewPosition = viewedProfile?.position || null;
+  if (selectedId) console.log("[MyOffice] viewedProfile:", viewedProfile, "→ viewPosition:", viewPosition);
 
   const otherEmployees = employees.filter(e => e.full_name !== userName);
 
