@@ -197,7 +197,7 @@ function EmployeeSwitcher({ employees, selectedId, onSelect }) {
         {employees.map(emp => (
           <button
             key={emp.id}
-            onClick={() => onSelect(emp.id)}
+            onClick={() => onSelect(emp)}
             style={{ padding: "6px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", border: "1.5px solid", borderColor: selectedId === emp.id ? "#4a90e2" : "#e5e7eb", background: selectedId === emp.id ? "#e0eeff" : "white", color: selectedId === emp.id ? "#1d4ed8" : "#374151" }}
           >
             {emp.full_name || "—"}
@@ -247,7 +247,6 @@ function WorkScheduleSection({ userName, supabase }) {
     const start = dateFmt(year, month, 1);
     const end = dateFmt(year, month, new Date(year, month, 0).getDate());
     const wsUrl = `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours,start_time,end_time`;
-    console.log("[work_schedule] GET", wsUrl);
     apiFetch(supabase, wsUrl)
       .then(rows => { setSchedule(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -379,7 +378,6 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     if (!employeeEmail) { setLoading(false); return; }
     setLoading(true);
     setMode(null);
-    console.log("[staff_regulations] GET", `staff_regulations?${filterParam}&select=*`);
     apiFetch(supabase, `staff_regulations?${filterParam}&select=*`)
       .then(rows => {
         const content = rows[0]?.content || "";
@@ -392,7 +390,6 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   }
 
   function fetchAllRegs() {
-    console.log("[staff_regulations] GET", "staff_regulations?select=*");
     apiFetch(supabase, "staff_regulations?select=*")
       .then(rows => setAllRegs(rows.filter(r => r.content && r.content.trim().length > 0)))
       .catch(() => {});
@@ -407,13 +404,11 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     if (!employeeEmail) return;
     const base = { employee_email: employeeEmail };
     if (rowExists) {
-      console.log("[staff_regulations] PATCH", `staff_regulations?${filterParam}`, { content: content.slice(0, 40), file_path: fp ?? null });
       await apiFetch(supabase, `staff_regulations?${filterParam}`, {
         method: "PATCH",
         body: JSON.stringify({ content, file_path: fp ?? null }),
       });
     } else {
-      console.log("[staff_regulations] POST", "staff_regulations", { ...base, file_path: fp ?? null });
       await apiFetch(supabase, `staff_regulations`, {
         method: "POST",
         body: JSON.stringify({ ...base, content, file_path: fp ?? null }),
@@ -469,7 +464,6 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     setDeleting(true);
     try {
       if (filePath) await supabase.storage.from("regulations").remove([filePath]);
-      console.log("[staff_regulations] PATCH (delete)", `staff_regulations?${filterParam}`);
       await apiFetch(supabase, `staff_regulations?${filterParam}`, {
         method: "PATCH",
         body: JSON.stringify({ content: "", file_path: null }),
@@ -630,13 +624,11 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
     try {
       let savedId = instruction?.id;
       if (savedId) {
-        console.log("[instructions] PATCH", `instructions?id=eq.${savedId}`);
         await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
           method: "PATCH",
           body: JSON.stringify({ title: title.trim(), target: target, content }),
         });
       } else {
-        console.log("[instructions] POST", "instructions");
         const rows = await apiFetch(supabase, `instructions`, {
           method: "POST",
           body: JSON.stringify({ title: title.trim(), target: target, content }),
@@ -650,7 +642,6 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
         const storagePath = `instructions/${savedId}/${sanitizeFilename(pendingFile.name)}`;
         const { error: upErr } = await supabase.storage.from("instructions").upload(storagePath, pendingFile, { upsert: true });
         if (upErr) throw upErr;
-        console.log("[instructions] PATCH (file_path)", `instructions?id=eq.${savedId}`);
         await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
           method: "PATCH",
           body: JSON.stringify({ file_path: storagePath }),
@@ -745,7 +736,6 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
       query = "instructions?order=created_at.desc&select=id,title,target,content,file_path";
     } else {
       // Non-admin OR admin viewing another employee: filter by viewed person's role/position
-      console.log("viewPosition:", viewPosition, "viewRole:", viewRole);
       const targets = ["all"];
       if (viewRole === "teacher") targets.push("teacher");
       if (viewPosition === "accountmanager") {
@@ -760,7 +750,6 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
         query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
       }
     }
-    console.log("[instructions] GET", query);
     apiFetch(supabase, query)
       .then(rows => { setInstructions(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -772,7 +761,6 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
     if (!window.confirm("Удалить инструкцию?")) return;
     setDeleting(id);
     try {
-      console.log("[instructions] DELETE", `instructions?id=eq.${id}`);
       await apiFetch(supabase, `instructions?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       fetchInstructions();
     } catch(e) {
@@ -878,7 +866,6 @@ function TasksSection({ userName, supabase }) {
     if (!userName) return;
     setLoading(true);
     const tasksUrl = `staff_tasks?assigned_to=eq.${encodeURIComponent(userName)}&order=due_date.asc.nullslast&select=id,title,description,due_date,status`;
-    console.log("[staff_tasks] GET", tasksUrl);
     apiFetch(supabase, tasksUrl)
       .then(rows => { setTasks(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -929,10 +916,11 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   const isAdmin = role === "admin";
   const [employees, setEmployees] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
+  const [selectedRole, setSelectedRole] = React.useState(null);
+  const [selectedPosition, setSelectedPosition] = React.useState(null);
 
   React.useEffect(() => {
     if (!isAdmin) return;
-    console.log("[profiles] GET", "profiles?select=id,full_name,role,email,position&order=full_name.asc");
     apiFetch(supabase, "profiles?select=id,full_name,role,email,position&order=full_name.asc")
       .then(rows => setEmployees(rows))
       .catch(() => {});
@@ -940,10 +928,9 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
 
   const viewedProfile = selectedId ? employees.find(e => e.id === selectedId) : null;
   const viewName     = viewedProfile?.full_name || userName;
-  const viewRole     = viewedProfile?.role || role;
+  const viewRole     = selectedRole || role;
   const viewEmail    = viewedProfile?.email || (selectedId ? null : userEmail);
-  const viewPosition = viewedProfile?.position || null;
-  console.log('viewedProfile:', viewedProfile, 'viewPosition:', viewPosition);
+  const viewPosition = selectedPosition;
 
   const otherEmployees = employees.filter(e => e.full_name !== userName);
 
@@ -951,7 +938,10 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
 
       {isAdmin && employees.length > 0 && (
-        <EmployeeSwitcher employees={otherEmployees} selectedId={selectedId} onSelect={setSelectedId} />
+        <EmployeeSwitcher employees={otherEmployees} selectedId={selectedId} onSelect={emp => {
+          if (emp === null) { setSelectedId(null); setSelectedRole(null); setSelectedPosition(null); }
+          else { setSelectedId(emp.id); setSelectedRole(emp.role); setSelectedPosition(emp.position ?? null); }
+        }} />
       )}
 
       <ProfileHeader name={viewName} role={viewRole} email={viewEmail} />
