@@ -246,7 +246,9 @@ function WorkScheduleSection({ userName, supabase }) {
     setLoading(true);
     const start = dateFmt(year, month, 1);
     const end = dateFmt(year, month, new Date(year, month, 0).getDate());
-    apiFetch(supabase, `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours,start_time,end_time`)
+    const wsUrl = `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours,start_time,end_time`;
+    console.log("[work_schedule] GET", wsUrl);
+    apiFetch(supabase, wsUrl)
       .then(rows => { setSchedule(rows); setLoading(false); })
       .catch(() => setLoading(false));
   }, [userName, month, year]);
@@ -628,11 +630,13 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
     try {
       let savedId = instruction?.id;
       if (savedId) {
+        console.log("[instructions] PATCH", `instructions?id=eq.${savedId}`);
         await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
           method: "PATCH",
           body: JSON.stringify({ title: title.trim(), target: target, content }),
         });
       } else {
+        console.log("[instructions] POST", "instructions");
         const rows = await apiFetch(supabase, `instructions`, {
           method: "POST",
           body: JSON.stringify({ title: title.trim(), target: target, content }),
@@ -646,6 +650,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
         const storagePath = `instructions/${savedId}/${sanitizeFilename(pendingFile.name)}`;
         const { error: upErr } = await supabase.storage.from("instructions").upload(storagePath, pendingFile, { upsert: true });
         if (upErr) throw upErr;
+        console.log("[instructions] PATCH (file_path)", `instructions?id=eq.${savedId}`);
         await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
           method: "PATCH",
           body: JSON.stringify({ file_path: storagePath }),
@@ -754,6 +759,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
         query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
       }
     }
+    console.log("[instructions] GET", query);
     apiFetch(supabase, query)
       .then(rows => { setInstructions(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -765,6 +771,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
     if (!window.confirm("Удалить инструкцию?")) return;
     setDeleting(id);
     try {
+      console.log("[instructions] DELETE", `instructions?id=eq.${id}`);
       await apiFetch(supabase, `instructions?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
       fetchInstructions();
     } catch(e) {
@@ -869,7 +876,9 @@ function TasksSection({ userName, supabase }) {
   React.useEffect(() => {
     if (!userName) return;
     setLoading(true);
-    apiFetch(supabase, `staff_tasks?assigned_to=eq.${encodeURIComponent(userName)}&order=due_date.asc.nullslast&select=id,title,description,due_date,status`)
+    const tasksUrl = `staff_tasks?assigned_to=eq.${encodeURIComponent(userName)}&order=due_date.asc.nullslast&select=id,title,description,due_date,status`;
+    console.log("[staff_tasks] GET", tasksUrl);
+    apiFetch(supabase, tasksUrl)
       .then(rows => { setTasks(rows); setLoading(false); })
       .catch(() => setLoading(false));
   }, [userName]);
@@ -922,6 +931,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
 
   React.useEffect(() => {
     if (!isAdmin) return;
+    console.log("[profiles] GET", "profiles?select=id,full_name,role,email,position&order=full_name.asc");
     apiFetch(supabase, "profiles?select=id,full_name,role,email,position&order=full_name.asc")
       .then(rows => setEmployees(rows))
       .catch(() => {});
