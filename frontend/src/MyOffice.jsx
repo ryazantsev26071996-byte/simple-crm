@@ -376,9 +376,10 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     : `employee_name=eq.${encodeURIComponent(employeeName)}`;
 
   function fetchRegulation() {
+    if (!employeeEmail && !employeeName) { setLoading(false); return; }
     setLoading(true);
     setMode(null);
-    apiFetch(supabase, `staff_regulations?${filterParam}&select=content,file_path`)
+    apiFetch(supabase, `staff_regulations?${filterParam}&select=*`)
       .then(rows => {
         const content = rows[0]?.content || "";
         setHtml(content);
@@ -748,8 +749,12 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
       } else if (viewRole === "manager") {
         targets.push("manager");
       }
-      const orClause = targets.map(t => `target.eq.${t}`).join(",");
-      query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
+      if (targets.length === 1) {
+        query = `instructions?target=eq.${targets[0]}&order=created_at.desc&select=id,title,target,content,file_path`;
+      } else {
+        const orClause = targets.map(t => `target.eq.${t}`).join(",");
+        query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
+      }
     }
     apiFetch(supabase, query)
       .then(rows => { setInstructions(rows); setLoading(false); })
