@@ -750,6 +750,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, supabase }) {
         query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
       }
     }
+    console.log('targets:', targets, 'viewRole:', viewRole);
     apiFetch(supabase, query)
       .then(rows => { setInstructions(rows); setLoading(false); })
       .catch(() => setLoading(false));
