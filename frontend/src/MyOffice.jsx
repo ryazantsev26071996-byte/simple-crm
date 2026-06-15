@@ -377,6 +377,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     if (!employeeEmail) { setLoading(false); return; }
     setLoading(true);
     setMode(null);
+    console.log("[staff_regulations] GET", `staff_regulations?${filterParam}&select=*`);
     apiFetch(supabase, `staff_regulations?${filterParam}&select=*`)
       .then(rows => {
         const content = rows[0]?.content || "";
@@ -389,6 +390,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   }
 
   function fetchAllRegs() {
+    console.log("[staff_regulations] GET", "staff_regulations?select=*");
     apiFetch(supabase, "staff_regulations?select=*")
       .then(rows => setAllRegs(rows.filter(r => r.content && r.content.trim().length > 0)))
       .catch(() => {});
@@ -403,11 +405,13 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     if (!employeeEmail) return;
     const base = { employee_email: employeeEmail };
     if (rowExists) {
+      console.log("[staff_regulations] PATCH", `staff_regulations?${filterParam}`, { content: content.slice(0, 40), file_path: fp ?? null });
       await apiFetch(supabase, `staff_regulations?${filterParam}`, {
         method: "PATCH",
         body: JSON.stringify({ content, file_path: fp ?? null }),
       });
     } else {
+      console.log("[staff_regulations] POST", "staff_regulations", { ...base, file_path: fp ?? null });
       await apiFetch(supabase, `staff_regulations`, {
         method: "POST",
         body: JSON.stringify({ ...base, content, file_path: fp ?? null }),
@@ -463,6 +467,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     setDeleting(true);
     try {
       if (filePath) await supabase.storage.from("regulations").remove([filePath]);
+      console.log("[staff_regulations] PATCH (delete)", `staff_regulations?${filterParam}`);
       await apiFetch(supabase, `staff_regulations?${filterParam}`, {
         method: "PATCH",
         body: JSON.stringify({ content: "", file_path: null }),
