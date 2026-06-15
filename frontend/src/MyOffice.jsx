@@ -742,9 +742,12 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
     } else {
       // Non-admin OR admin viewing another employee: filter by viewed person's role/position
       const targets = ["all"];
-      if (viewRole === "teacher")  targets.push("teacher");
-      if (viewRole === "manager")  targets.push("manager");
-      if (viewPosition === "account_manager") targets.push("account_manager");
+      if (viewRole === "teacher") targets.push("teacher");
+      if (viewPosition === "accountmanager") {
+        targets.push("accountmanager");
+      } else if (viewRole === "manager") {
+        targets.push("manager");
+      }
       const orClause = targets.map(t => `target.eq.${t}`).join(",");
       query = `instructions?or=(${orClause})&order=created_at.desc&select=id,title,target,content,file_path`;
     }
