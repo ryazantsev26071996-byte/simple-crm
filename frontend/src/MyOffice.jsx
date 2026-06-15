@@ -371,12 +371,10 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   const docxRef    = React.useRef(null);
 
   const hasContent = html.trim().length > 0;
-  const filterParam = employeeEmail
-    ? `employee_email=eq.${encodeURIComponent(employeeEmail)}`
-    : `employee_name=eq.${encodeURIComponent(employeeName)}`;
+  const filterParam = `employee_email=eq.${encodeURIComponent(employeeEmail || "")}`;
 
   function fetchRegulation() {
-    if (!employeeEmail && !employeeName) { setLoading(false); return; }
+    if (!employeeEmail) { setLoading(false); return; }
     setLoading(true);
     setMode(null);
     apiFetch(supabase, `staff_regulations?${filterParam}&select=*`)
@@ -391,7 +389,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   }
 
   function fetchAllRegs() {
-    apiFetch(supabase, "staff_regulations?select=employee_email,employee_name,content,file_path")
+    apiFetch(supabase, "staff_regulations?select=*")
       .then(rows => setAllRegs(rows.filter(r => r.content && r.content.trim().length > 0)))
       .catch(() => {});
   }
@@ -402,9 +400,8 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   }, [filterParam, isAdmin]);
 
   async function persistContent(content, fp) {
-    const base = employeeEmail
-      ? { employee_email: employeeEmail }
-      : { employee_name: employeeName };
+    if (!employeeEmail) return;
+    const base = { employee_email: employeeEmail };
     if (rowExists) {
       await apiFetch(supabase, `staff_regulations?${filterParam}`, {
         method: "PATCH",
@@ -445,7 +442,8 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
       const result = await mammoth.default.convertToHtml({ arrayBuffer });
       const convertedHtml = result.value;
 
-      const identifier = (employeeEmail || employeeName).replace(/[^a-zA-Z0-9_\-@.]/g, "_");
+      if (!employeeEmail) throw new Error("Email сотрудника не найден");
+      const identifier = employeeEmail.replace(/[^a-zA-Z0-9_\-@.]/g, "_");
       const storagePath = `regulations/${identifier}/${sanitizeFilename(file.name)}`;
       const { error: upErr } = await supabase.storage.from("regulations").upload(storagePath, file, { upsert: true });
       if (upErr) throw upErr;
@@ -479,8 +477,8 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   }
 
   function getRegName(reg) {
-    const emp = employees?.find(e => e.email === reg.employee_email || e.full_name === reg.employee_name);
-    return emp?.full_name || reg.employee_name || reg.employee_email || "Сотрудник";
+    const emp = employees?.find(e => e.email === reg.employee_email);
+    return emp?.full_name || reg.employee_email || "Сотрудник";
   }
 
   async function handleCopy(reg) {
@@ -497,12 +495,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
     setCopying(false);
   }
 
-  const copyOptions = allRegs.filter(r =>
-    r.employee_email !== employeeEmail || r.employee_name !== employeeName
-  ).filter(r =>
-    !(r.employee_email === employeeEmail && employeeEmail) &&
-    !(r.employee_name === employeeName && !employeeEmail)
-  );
+  const copyOptions = allRegs.filter(r => r.employee_email !== employeeEmail);
 
   return (
     <>
