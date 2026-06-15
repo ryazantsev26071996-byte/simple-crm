@@ -739,7 +739,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, supabase }) {
       const targets = ["all"];
       if (viewRole === "teacher") targets.push("teacher");
       if (viewRole === "accountmanager") {
-        targets.push("accountmanager");
+        targets.push("account_manager");
       } else if (viewRole === "manager") {
         targets.push("manager");
       }
