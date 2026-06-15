@@ -943,7 +943,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   const viewRole     = viewedProfile?.role || role;
   const viewEmail    = viewedProfile?.email || (selectedId ? null : userEmail);
   const viewPosition = viewedProfile?.position || null;
-  if (selectedId) console.log("[MyOffice] viewedProfile:", viewedProfile, "→ viewPosition:", viewPosition);
+  console.log('viewedProfile:', viewedProfile, 'viewPosition:', viewPosition);
 
   const otherEmployees = employees.filter(e => e.full_name !== userName);
 
