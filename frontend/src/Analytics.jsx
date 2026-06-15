@@ -390,7 +390,7 @@ export default function Analytics() {
     return dates.size;
   }, [workSchedule]);
 
-  const myManagerName = role === "manager"
+  const myManagerName = (role === "manager" || role === "accountmanager")
     ? MANAGERS.find(m => authorName === m || authorName.toLowerCase().startsWith(m.toLowerCase()))
     : null;
 
@@ -517,7 +517,7 @@ export default function Analytics() {
       {showTeam && <TeamOnline />}
 
       {/* ── Manager speedometer dashboard (own gauge only) ── */}
-      {role === "manager" && myManagerName && (() => {
+      {(role === "manager" || role === "accountmanager") && myManagerName && (() => {
         const s = mgStats(myManagerName);
         const mgPct = s.plan > 0 ? s.revenue / s.plan * 100 : 0;
         return (

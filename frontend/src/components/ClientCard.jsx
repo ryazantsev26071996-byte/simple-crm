@@ -45,7 +45,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {(role === 'admin' || role === 'manager') && (
+          {(role === 'admin' || role === 'manager' || role === 'accountmanager') && (
             <button onClick={async () => {
               if (!window.confirm('Удалить клиента ' + client.name + '?')) return;
               const { error } = await supabase.from('clients').delete().eq('id', client.id);
@@ -62,7 +62,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {error && <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
-        {(role === 'manager' || role === 'admin') && (
+        {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <ClientForm mode="Редактировать" initialValue={client} disabled={false} submitLabel="Сохранить"
             onSubmit={async (payload) => {
               try {
@@ -73,11 +73,11 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
           />
         )}
 
-        {client.stage === 'ученик' && (role === 'manager' || role === 'admin') && (
+        {client.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <StudentInfoBlock client={client} onUpdate={onUpdate} />
         )}
 
-        {(role === 'manager' || role === 'admin') && (
+        {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <ContractBlock client={client} role={role} onUpdate={onUpdate} />
         )}
 

@@ -293,7 +293,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                             </div>
                           </div>
                         ))}
-                        {!isFull&&(role==="manager"||role==="admin")&&(
+                        {!isFull&&(role==="manager"||role==="accountmanager"||role==="admin")&&(
                           <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>
                             + {MAX_PER_SLOT-entries.length} мест
                           </button>

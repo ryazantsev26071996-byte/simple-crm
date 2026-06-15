@@ -69,7 +69,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
 
   function getStageTotalAmount(stage) {
     if (stage !== 'ученик' && stage !== 'продажа') return null
-    if (role !== 'manager' && role !== 'admin') return null
+    if (role !== 'manager' && role !== 'accountmanager' && role !== 'admin') return null
     if (filterMonth === 'all') return null
     return filteredClients
       .filter(c => c.stage === stage)
@@ -85,7 +85,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
           placeholder="Поиск по имени или последним цифрам номера..."
           style={{ flex: 1, minWidth: 0, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
         />
-        {(role === 'manager' || role === 'admin') && (
+        {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
             style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none', cursor: 'pointer' }}>
             <option value="all">Все месяцы</option>
@@ -95,7 +95,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
             })}
           </select>
         )}
-        {(role === 'manager' || role === 'admin') && (
+        {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <button
             onClick={() => setShowAddModal(true)}
             style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#4a90e2', color: 'white', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}

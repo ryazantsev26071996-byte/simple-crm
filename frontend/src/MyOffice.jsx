@@ -3,7 +3,7 @@ import React from "react";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const ROLE_LABELS = { admin: "Администратор", manager: "Менеджер", teacher: "Педагог" };
+const ROLE_LABELS = { admin: "Администратор", manager: "Менеджер", accountmanager: "Аккаунт-менеджер", teacher: "Педагог" };
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
 const TARGET_LABELS = { all: "Все", teacher: "Педагоги", manager: "Менеджеры", account_manager: "Аккаунт-менеджеры" };
@@ -720,7 +720,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
   );
 }
 
-function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, supabase }) {
+function InstructionsSection({ isAdmin, isViewingSelf, viewRole, supabase }) {
   const [instructions, setInstructions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [viewModal, setViewModal] = React.useState(null);
@@ -738,7 +738,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
       // Non-admin OR admin viewing another employee: filter by viewed person's role/position
       const targets = ["all"];
       if (viewRole === "teacher") targets.push("teacher");
-      if (viewPosition === "accountmanager") {
+      if (viewRole === "accountmanager") {
         targets.push("accountmanager");
       } else if (viewRole === "manager") {
         targets.push("manager");
@@ -755,7 +755,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, viewPosition, s
       .catch(() => setLoading(false));
   }
 
-  React.useEffect(() => { fetchInstructions(); }, [isAdmin, isViewingSelf, viewRole, viewPosition]);
+  React.useEffect(() => { fetchInstructions(); }, [isAdmin, isViewingSelf, viewRole]);
 
   async function handleDelete(id) {
     if (!window.confirm("Удалить инструкцию?")) return;
@@ -917,7 +917,6 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   const [employees, setEmployees] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
   const [selectedRole, setSelectedRole] = React.useState(null);
-  const [selectedPosition, setSelectedPosition] = React.useState(null);
 
   React.useEffect(() => {
     if (!isAdmin) return;
@@ -930,7 +929,6 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   const viewName     = viewedProfile?.full_name || userName;
   const viewRole     = selectedRole || role;
   const viewEmail    = viewedProfile?.email || (selectedId ? null : userEmail);
-  const viewPosition = selectedPosition;
 
   const otherEmployees = employees.filter(e => e.full_name !== userName);
 
@@ -939,8 +937,8 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
 
       {isAdmin && employees.length > 0 && (
         <EmployeeSwitcher employees={otherEmployees} selectedId={selectedId} onSelect={emp => {
-          if (emp === null) { setSelectedId(null); setSelectedRole(null); setSelectedPosition(null); }
-          else { setSelectedId(emp.id); setSelectedRole(emp.role); setSelectedPosition(emp.position ?? null); }
+          if (emp === null) { setSelectedId(null); setSelectedRole(null); }
+          else { setSelectedId(emp.id); setSelectedRole(emp.role); }
         }} />
       )}
 
@@ -959,7 +957,6 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
         isAdmin={isAdmin}
         isViewingSelf={selectedId === null}
         viewRole={viewRole}
-        viewPosition={viewPosition}
         supabase={supabase}
       />
       <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
