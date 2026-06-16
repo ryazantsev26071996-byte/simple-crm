@@ -1,4 +1,5 @@
 import React from "react";
+import { RecurringTasksAdmin, TodayRecurringTasks } from "./RecurringTasks.jsx";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -959,7 +960,9 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
         viewRole={viewRole}
         supabase={supabase}
       />
+      {!isAdmin && <TodayRecurringTasks userName={userName} supabase={supabase} />}
       <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
+      {isAdmin && selectedId === null && <RecurringTasksAdmin employees={employees} supabase={supabase} />}
 
     </div>
   );
