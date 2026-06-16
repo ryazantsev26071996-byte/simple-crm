@@ -106,6 +106,7 @@ function TaskModal({ task, initChecklist, employees, supabase, onSaved, onClose 
   const [items, setItems]           = React.useState((initChecklist || []).map(i => ({ text: i.text })));
   const [loadingSched, setLoadingSched] = React.useState(false);
   const [saving, setSaving]         = React.useState(false);
+  const [pasteText, setPasteText]   = React.useState("");
 
   React.useEffect(() => {
     if (!emp) { setSchedule([]); return; }
@@ -225,6 +226,30 @@ function TaskModal({ task, initChecklist, employees, supabase, onSaved, onClose 
               ➕ Добавить пункт
             </button>
           </div>
+
+          <div style={{ marginBottom:10 }}>
+            <textarea
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              style={{ ...inp, minHeight:72, resize:"vertical", fontFamily:"inherit", fontSize:13 }}
+              placeholder={"Вставьте список пунктов, каждый с новой строки или нумерованный (1. Пункт). Нажмите «Разобрать»"}
+            />
+            <button
+              onClick={() => {
+                const parsed = pasteText
+                  .split("\n")
+                  .map(line => line.replace(/^[\d]+[.)]\s*|^[-•]\s*/, "").trim())
+                  .filter(line => line.length > 0)
+                  .map(text => ({ text }));
+                if (parsed.length > 0) setItems(p => [...p, ...parsed]);
+                setPasteText("");
+              }}
+              style={{ marginTop:6, fontSize:12, padding:"4px 12px", border:"1px solid #6366f1", background:"#eef2ff", color:"#4338ca", borderRadius:6, cursor:"pointer", fontWeight:600 }}
+            >
+              Разобрать
+            </button>
+          </div>
+
           {items.length === 0
             ? <div style={{ color:"#9ca3af", fontSize:13 }}>Нет пунктов чеклиста</div>
             : (
