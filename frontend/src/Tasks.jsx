@@ -113,17 +113,13 @@ export default function Tasks({ user, profile, onClientSelect }) {
     const now = !was;
     setRecurringLogMap(p => ({ ...p, [instId]: { ...(p[instId] || {}), [itemId]: now } }));
     try {
-      const patched = await apiFetch(`recurring_task_checklist_log?instance_id=eq.${instId}&checklist_item_id=eq.${itemId}`, {
-        method: "PATCH",
-        headers: { Prefer: "return=representation" },
-        body: JSON.stringify({ is_checked: now, checked_at: new Date().toISOString() }),
+      await apiFetch(`recurring_task_checklist_log?instance_id=eq.${instId}&checklist_item_id=eq.${itemId}`, {
+        method: "DELETE",
       });
-      if (!patched || patched.length === 0) {
-        await apiFetch("recurring_task_checklist_log", {
-          method: "POST",
-          body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now, checked_at: new Date().toISOString() }),
-        });
-      }
+      await apiFetch("recurring_task_checklist_log", {
+        method: "POST",
+        body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now, checked_at: new Date().toISOString() }),
+      });
       const task = recurringTaskMap[taskId];
       if (task && task.checklist.length > 0) {
         if (now) {
