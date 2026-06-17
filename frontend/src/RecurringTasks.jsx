@@ -511,11 +511,17 @@ export function TodayRecurringTasks({ userName, supabase }) {
     const now = !was;
     setLogMap(p => ({ ...p, [instId]: { ...(p[instId]||{}), [itemId]: now } }));
     try {
-      await apiFetch(supabase, "recurring_task_checklist_log", {
-        method: "POST",
-        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-        body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now }),
+      const patched = await apiFetch(supabase, `recurring_task_checklist_log?instance_id=eq.${instId}&checklist_item_id=eq.${itemId}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({ is_checked: now }),
       });
+      if (!patched || patched.length === 0) {
+        await apiFetch(supabase, "recurring_task_checklist_log", {
+          method: "POST",
+          body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now }),
+        });
+      }
       const task = taskMap[taskId];
       if (task && task.checklist.length > 0) {
         if (now) {
