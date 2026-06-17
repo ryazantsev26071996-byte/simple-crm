@@ -64,6 +64,9 @@ export default function Tasks({ user, profile, onClientSelect }) {
   const [editingTask, setEditingTask] = React.useState(null);
   const [profiles, setProfiles] = React.useState([]);
   const [doneOpen, setDoneOpen] = React.useState(false);
+  const [recurringInstances, setRecurringInstances] = React.useState([]);
+  const [recurringTaskMap, setRecurringTaskMap]     = React.useState({});
+  const [recurringLogMap, setRecurringLogMap]       = React.useState({});
 
   const effectiveScope = isAdmin ? scope : "mine";
 
@@ -71,7 +74,66 @@ export default function Tasks({ user, profile, onClientSelect }) {
     if (!user) return;
     loadTasks();
     loadProfiles();
+    if (effectiveScope === "mine") loadRecurringTasks();
+    else setRecurringInstances([]);
   }, [user?.id, effectiveScope]);
+
+  async function loadRecurringTasks() {
+    if (!myName) return;
+    try {
+      const date = new Date().toISOString().slice(0, 10);
+      const insts = await apiFetch(`recurring_task_instances?assigned_to=eq.${encodeURIComponent(myName)}&date=eq.${date}&is_completed=eq.false&select=id,task_id,date,is_completed`);
+      setRecurringInstances(insts || []);
+      if (!insts || insts.length === 0) return;
+
+      const taskIds = [...new Set(insts.map(i => i.task_id))];
+      const instIds = insts.map(i => i.id);
+      const [taskRows, clRows, logRows] = await Promise.all([
+        apiFetch(`recurring_tasks?id=in.(${taskIds.join(",")})&select=id,title,description`),
+        apiFetch(`recurring_task_checklist?task_id=in.(${taskIds.join(",")})&order=sort_order.asc&select=id,task_id,item`),
+        apiFetch(`recurring_task_checklist_log?instance_id=in.(${instIds.join(",")})&select=instance_id,checklist_item_id,is_checked`),
+      ]);
+
+      const tm = {};
+      (taskRows || []).forEach(t => { tm[t.id] = { title: t.title, description: t.description, checklist: [] }; });
+      (clRows || []).forEach(c => { if (tm[c.task_id]) tm[c.task_id].checklist.push(c); });
+      setRecurringTaskMap(tm);
+
+      const lm = {};
+      (logRows || []).forEach(l => {
+        if (!lm[l.instance_id]) lm[l.instance_id] = {};
+        lm[l.instance_id][l.checklist_item_id] = l.is_checked;
+      });
+      setRecurringLogMap(lm);
+    } catch (e) { console.error(e); }
+  }
+
+  async function toggleRecurringItem(instId, itemId, taskId) {
+    const was = recurringLogMap[instId]?.[itemId] || false;
+    const now = !was;
+    setRecurringLogMap(p => ({ ...p, [instId]: { ...(p[instId] || {}), [itemId]: now } }));
+    try {
+      await apiFetch("recurring_task_checklist_log", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now, checked_at: new Date().toISOString() }),
+      });
+      const task = recurringTaskMap[taskId];
+      if (task && task.checklist.length > 0 && now) {
+        const updLog = { ...(recurringLogMap[instId] || {}), [itemId]: true };
+        if (task.checklist.every(c => updLog[c.id])) {
+          await apiFetch(`recurring_task_instances?id=eq.${instId}`, {
+            method: "PATCH",
+            headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ is_completed: true }),
+          });
+          setRecurringInstances(p => p.filter(i => i.id !== instId));
+        }
+      }
+    } catch (e) {
+      setRecurringLogMap(p => ({ ...p, [instId]: { ...(p[instId] || {}), [itemId]: was } }));
+    }
+  }
 
   async function loadTasks() {
     setLoading(true);
@@ -230,6 +292,40 @@ export default function Tasks({ user, profile, onClientSelect }) {
 
       {/* Task list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {effectiveScope === "mine" && recurringInstances.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: "#7c3aed" }}>🔁 Повторяющиеся задачи на сегодня</span>
+              <span style={{ fontSize: 11, background: "#7c3aed", color: "white", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>{recurringInstances.length}</span>
+            </div>
+            {recurringInstances.map(inst => {
+              const task = recurringTaskMap[inst.task_id];
+              if (!task) return null;
+              const cl = task.checklist;
+              const instLog = recurringLogMap[inst.id] || {};
+              const checkedCount = cl.filter(c => instLog[c.id]).length;
+              return (
+                <div key={inst.id} style={{ background: "white", borderRadius: 8, border: "1px solid #e8e4ff", padding: "10px 12px", marginBottom: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: cl.length > 0 ? 6 : 0 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13, color: "#1e293b" }}>{task.title}</span>
+                    {cl.length > 0 && <span style={{ fontSize: 11, color: "#6b7280" }}>{checkedCount}/{cl.length}</span>}
+                  </div>
+                  {task.description && <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 6 }}>{task.description}</div>}
+                  {cl.map(item => (
+                    <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, marginBottom: 4 }}>
+                      <input type="checkbox" checked={!!instLog[item.id]}
+                        onChange={() => toggleRecurringItem(inst.id, item.id, inst.task_id)}
+                        style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#7c3aed" }} />
+                      <span style={{ color: instLog[item.id] ? "#16a34a" : "#374151", textDecoration: instLog[item.id] ? "line-through" : "none" }}>
+                        {item.item}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
         {loading && (
           <div style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Загрузка...</div>
         )}
