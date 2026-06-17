@@ -517,13 +517,23 @@ export function TodayRecurringTasks({ userName, supabase }) {
         body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now }),
       });
       const task = taskMap[taskId];
-      if (task && task.checklist.length > 0 && now) {
-        const updLog = { ...(logMap[instId]||{}), [itemId]: true };
-        if (task.checklist.every(c => updLog[c.id])) {
-          await apiFetch(supabase, `recurring_task_instances?id=eq.${instId}`, {
-            method: "PATCH", body: JSON.stringify({ is_completed: true }),
-          });
-          setInstances(p => p.map(i => i.id === instId ? { ...i, is_completed:true } : i));
+      if (task && task.checklist.length > 0) {
+        if (now) {
+          const updLog = { ...(logMap[instId]||{}), [itemId]: true };
+          if (task.checklist.every(c => updLog[c.id])) {
+            await apiFetch(supabase, `recurring_task_instances?id=eq.${instId}`, {
+              method: "PATCH", body: JSON.stringify({ is_completed: true }),
+            });
+            setInstances(p => p.map(i => i.id === instId ? { ...i, is_completed:true } : i));
+          }
+        } else {
+          const inst = instances.find(i => i.id === instId);
+          if (inst?.is_completed) {
+            await apiFetch(supabase, `recurring_task_instances?id=eq.${instId}`, {
+              method: "PATCH", body: JSON.stringify({ is_completed: false }),
+            });
+            setInstances(p => p.map(i => i.id === instId ? { ...i, is_completed:false } : i));
+          }
         }
       }
     } catch (e) {
@@ -553,9 +563,9 @@ export function TodayRecurringTasks({ userName, supabase }) {
               </div>
               {task.description && <div style={{ fontSize:13, color:"#6b7280", marginBottom:cl.length > 0 ? 10 : 0 }}>{task.description}</div>}
               {cl.map(item => (
-                <label key={item.id} style={{ display:"flex", alignItems:"center", gap:8, cursor: inst.is_completed ? "default" : "pointer", fontSize:14, marginBottom:4 }}>
-                  <input type="checkbox" checked={!!instLog[item.id]} disabled={inst.is_completed}
-                    onChange={() => !inst.is_completed && toggle(inst.id, item.id, inst.task_id)}
+                <label key={item.id} style={{ display:"flex", alignItems:"center", gap:8, cursor:"pointer", fontSize:14, marginBottom:4 }}>
+                  <input type="checkbox" checked={!!instLog[item.id]}
+                    onChange={() => toggle(inst.id, item.id, inst.task_id)}
                     style={{ width:16, height:16 }} />
                   <span style={{ color: instLog[item.id] ? "#16a34a" : "#374151", textDecoration: instLog[item.id] ? "line-through" : "none" }}>
                     {item.item}

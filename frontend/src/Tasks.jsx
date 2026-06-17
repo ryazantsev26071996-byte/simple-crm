@@ -119,15 +119,27 @@ export default function Tasks({ user, profile, onClientSelect }) {
         body: JSON.stringify({ instance_id: instId, checklist_item_id: itemId, is_checked: now, checked_at: new Date().toISOString() }),
       });
       const task = recurringTaskMap[taskId];
-      if (task && task.checklist.length > 0 && now) {
-        const updLog = { ...(recurringLogMap[instId] || {}), [itemId]: true };
-        if (task.checklist.every(c => updLog[c.id])) {
-          await apiFetch(`recurring_task_instances?id=eq.${instId}`, {
-            method: "PATCH",
-            headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ is_completed: true }),
-          });
-          setRecurringInstances(p => p.filter(i => i.id !== instId));
+      if (task && task.checklist.length > 0) {
+        if (now) {
+          const updLog = { ...(recurringLogMap[instId] || {}), [itemId]: true };
+          if (task.checklist.every(c => updLog[c.id])) {
+            await apiFetch(`recurring_task_instances?id=eq.${instId}`, {
+              method: "PATCH",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ is_completed: true }),
+            });
+            setRecurringInstances(p => p.map(i => i.id === instId ? { ...i, is_completed: true } : i));
+          }
+        } else {
+          const inst = recurringInstances.find(i => i.id === instId);
+          if (inst?.is_completed) {
+            await apiFetch(`recurring_task_instances?id=eq.${instId}`, {
+              method: "PATCH",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({ is_completed: false }),
+            });
+            setRecurringInstances(p => p.map(i => i.id === instId ? { ...i, is_completed: false } : i));
+          }
         }
       }
     } catch (e) {
