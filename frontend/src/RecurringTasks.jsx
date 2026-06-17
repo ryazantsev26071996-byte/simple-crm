@@ -42,6 +42,11 @@ function fmtDateRu(dateStr) {
   return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 }
 
+function fmtDDMMYYYY(dateStr) {
+  const d = new Date(dateStr + "T12:00:00");
+  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+}
+
 function currentMonth() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,"0")}`;
@@ -94,6 +99,79 @@ function Overlay({ title, onClose, children, wide }) {
 
 const inp = { width:"100%", padding:"8px 12px", border:"1px solid #e5e7eb", borderRadius:8, fontSize:14, outline:"none", boxSizing:"border-box" };
 const lbl = { display:"block", fontWeight:600, fontSize:13, color:"#374151", marginBottom:5 };
+
+// ── Task progress modal (admin read-only) ─────────────────────────────────────
+
+function TaskProgressModal({ task, supabase, onClose }) {
+  const [instances, setInstances] = React.useState([]);
+  const [checklist, setChecklist] = React.useState([]);
+  const [logMap, setLogMap]       = React.useState({});
+  const [loading, setLoading]     = React.useState(true);
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const [insts, cl] = await Promise.all([
+          apiFetch(supabase, `recurring_task_instances?task_id=eq.${task.id}&order=date.desc&select=id,date,is_completed`),
+          apiFetch(supabase, `recurring_task_checklist?task_id=eq.${task.id}&order=sort_order.asc&select=id,item`),
+        ]);
+        setInstances(insts);
+        setChecklist(cl);
+        if (insts.length > 0) {
+          const ids = insts.map(i => i.id);
+          const logs = await apiFetch(supabase, `recurring_task_checklist_log?instance_id=in.(${ids.join(",")})&select=instance_id,checklist_item_id,is_checked`);
+          const lm = {};
+          logs.forEach(l => {
+            if (!lm[l.instance_id]) lm[l.instance_id] = {};
+            lm[l.instance_id][l.checklist_item_id] = l.is_checked;
+          });
+          setLogMap(lm);
+        }
+      } catch (e) {}
+      setLoading(false);
+    }
+    load();
+  }, [task.id]);
+
+  return (
+    <Overlay title={task.title} onClose={onClose} wide>
+      <div style={{ fontSize:13, color:"#6b7280", marginBottom:16 }}>👤 {task.assigned_to}</div>
+      {loading
+        ? <div style={{ color:"#9ca3af", fontSize:13 }}>Загрузка...</div>
+        : instances.length === 0
+          ? <div style={{ color:"#9ca3af", fontSize:13 }}>Нет экземпляров</div>
+          : (
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {instances.map(inst => {
+                const instLog = logMap[inst.id] || {};
+                return (
+                  <div key={inst.id} style={{ border:"1px solid " + (inst.is_completed ? "#bbf7d0" : "#e8eaf6"), borderRadius:10, padding:"12px 14px", background: inst.is_completed ? "#f0fdf4" : "#fafbff" }}>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: checklist.length > 0 ? 8 : 0 }}>
+                      <span style={{ fontWeight:600, fontSize:14, color:"#1e293b" }}>
+                        {fmtDDMMYYYY(inst.date)} ({dayRu(inst.date)})
+                      </span>
+                      <span style={{ fontSize:13, fontWeight:600, color: inst.is_completed ? "#16a34a" : "#ef4444" }}>
+                        {inst.is_completed ? "✅ Выполнено" : "❌ Не выполнено"}
+                      </span>
+                    </div>
+                    {checklist.length > 0 && (
+                      <div style={{ display:"flex", flexDirection:"column", gap:3 }}>
+                        {checklist.map(item => (
+                          <div key={item.id} style={{ display:"flex", alignItems:"center", gap:6, fontSize:13, color: instLog[item.id] ? "#16a34a" : "#9ca3af" }}>
+                            <span style={{ fontWeight:700, width:14 }}>{instLog[item.id] ? "✓" : "✗"}</span>
+                            <span style={{ textDecoration: instLog[item.id] ? "line-through" : "none" }}>{item.item}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+    </Overlay>
+  );
+}
 
 // ── Create / Edit modal ───────────────────────────────────────────────────────
 
@@ -296,6 +374,7 @@ export function RecurringTasksAdmin({ employees, supabase }) {
   const [loading, setLoading]       = React.useState(true);
   const [showCreate, setShowCreate] = React.useState(false);
   const [editData, setEditData]     = React.useState(null);
+  const [viewTask, setViewTask]     = React.useState(null);
   const [deleting, setDeleting]     = React.useState(null);
   const [reportEmp, setReportEmp]   = React.useState("all");
   const [reportMonth, setReportMonth] = React.useState(currentMonth);
@@ -391,16 +470,19 @@ export function RecurringTasksAdmin({ employees, supabase }) {
           : (
             <div style={{ display:"flex", flexDirection:"column", gap:8, marginBottom:20 }}>
               {tasks.map(t => (
-                <div key={t.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", border:"1px solid #e8eaf6", borderRadius:10, background:"#fafbff" }}>
+                <div key={t.id} onClick={() => setViewTask(t)}
+                  style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", border:"1px solid #e8eaf6", borderRadius:10, background:"#fafbff", cursor:"pointer" }}
+                  onMouseEnter={e => e.currentTarget.style.background="#f0f4ff"}
+                  onMouseLeave={e => e.currentTarget.style.background="#fafbff"}>
                   <div>
                     <span style={{ fontWeight:600, fontSize:14, color:"#1e293b" }}>{t.title}</span>
                     <span style={{ fontSize:12, color:"#9ca3af", marginLeft:10 }}>{t.assigned_to}</span>
                     <span style={{ fontSize:11, color:"#c4b5fd", marginLeft:8 }}>{instCounts[t.id] || 0} экз.</span>
                   </div>
                   <div style={{ display:"flex", gap:6 }}>
-                    <button onClick={() => handleEdit(t)}
+                    <button onClick={e => { e.stopPropagation(); handleEdit(t); }}
                       style={{ padding:"5px 10px", border:"1px solid #e5e7eb", borderRadius:6, cursor:"pointer", background:"white", fontSize:13 }}>✏️</button>
-                    <button onClick={() => handleDelete(t)} disabled={deleting === t.id}
+                    <button onClick={e => { e.stopPropagation(); handleDelete(t); }} disabled={deleting === t.id}
                       style={{ padding:"5px 10px", border:"1px solid #fcc", borderRadius:6, cursor:"pointer", background:"white", fontSize:13, color:"#e55" }}>
                       {deleting === t.id ? "..." : "🗑️"}
                     </button>
@@ -463,6 +545,9 @@ export function RecurringTasksAdmin({ employees, supabase }) {
       {editData && (
         <TaskModal task={editData.task} initChecklist={editData.checklist} employees={employees} supabase={supabase}
           onSaved={fetchTasks} onClose={() => setEditData(null)} />
+      )}
+      {viewTask && (
+        <TaskProgressModal task={viewTask} supabase={supabase} onClose={() => setViewTask(null)} />
       )}
     </Card>
   );
