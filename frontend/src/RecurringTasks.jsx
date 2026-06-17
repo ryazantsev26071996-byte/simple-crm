@@ -103,7 +103,7 @@ function TaskModal({ task, initChecklist, employees, supabase, onSaved, onClose 
   const [emp, setEmp]     = React.useState(task?.assigned_to || "");
   const [schedule, setSchedule]     = React.useState([]);
   const [selDates, setSelDates]     = React.useState(new Set());
-  const [items, setItems]           = React.useState((initChecklist || []).map(i => ({ text: i.text })));
+  const [items, setItems]           = React.useState((initChecklist || []).map(i => ({ text: i.item })));
   const [loadingSched, setLoadingSched] = React.useState(false);
   const [saving, setSaving]         = React.useState(false);
   const [pasteText, setPasteText]   = React.useState("");
@@ -156,7 +156,7 @@ function TaskModal({ task, initChecklist, employees, supabase, onSaved, onClose 
       if (valid.length > 0) {
         await apiFetch(supabase, "recurring_task_checklist", {
           method: "POST",
-          body: JSON.stringify(valid.map((it, i) => ({ task_id: tid, text: it.text.trim(), position: i }))),
+          body: JSON.stringify(valid.map((it, i) => ({ task_id: tid, item: it.text.trim(), position: i }))),
         });
       }
       if (!task?.id && selDates.size > 0) {
@@ -322,7 +322,7 @@ export function RecurringTasksAdmin({ employees, supabase }) {
 
   async function handleEdit(task) {
     try {
-      const checklist = await apiFetch(supabase, `recurring_task_checklist?task_id=eq.${task.id}&order=position.asc&select=id,text,position`);
+      const checklist = await apiFetch(supabase, `recurring_task_checklist?task_id=eq.${task.id}&order=position.asc&select=id,item,position`);
       setEditData({ task, checklist });
     } catch (e) { alert("Ошибка: " + e.message); }
   }
@@ -488,7 +488,7 @@ export function TodayRecurringTasks({ userName, supabase }) {
       const instIds = insts.map(i => i.id);
       const [taskRows, clRows, logRows] = await Promise.all([
         apiFetch(supabase, `recurring_tasks?id=in.(${taskIds.join(",")})&select=id,title,description`),
-        apiFetch(supabase, `recurring_task_checklist?task_id=in.(${taskIds.join(",")})&order=position.asc&select=id,task_id,text`),
+        apiFetch(supabase, `recurring_task_checklist?task_id=in.(${taskIds.join(",")})&order=position.asc&select=id,task_id,item`),
         apiFetch(supabase, `recurring_task_checklist_log?instance_id=in.(${instIds.join(",")})&select=instance_id,checklist_item_id,is_checked`),
       ]);
 
@@ -558,7 +558,7 @@ export function TodayRecurringTasks({ userName, supabase }) {
                     onChange={() => !inst.is_completed && toggle(inst.id, item.id, inst.task_id)}
                     style={{ width:16, height:16 }} />
                   <span style={{ color: instLog[item.id] ? "#16a34a" : "#374151", textDecoration: instLog[item.id] ? "line-through" : "none" }}>
-                    {item.text}
+                    {item.item}
                   </span>
                 </label>
               ))}
