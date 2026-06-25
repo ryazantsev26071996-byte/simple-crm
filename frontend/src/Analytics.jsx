@@ -186,6 +186,7 @@ export default function Analytics() {
   const [lessons, setLessons] = React.useState([]);
   const [plans,   setPlans]   = React.useState([]);
   const [workSchedule, setWorkSchedule] = React.useState([]);
+  const [paymentSchedule, setPaymentSchedule] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
   const [editPlan, setEditPlan] = React.useState({});
@@ -241,13 +242,14 @@ export default function Analytics() {
       const start = dateFmt(year, month, 1);
       const end   = dateFmt(year, month, daysInMonth);
       const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
-      const [leadsData, salesData, tr, le, pl, ws] = await Promise.all([
+      const [leadsData, salesData, tr, le, pl, ws, psData] = await Promise.all([
         apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
         apiFetch(`clients?stage=in.(продажа,ученик)&select=*&order=created_at.desc&limit=500`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
         apiFetch(`schedule?date=gte.${start}&date=lte.${end}&select=*&limit=1000`),
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
         apiFetch(`work_schedule?date=gte.${dateFmt(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate())}&date=lte.${end}&hours=gt.0&select=employee_name,date,hours`).catch(() => []),
+        apiFetch(`payment_schedule?planned_date=gte.${start}&planned_date=lte.${end}&select=*`).catch(() => []),
       ]);
       const leads = Array.isArray(leadsData) ? leadsData : [];
       const sales = (Array.isArray(salesData) ? salesData : []).filter(c => {
@@ -261,6 +263,7 @@ export default function Analytics() {
       setLessons(Array.isArray(le) ? le : []);
       setPlans(Array.isArray(pl) ? pl : []);
       setWorkSchedule(Array.isArray(ws) ? ws : []);
+      setPaymentSchedule(Array.isArray(psData) ? psData : []);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -417,7 +420,9 @@ export default function Analytics() {
     });
     const mTrials  = trials.filter(t => t.manager === manager && !t.rescheduled);
     const mAtt     = mTrials.filter(t => t.attended === true);
-    const revenue  = mSales.reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const nonInstRevenue = mSales.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const instRevenue    = paymentSchedule.filter(p => p.manager_name === manager).reduce((s, p) => s + (p.actual_amount || 0), 0);
+    const revenue        = nonInstRevenue + instRevenue;
     const plan     = plans.find(p => p.manager_name === manager)?.plan || 0;
     return {
       sales:         mSales,
@@ -437,8 +442,13 @@ export default function Analytics() {
     const amAttended      = amTrials.filter(t => t.attended === true);
     const amRenewals      = clients.filter(c => c.manager_name === name && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
     const amRegistrations = clients.filter(c => ["ученик","продажа"].includes(c.stage) && c.registered_by === name);
-    const renewalRevenue  = amRenewals.reduce((s, c) => s + (c.amount_paid || 0), 0);
-    const regSum          = amRegistrations.reduce((s, c) => s + (c.amount_paid || 0), 0);
+    const renewalRevenue  = amRenewals.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0)
+                          + paymentSchedule.filter(p => p.manager_name === name).reduce((s, p) => s + (p.actual_amount || 0), 0);
+    const regSum          = amRegistrations.reduce((s, c) => {
+      if (c.payment_method === 'Рассрочка школы')
+        return s + paymentSchedule.filter(p => p.client_id === c.id).reduce((acc, p) => acc + (p.actual_amount || 0), 0);
+      return s + (c.amount_paid || 0);
+    }, 0);
     const revenue         = renewalRevenue + regSum;
     const renewalPlan     = plans.find(p => p.manager_name === `${name}_продления`)?.plan || 0;
     const regPlan         = plans.find(p => p.manager_name === `${name}_оформления`)?.plan || 0;
@@ -462,7 +472,8 @@ export default function Analytics() {
   }
 
   const totalSales   = salesClients.length;
-  const totalRevenue = salesClients.reduce((s, c) => s + (c.amount_paid || 0), 0);
+  const totalRevenue = salesClients.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0)
+                     + paymentSchedule.reduce((s, p) => s + (p.actual_amount || 0), 0);
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
   const refusals     = clients.filter(c => c.stage === "расторжение").length;
   const avgCheck     = totalSales ? Math.round(totalRevenue / totalSales) : 0;

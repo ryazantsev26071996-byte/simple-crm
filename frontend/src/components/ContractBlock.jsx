@@ -67,6 +67,9 @@ export default function ContractBlock({ client, onUpdate, role }) {
   const [history, setHistory] = React.useState([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
   const [expandedIds, setExpandedIds] = React.useState(new Set())
+  const [schedule, setSchedule] = React.useState([])
+  const [schedSaving, setSchedSaving] = React.useState(false)
+  const [payCount, setPayCount] = React.useState(2)
 
   React.useEffect(() => {
     setForm({
@@ -86,6 +89,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
       requisites: client?.requisites || "",
     })
     if (client?.id) loadHistory(client.id)
+    if (client?.id) loadSchedule(client.id)
   }, [client?.id])
 
   async function loadHistory(id) {
@@ -93,6 +97,71 @@ export default function ContractBlock({ client, onUpdate, role }) {
       const data = await apiFetch(`contract_history?client_id=eq.${id}&order=saved_at.desc`)
       setHistory(data || [])
     } catch {}
+  }
+
+  async function loadSchedule(id) {
+    try {
+      const data = await apiFetch(`payment_schedule?client_id=eq.${id}&order=payment_number.asc`)
+      setSchedule(data || [])
+    } catch {}
+  }
+
+  function generateRows() {
+    setSchedule(Array.from({ length: payCount }, (_, i) => ({
+      payment_number: i + 1, planned_date: '', planned_amount: '', actual_amount: '',
+    })))
+  }
+
+  function addPaymentRow() {
+    setSchedule(s => [...s, { payment_number: s.length + 1, planned_date: '', planned_amount: '', actual_amount: '' }])
+  }
+
+  async function deletePaymentRow(idx) {
+    const row = schedule[idx]
+    if (row.id) {
+      try {
+        await apiFetch(`payment_schedule?id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } })
+      } catch(e) { alert(e.message); return }
+    }
+    setSchedule(s => s.filter((_, i) => i !== idx))
+  }
+
+  function updatePaymentRow(idx, field, value) {
+    setSchedule(s => s.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  }
+
+  async function saveSchedule() {
+    setSchedSaving(true)
+    try {
+      for (let i = 0; i < schedule.length; i++) {
+        const row = schedule[i]
+        const payload = {
+          client_id: client.id,
+          payment_number: i + 1,
+          planned_date: row.planned_date || null,
+          planned_amount: row.planned_amount !== '' ? Number(row.planned_amount) : null,
+          actual_amount: row.actual_amount !== '' ? Number(row.actual_amount) : null,
+          manager_name: client.manager_name || null,
+        }
+        if (row.id) {
+          await apiFetch(`payment_schedule?id=eq.${row.id}`, { method: 'PATCH', body: JSON.stringify(payload) })
+        } else {
+          await apiFetch('payment_schedule', { method: 'POST', body: JSON.stringify(payload) })
+        }
+      }
+      const totalActual = schedule.reduce((s, r) => s + (Number(r.actual_amount) || 0), 0)
+      const res = await apiFetch(`clients?id=eq.${client.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ amount_paid: totalActual }),
+      })
+      const updated = Array.isArray(res) ? res[0] : res
+      if (onUpdate && updated) onUpdate(updated)
+      await loadSchedule(client.id)
+    } catch(e) {
+      alert(e.message)
+    } finally {
+      setSchedSaving(false)
+    }
   }
 
   async function handleSave() {
@@ -193,6 +262,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
   }
   const labelStyle = { fontSize: 11, color: '#888', marginBottom: 3, fontWeight: 500 }
   const isInstallment = form.payment_method === 'Рассрочка банка'
+  const isSchoolInstallment = form.payment_method === 'Рассрочка школы'
 
   return (
     <>
@@ -333,6 +403,92 @@ export default function ContractBlock({ client, onUpdate, role }) {
           </div>
         </div>
       </div>
+
+      {isSchoolInstallment && (
+        <div style={{ marginTop: 8, padding: '12px 14px', background: '#f0fff8', borderRadius: 10, border: '1px solid #b7e4c7' }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: '#2d6a4f', marginBottom: 10 }}>💳 График платежей (рассрочка школы)</div>
+
+          {schedule.length === 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={labelStyle}>Количество платежей:</div>
+              <select value={payCount} onChange={e => setPayCount(Number(e.target.value))}
+                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #b7e4c7', fontSize: 13 }}>
+                {Array.from({ length: 11 }, (_, i) => i + 2).map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <button onClick={generateRows}
+                style={{ padding: '4px 12px', borderRadius: 6, border: 'none', background: '#40916c', color: 'white', fontSize: 12, cursor: 'pointer' }}>
+                Создать строки
+              </button>
+            </div>
+          )}
+
+          {schedule.length > 0 && (
+            <div style={{ overflowX: 'auto', marginBottom: 10 }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 12, width: '100%' }}>
+                <thead>
+                  <tr>
+                    {['№', 'Плановая дата', 'Плановая сумма', 'Фактическая сумма', ''].map(h => (
+                      <th key={h} style={{ padding: '4px 8px', background: '#d8f3dc', border: '1px solid #b7e4c7', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {schedule.map((row, idx) => (
+                    <tr key={idx}>
+                      <td style={{ padding: '3px 8px', border: '1px solid #d8f3dc', textAlign: 'center', width: 32 }}>{idx + 1}</td>
+                      <td style={{ padding: '3px 6px', border: '1px solid #d8f3dc' }}>
+                        <input type="date" value={row.planned_date || ''}
+                          onChange={e => updatePaymentRow(idx, 'planned_date', e.target.value)}
+                          style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12, fontFamily: 'inherit' }} />
+                      </td>
+                      <td style={{ padding: '3px 6px', border: '1px solid #d8f3dc' }}>
+                        <input type="number" value={row.planned_amount ?? ''}
+                          onChange={e => updatePaymentRow(idx, 'planned_amount', e.target.value)}
+                          placeholder="0"
+                          style={{ width: 100, padding: '2px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12, fontFamily: 'inherit' }} />
+                      </td>
+                      <td style={{ padding: '3px 6px', border: '1px solid #d8f3dc' }}>
+                        <input type="number" value={row.actual_amount ?? ''}
+                          onChange={e => updatePaymentRow(idx, 'actual_amount', e.target.value)}
+                          placeholder="0"
+                          style={{ width: 100, padding: '2px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12, fontFamily: 'inherit' }} />
+                      </td>
+                      <td style={{ padding: '3px 4px', border: '1px solid #d8f3dc', textAlign: 'center' }}>
+                        {(role === 'admin' || role === 'manager') && (
+                          <button onClick={() => deletePaymentRow(idx)}
+                            style={{ padding: '1px 8px', borderRadius: 4, border: '1px solid #fcc', background: 'white', color: '#e55', fontSize: 11, cursor: 'pointer' }}>
+                            ✕
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: '#d8f3dc' }}>
+                    <td colSpan={3} style={{ padding: '4px 8px', border: '1px solid #b7e4c7', fontWeight: 600, fontSize: 12 }}>Итого фактически:</td>
+                    <td style={{ padding: '4px 8px', border: '1px solid #b7e4c7', fontWeight: 600, fontSize: 12 }}>
+                      {schedule.reduce((s, r) => s + (Number(r.actual_amount) || 0), 0).toLocaleString('ru-RU')} ₽
+                    </td>
+                    <td style={{ border: '1px solid #b7e4c7' }} />
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={addPaymentRow}
+              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #40916c', background: 'white', color: '#40916c', fontSize: 12, cursor: 'pointer' }}>
+              ➕ Добавить платёж
+            </button>
+            {schedule.length > 0 && (
+              <button onClick={saveSchedule} disabled={schedSaving}
+                style={{ padding: '4px 14px', borderRadius: 6, border: 'none', background: '#40916c', color: 'white', fontSize: 12, cursor: schedSaving ? 'default' : 'pointer', opacity: schedSaving ? 0.6 : 1 }}>
+                {schedSaving ? 'Сохранение...' : '💾 Сохранить расписание'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {history.length > 0 && (
         <div style={{ marginTop: 8, padding: '10px 14px', background: '#fffbf0', borderRadius: 10, border: '1px solid #f5e9c8' }}>
