@@ -736,17 +736,26 @@ export default function Analytics() {
                       <tr>{["Клиент","Сумма","Оплата","Кто оформил","Стадия"].map(h => <th key={h} style={TH}>{h}</th>)}</tr>
                     </thead>
                     <tbody>
-                      {s.sales.map(c => (
-                        <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
-                          onMouseLeave={e => e.currentTarget.style.background = "white"}>
-                          <td style={TD}>{c.name}</td>
-                          <td style={TD}>{(c.amount_paid||0).toLocaleString("ru-RU")} ₽</td>
-                          <td style={TD}>{c.payment_method || "—"}</td>
-                          <td style={TD}>{c.registered_by || "—"}</td>
-                          <td style={TD}>{c.stage}</td>
-                        </tr>
-                      ))}
+                      {s.sales.map(c => {
+                        let displayAmount;
+                        if (c.payment_method === 'Рассрочка школы') {
+                          displayAmount = paymentSchedule.filter(p => p.client_id === c.id).reduce((acc, p) => acc + (p.actual_amount || 0), 0);
+                          if (displayAmount === 0) return null;
+                        } else {
+                          displayAmount = c.amount_paid || 0;
+                        }
+                        return (
+                          <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
+                            onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                            <td style={TD}>{c.name}</td>
+                            <td style={TD}>{displayAmount.toLocaleString("ru-RU")} ₽</td>
+                            <td style={TD}>{c.payment_method || "—"}</td>
+                            <td style={TD}>{c.registered_by || "—"}</td>
+                            <td style={TD}>{c.stage}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
