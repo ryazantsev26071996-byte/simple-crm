@@ -342,8 +342,8 @@ export default function WorkSchedule() {
               <tr>
                 <th style={{ ...TH, minWidth: 110 }}>Сотрудник</th>
                 <th style={{ ...TH, minWidth: 90 }}>Роль</th>
-                <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 10–25</th>
-                <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 26–10</th>
+                <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 11–25</th>
+                <th style={{ ...TH, minWidth: 90, textAlign: "center" }}>Часов 26–11</th>
                 <th style={{ ...TH, minWidth: 70, textAlign: "center" }}>Всего</th>
               </tr>
             </thead>
@@ -356,8 +356,8 @@ export default function WorkSchedule() {
                   </td>
                 </tr>,
                 ...names.map(emp => {
-                  const p1  = sumPeriod(emp, 10, month, year, 25, month, year);
-                  const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 10, month, year);
+                  const p1  = sumPeriod(emp, 11, month, year, 25, month, year);
+                  const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 11, month, year);
                   const tot = monthTotal(emp);
                   return (
                     <tr key={emp}
@@ -393,8 +393,8 @@ export default function WorkSchedule() {
                 <thead>
                   <tr>
                     <th style={{ ...TH, minWidth: 110 }}>Сотрудник</th>
-                    <th style={{ ...TH, minWidth: 80, textAlign: 'center' }}>Часов 10–25</th>
-                    <th style={{ ...TH, minWidth: 80, textAlign: 'center' }}>Часов 26–10</th>
+                    <th style={{ ...TH, minWidth: 80, textAlign: 'center' }}>Часов 11–25</th>
+                    <th style={{ ...TH, minWidth: 80, textAlign: 'center' }}>Часов 26–11</th>
                     <th style={{ ...TH, minWidth: 70, textAlign: 'center' }}>Всего ч.</th>
                     <th style={{ ...TH, minWidth: 120 }}>Ставка ₽/ч</th>
                     <th style={{ ...TH, minWidth: 100, textAlign: 'right' }}>Итого</th>
@@ -402,8 +402,8 @@ export default function WorkSchedule() {
                 </thead>
                 <tbody>
                   {EMPLOYEES['Педагоги'].map(emp => {
-                    const p1  = sumPeriod(emp, 10, month, year, 25, month, year);
-                    const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 10, month, year);
+                    const p1  = sumPeriod(emp, 11, month, year, 25, month, year);
+                    const p2  = sumPeriod(emp, 26, prevMonth, prevYear, 11, month, year);
                     const tot = monthTotal(emp);
                     const savedRate = salaryRates.find(r => r.employee_name === emp && Number(r.month) === month && Number(r.year) === year)?.hourly_rate || 250;
                     const rate   = editingRates[emp] !== undefined ? Number(editingRates[emp]) : savedRate;
