@@ -187,6 +187,7 @@ export default function Analytics() {
   const [plans,   setPlans]   = React.useState([]);
   const [workSchedule, setWorkSchedule] = React.useState([]);
   const [paymentSchedule, setPaymentSchedule] = React.useState([]);
+  const [allSalesClients, setAllSalesClients] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
   const [editPlan, setEditPlan] = React.useState({});
@@ -264,6 +265,7 @@ export default function Analytics() {
       setPlans(Array.isArray(pl) ? pl : []);
       setWorkSchedule(Array.isArray(ws) ? ws : []);
       setPaymentSchedule(Array.isArray(psData) ? psData : []);
+      setAllSalesClients(Array.isArray(salesData) ? salesData : []);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -424,8 +426,20 @@ export default function Analytics() {
     const instRevenue    = paymentSchedule.filter(p => p.manager_name === manager).reduce((s, p) => s + (p.actual_amount || 0), 0);
     const revenue        = nonInstRevenue + instRevenue;
     const plan     = plans.find(p => p.manager_name === manager)?.plan || 0;
+
+    // Installment clients with actual payments this month sold in a prior month
+    const instIdsThisMonth = [...new Set(
+      paymentSchedule
+        .filter(p => p.manager_name === manager && (p.actual_amount || 0) > 0)
+        .map(p => p.client_id)
+    )];
+    const extraInstClients = instIdsThisMonth
+      .filter(id => !mSales.find(c => c.id === id))
+      .map(id => allSalesClients.find(c => c.id === id))
+      .filter(Boolean);
+
     return {
-      sales:         mSales,
+      sales:         [...mSales, ...extraInstClients],
       lessonsCount:  mAtt.length,
       studentsCount: mAtt.length,
       salesCount:    mSales.length,
