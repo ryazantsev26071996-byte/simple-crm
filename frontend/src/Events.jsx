@@ -189,7 +189,7 @@ export default function Events() {
           style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
           {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-        {role === "admin" && (
+        {(role === "admin" || role === "accountmanager") && (
           <button onClick={() => openAdd("")}
             style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", fontSize: 13, cursor: "pointer", fontWeight: 500 }}>
             + Добавить
@@ -226,7 +226,7 @@ export default function Events() {
                         {ev.title}
                       </div>
                     ))}
-                    {role === "admin" && (
+                    {(role === "admin" || role === "accountmanager") && (
                       <div onClick={() => openAdd(dateFmt(year, month, day))}
                         style={{ fontSize: 16, lineHeight: 1, color: "#ddd", cursor: "pointer", position: "absolute", top: 3, right: 5, userSelect: "none" }}
                         title="Добавить мероприятие">+</div>
@@ -377,7 +377,7 @@ export default function Events() {
                   Отмена
                 </button>
               </div>
-              {modal.mode === "edit" && role === "admin" && (
+              {modal.mode === "edit" && (role === "admin" || role === "accountmanager") && (
                 <button onClick={handleDelete} disabled={saving}
                   style={{ padding: "7px 16px", borderRadius: 6, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 13, cursor: "pointer" }}>
                   Удалить
