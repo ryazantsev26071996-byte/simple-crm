@@ -117,6 +117,21 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
     }
   }
 
+  async function addComment(clientId, text) {
+    if (!clientId) return;
+    try {
+      await apiFetch("comments", {
+        method: "POST",
+        body: JSON.stringify({
+          client_id: clientId,
+          text,
+          author_name: authorName || null,
+          created_at: new Date().toISOString(),
+        }),
+      });
+    } catch(e) { console.error("addComment error:", e); }
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
@@ -194,6 +209,25 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         const newStage = form.bought === true ? 'ученик' : 'был не купил';
         await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ stage: newStage }) });
         if (onClientsChange) onClientsChange({ id: Number(clientId), stage: newStage });
+      }
+
+      if (clientId) {
+        const entry = modal.entry;
+        const displayDate = modal.date.split('-').reverse().join('.');
+        if (form.confirmed_day && !entry?.confirmed_day)
+          await addComment(clientId, `✅ Подтверждён за день — ${displayDate} ${modal.time}`);
+        if (form.confirmed_2h && !entry?.confirmed_2h)
+          await addComment(clientId, `✅ Подтверждён за 2 часа — ${displayDate} ${modal.time}`);
+        if (form.attended === true && entry?.attended !== true)
+          await addComment(clientId, `✅ Пришёл на пробное занятие — ${displayDate}`);
+        if (form.attended === false && entry?.attended !== false)
+          await addComment(clientId, `❌ Не пришёл на пробное занятие — ${displayDate}`);
+        if (form.bought === true && entry?.bought !== true)
+          await addComment(clientId, `🎉 Купил абонемент после пробного`);
+        if (form.comment && form.comment !== (entry?.comment || ''))
+          await addComment(clientId, `📝 Заметка о клиенте: ${form.comment}`);
+        if (form.feedback && form.feedback !== (entry?.feedback || ''))
+          await addComment(clientId, `📞 Обратная связь после звонка: ${form.feedback}`);
       }
 
       setModal(null);
