@@ -22,6 +22,42 @@ function autoResize(el) {
   el.style.height = el.scrollHeight + 'px';
 }
 
+const taStyle = {
+  width: '100%', padding: '8px 10px', borderRadius: 6,
+  border: '1px solid #e0e0e0', fontSize: 13, minHeight: 60,
+  background: 'white', color: '#333',
+  resize: 'none', overflow: 'hidden', fontFamily: 'inherit',
+  boxSizing: 'border-box',
+};
+
+const labelStyle = { fontSize: 12, color: '#888', marginBottom: 4, fontWeight: 500 };
+
+function Field({ label, placeholder, editing, value, onChange }) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={labelStyle}>{label}</div>
+      {editing ? (
+        <textarea
+          style={taStyle}
+          value={value}
+          ref={el => autoResize(el)}
+          onInput={e => { autoResize(e.target); onChange(e.target.value); }}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+        />
+      ) : (
+        <div style={{
+          fontSize: 13, color: value ? '#333' : '#aaa',
+          whiteSpace: 'pre-wrap', lineHeight: 1.55,
+          padding: '6px 2px', minHeight: 20,
+        }}>
+          {value || 'Не заполнено'}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudentInfoBlock({ client, onUpdate }) {
   const [editing, setEditing] = React.useState(false);
   const [form, setForm] = React.useState({
@@ -64,43 +100,6 @@ export default function StudentInfoBlock({ client, onUpdate }) {
     setEditing(false);
   }
 
-  const taStyle = {
-    width: '100%', padding: '8px 10px', borderRadius: 6,
-    border: '1px solid #e0e0e0', fontSize: 13, minHeight: 60,
-    background: 'white', color: '#333',
-    resize: 'none', overflow: 'hidden', fontFamily: 'inherit',
-    boxSizing: 'border-box',
-  };
-
-  const labelStyle = { fontSize: 12, color: '#888', marginBottom: 4, fontWeight: 500 };
-
-  function Field({ label, field, placeholder }) {
-    const value = form[field];
-    return (
-      <div style={{ marginBottom: 8 }}>
-        <div style={labelStyle}>{label}</div>
-        {editing ? (
-          <textarea
-            style={taStyle}
-            value={value}
-            ref={el => autoResize(el)}
-            onInput={e => { autoResize(e.target); setForm(f => ({ ...f, [field]: e.target.value })); }}
-            onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-            placeholder={placeholder}
-          />
-        ) : (
-          <div style={{
-            fontSize: 13, color: value ? '#333' : '#aaa',
-            whiteSpace: 'pre-wrap', lineHeight: 1.55,
-            padding: '6px 2px', minHeight: 20,
-          }}>
-            {value || 'Не заполнено'}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   return (
     <div style={{ marginTop: 12, padding: '12px 14px', background: '#f8f9ff', borderRadius: 10, border: '1px solid #e8eaf6' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -124,9 +123,12 @@ export default function StudentInfoBlock({ client, onUpdate }) {
         )}
       </div>
 
-      <Field label="Кто такой ученик (кратко)" field="student_info" placeholder="Кто это, чем занимается, что хочет от занятий..." />
-      <Field label="Комментарий после пробного занятия" field="trial_comment" placeholder="Впечатления, интересы, что понравилось..." />
-      <Field label="Комментарий после нулевого урока" field="zero_lesson_comment" placeholder="Первые впечатления, прогресс, пожелания..." />
+      <Field label="Кто такой ученик (кратко)" placeholder="Кто это, чем занимается, что хочет от занятий..."
+        editing={editing} value={form.student_info} onChange={v => setForm(f => ({ ...f, student_info: v }))} />
+      <Field label="Комментарий после пробного занятия" placeholder="Впечатления, интересы, что понравилось..."
+        editing={editing} value={form.trial_comment} onChange={v => setForm(f => ({ ...f, trial_comment: v }))} />
+      <Field label="Комментарий после нулевого урока" placeholder="Первые впечатления, прогресс, пожелания..."
+        editing={editing} value={form.zero_lesson_comment} onChange={v => setForm(f => ({ ...f, zero_lesson_comment: v }))} />
     </div>
   );
 }
