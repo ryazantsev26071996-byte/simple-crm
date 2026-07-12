@@ -185,6 +185,7 @@ export default function Analytics() {
   const [trials,  setTrials]  = React.useState([]);
   const [lessons, setLessons] = React.useState([]);
   const [plans,   setPlans]   = React.useState([]);
+  const [schoolPlanInput, setSchoolPlanInput] = React.useState('');
   const [workSchedule, setWorkSchedule] = React.useState([]);
   const [paymentSchedule, setPaymentSchedule] = React.useState([]);
   const [allSalesClients, setAllSalesClients] = React.useState([]);
@@ -235,6 +236,10 @@ export default function Analytics() {
   }, [addLeadSearch]);
 
   React.useEffect(() => { loadData(); }, [month, year]);
+  React.useEffect(() => {
+    const row = plans.find(p => p.manager_name === 'school');
+    setSchoolPlanInput(row ? String(row.plan) : '');
+  }, [plans]);
 
   async function loadData() {
     setLoading(true);
@@ -489,6 +494,7 @@ export default function Analytics() {
   const totalRevenue = salesClients.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0)
                      + paymentSchedule.reduce((s, p) => s + (p.actual_amount || 0), 0);
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
+  const schoolPlan   = Number(schoolPlanInput) || 0;
   const refusals     = clients.filter(c => c.stage === "расторжение").length;
   const avgCheck     = totalSales ? Math.round(totalRevenue / totalSales) : 0;
   const uniqueTrialSlots   = new Set(trials.filter(t => t.attended).map(t => `${t.date}_${t.time}`)).size;
@@ -880,10 +886,33 @@ export default function Analytics() {
             ["Всего уроков",               monthSum.attended],
             ["Ср. кол-во учеников на 1 ВУ", avgPerSlot],
             ["CV в продажу (без отказов)", pct(totalSales, monthSum.attended)],
-            ["План школы",                 totalPlan ? totalPlan.toLocaleString("ru-RU") + " ₽" : "—"],
+          ].map(([label, value]) => (
+            <div key={label} style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 170 }}>
+              <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{label}</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>{value}</div>
+            </div>
+          ))}
+          <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 170 }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>План школы</div>
+            {role === "admin" ? (
+              <input
+                type="number"
+                value={schoolPlanInput}
+                onChange={e => setSchoolPlanInput(e.target.value)}
+                onBlur={() => savePlan('school', schoolPlanInput)}
+                placeholder="0"
+                style={{ fontSize: 16, fontWeight: 600, width: "100%", border: "none", background: "transparent", outline: "none", padding: 0, fontFamily: "inherit", color: "#222" }}
+              />
+            ) : (
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                {schoolPlan ? schoolPlan.toLocaleString("ru-RU") + " ₽" : "—"}
+              </div>
+            )}
+          </div>
+          {[
             ["Выручка школы",              totalRevenue.toLocaleString("ru-RU") + " ₽"],
-            ["% выполнения",               pct(totalRevenue, totalPlan)],
-            ["Сколько осталось",           totalPlan ? Math.max(0, totalPlan - totalRevenue).toLocaleString("ru-RU") + " ₽" : "—"],
+            ["% выполнения",               pct(totalRevenue, schoolPlan)],
+            ["Сколько осталось",           schoolPlan ? Math.max(0, schoolPlan - totalRevenue).toLocaleString("ru-RU") + " ₽" : "—"],
           ].map(([label, value]) => (
             <div key={label} style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 170 }}>
               <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{label}</div>
