@@ -295,44 +295,51 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                   {days.map(d => {
                     const entries = slotEntries(d, time);
                     const isFull = entries.length >= MAX_PER_SLOT;
+                    const blocked = isBlocked(d, time);
                     return (
-                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
-                        {entries.map(e => (
-                          <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
-                            style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
-                              background: e.rescheduled?"#e8f0ff":e.bought===true?"#e8f5e9":e.bought===false?"#fff3e0":e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",
-                              border:`1px solid ${e.rescheduled?"#b3c8f5":e.bought===true?"#a5d6a7":e.bought===false?"#ffcc80":e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
-                            <div style={{fontWeight:500,color:e.client_id?"#e67e22":"#333",cursor:e.client_id?"pointer":"default"}}
-                              onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
-                              {e.client_name||"—"}
-                            </div>
-                            {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
-                            {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
-                            {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
-                            <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
-                              {e.rescheduled && e.rescheduled_to ? (
-                                <span style={{color:"#4a90e2",fontSize:10,fontWeight:600}}>
-                                  🔄 {e.rescheduled_to.slice(8,10)}.{e.rescheduled_to.slice(5,7)}
-                                </span>
-                              ) : (
-                                <>
-                                  {e.confirmed_2h&&<span style={{color:"#1565c0",fontSize:10,fontWeight:600}}>✓подтв за 2ч</span>}
-                                  {!e.confirmed_2h&&e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв за день</span>}
-                                  {e.attended===true&&<span style={{color:"#2e7d32",fontSize:10}}>✓пришёл</span>}
-                                  {e.attended===false&&<span style={{color:"#c62828",fontSize:10}}>✗не пришёл</span>}
-                                  {e.bought===true&&<span style={{color:"#1b5e20",fontSize:10,fontWeight:600}}>💰купил</span>}
-                                  {e.bought===false&&<span style={{color:"#b71c1c",fontSize:10}}>✗не купил</span>}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        {!isFull&&(role==="manager"||role==="accountmanager"||role==="admin")&&(
-                          <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>
-                            + {MAX_PER_SLOT-entries.length} мест
-                          </button>
+                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",background:blocked?"#f0f0f0":fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
+                        {blocked ? (
+                          <div style={{textAlign:"center",color:"#aaa",fontSize:12,padding:"6px 0",userSelect:"none"}}>🚫 Закрыто</div>
+                        ) : (
+                          <>
+                            {entries.map(e => (
+                              <div key={e.id} onClick={() => openModal(fmt(d), time, e)}
+                                style={{marginBottom:3,padding:"4px 6px",borderRadius:4,fontSize:11,cursor:"pointer",
+                                  background: e.rescheduled?"#e8f0ff":e.bought===true?"#e8f5e9":e.bought===false?"#fff3e0":e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",
+                                  border:`1px solid ${e.rescheduled?"#b3c8f5":e.bought===true?"#a5d6a7":e.bought===false?"#ffcc80":e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
+                                <div style={{fontWeight:500,color:e.client_id?"#e67e22":"#333",cursor:e.client_id?"pointer":"default"}}
+                                  onClick={ev=>{if(e.client_id){ev.stopPropagation();openClientModal(e.client_id);}}}>
+                                  {e.client_name||"—"}
+                                </div>
+                                {e.lesson_type&&<div style={{color:"#888"}}>{e.lesson_type}</div>}
+                                {e.account_manager&&<div style={{color:"#e67e22",fontSize:10}}>АМ: {e.account_manager}</div>}
+                                {e.manager&&<div style={{color:"#4a90e2",fontSize:10}}>М: {e.manager}</div>}
+                                <div style={{display:"flex",gap:3,flexWrap:"wrap",marginTop:2}}>
+                                  {e.rescheduled && e.rescheduled_to ? (
+                                    <span style={{color:"#4a90e2",fontSize:10,fontWeight:600}}>
+                                      🔄 {e.rescheduled_to.slice(8,10)}.{e.rescheduled_to.slice(5,7)}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      {e.confirmed_2h&&<span style={{color:"#1565c0",fontSize:10,fontWeight:600}}>✓подтв за 2ч</span>}
+                                      {!e.confirmed_2h&&e.confirmed_day&&<span style={{color:"#1565c0",fontSize:10}}>✓подтв за день</span>}
+                                      {e.attended===true&&<span style={{color:"#2e7d32",fontSize:10}}>✓пришёл</span>}
+                                      {e.attended===false&&<span style={{color:"#c62828",fontSize:10}}>✗не пришёл</span>}
+                                      {e.bought===true&&<span style={{color:"#1b5e20",fontSize:10,fontWeight:600}}>💰купил</span>}
+                                      {e.bought===false&&<span style={{color:"#b71c1c",fontSize:10}}>✗не купил</span>}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            {!isFull&&(role==="manager"||role==="accountmanager"||role==="admin")&&(
+                              <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>
+                                + {MAX_PER_SLOT-entries.length} мест
+                              </button>
+                            )}
+                            {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
+                          </>
                         )}
-                        {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
                       </td>
                     );
                   })}
