@@ -187,25 +187,32 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
                   {days.map(d => {
                     const entries = slotEntries(d, time);
                     const isFull = entries.length >= MAX_PER_SLOT;
+                    const blocked = isBlocked(d, time);
                     return (
-                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
-                        {entries.map(e => (
-                          <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
-                            <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
-                              <span style={{fontSize:12,fontWeight:600,color:"#333",display:"block",marginBottom:2,whiteSpace:"normal",wordBreak:"break-word"}}>
-                                {e.client_name||"—"}
-                              </span>
-                              {e.lesson_type&&<div style={{color:"#888",fontSize:11}}>{e.lesson_type}</div>}
-                              {e.teacher&&<div style={{color:"#4a90e2",fontSize:11}}>{e.teacher}</div>}
-                              {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
-                              {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
-                              {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
-                              {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
-                            </div>
-                          </div>
-                        ))}
-                        {!isFull&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
-                        {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
+                      <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:blocked?"#f0f0f0":fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
+                        {blocked ? (
+                          <div style={{textAlign:"center",color:"#aaa",fontSize:12,padding:"6px 0",userSelect:"none"}}>🚫 Закрыто</div>
+                        ) : (
+                          <>
+                            {entries.map(e => (
+                              <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
+                                <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
+                                  <span style={{fontSize:12,fontWeight:600,color:"#333",display:"block",marginBottom:2,whiteSpace:"normal",wordBreak:"break-word"}}>
+                                    {e.client_name||"—"}
+                                  </span>
+                                  {e.lesson_type&&<div style={{color:"#888",fontSize:11}}>{e.lesson_type}</div>}
+                                  {e.teacher&&<div style={{color:"#4a90e2",fontSize:11}}>{e.teacher}</div>}
+                                  {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
+                                  {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
+                                  {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
+                                  {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
+                                </div>
+                              </div>
+                            ))}
+                            {!isFull&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
+                            {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
+                          </>
+                        )}
                       </td>
                     );
                   })}
