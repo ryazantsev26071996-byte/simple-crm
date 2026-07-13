@@ -118,6 +118,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
   }
 
   async function addComment(clientId, text) {
+    console.log('addComment called:', clientId, text);
     if (!clientId) return;
     try {
       await apiFetch("comments", {
@@ -213,6 +214,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
 
       if (clientId) {
         const entry = modal.entry;
+        console.log('entry client_id:', entry?.client_id, 'form:', form);
         const displayDate = modal.date.split('-').reverse().join('.');
         if (form.reminder_call_day && !entry?.reminder_call_day)
           await addComment(clientId, `📞 Звонок за день совершён — ${displayDate} ${modal.time}`);
