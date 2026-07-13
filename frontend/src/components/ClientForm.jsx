@@ -119,6 +119,14 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
   const [dupWarning, setDupWarning] = React.useState(null)
   const [customSub, setCustomSub] = React.useState({ months: '', lessons: '', freeze: '' })
   const [showCustomSub, setShowCustomSub] = React.useState(false)
+  const [trialLesson, setTrialLesson] = React.useState(null)
+
+  React.useEffect(() => {
+    if (!initialValue?.id) return
+    apiFetch(`trial_schedule?client_id=eq.${initialValue.id}&order=date.asc&limit=1&select=date,time`)
+      .then(data => { if (Array.isArray(data) && data.length > 0) setTrialLesson(data[0]) })
+      .catch(() => {})
+  }, [initialValue?.id])
 
   React.useEffect(() => {
     setForm({
@@ -318,6 +326,14 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
         <div className="formGroup">
           <div className="fieldLabel">Дата прихода лида</div>
           <input className="input" type="datetime-local" value={form.lead_date} disabled={disabled} onChange={set('lead_date')} />
+        </div>
+        <div className="formGroup">
+          <div className="fieldLabel">Дата пробного занятия</div>
+          <div className="input" style={{ background: '#f8f8f8', color: trialLesson ? '#222' : '#aaa' }}>
+            {trialLesson
+              ? `${trialLesson.date.split('-').reverse().join('.')} в ${trialLesson.time}`
+              : '—'}
+          </div>
         </div>
       </div>
       <div style={{ height: 8 }} />
