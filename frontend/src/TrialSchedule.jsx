@@ -100,7 +100,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
 
   React.useEffect(() => { loadSlots(); loadBlocks(); }, [weekStart]);
 
-  function openModal(date, time, entry = null) {
+  async function openModal(date, time, entry = null) {
     setModal({ date, time, entry });
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
@@ -114,6 +114,18 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         attended: null, bought: null, short_presentation: false, call_3days: false,
         bought_testdrive: null, feedback: "", newStage: 'записан на пробное',
         rescheduled: false, rescheduled_to: "", rescheduled_time: "" });
+      try {
+        const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role`);
+        if (Array.isArray(ws) && ws.length > 0) {
+          const managerRow = ws.find(r => r.employee_role === 'Менеджеры');
+          const accountRow = ws.find(r => r.employee_role === 'Аккаунты');
+          setForm(f => ({
+            ...f,
+            manager: managerRow?.employee_name || f.manager,
+            account_manager: accountRow?.employee_name || f.account_manager,
+          }));
+        }
+      } catch (e) {}
     }
   }
 
