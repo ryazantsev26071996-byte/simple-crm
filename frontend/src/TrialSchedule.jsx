@@ -183,6 +183,10 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         await apiFetch(`trial_schedule?id=eq.${modal.entry.id}`, { method: "PATCH", body: JSON.stringify(payload) });
       } else {
         await apiFetch("trial_schedule", { method: "POST", body: JSON.stringify(payload) });
+        if (clientId) {
+          const displayDate = modal.date.split('-').reverse().join('.');
+          await addComment(clientId, `📅 Записан на пробное занятие — ${displayDate} в ${modal.time}`);
+        }
       }
 
       // Create a new entry on the new date when first marking as rescheduled
