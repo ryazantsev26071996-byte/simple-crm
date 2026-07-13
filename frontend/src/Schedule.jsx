@@ -85,16 +85,27 @@ export default function Schedule({ clients, role, authorName, userId, onClientsC
     if (cl) setClientModal(cl);
   }
 
-  function openModal(date, time, entry = null) {
+  async function openModal(date, time, entry = null) {
     setModal({ date, time, entry });
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
-    setForm(entry ? {
-      client_id: entry.client_id || "", client_name: entry.client_name || "",
-      teacher: entry.teacher || "", recorded_by: entry.recorded_by || "",
-      lesson_type: entry.lesson_type || "", comment: entry.comment || "",
-      lesson_comment: "", attended: entry.attended, walk_in: entry.walk_in || false,
-    } : { client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false });
+    if (entry) {
+      setForm({
+        client_id: entry.client_id || "", client_name: entry.client_name || "",
+        teacher: entry.teacher || "", recorded_by: entry.recorded_by || "",
+        lesson_type: entry.lesson_type || "", comment: entry.comment || "",
+        lesson_comment: "", attended: entry.attended, walk_in: entry.walk_in || false,
+      });
+    } else {
+      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false });
+      try {
+        const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role`);
+        if (Array.isArray(ws) && ws.length > 0) {
+          const teacherRow = ws.find(r => r.employee_role === 'Педагоги');
+          if (teacherRow) setForm(f => ({ ...f, teacher: teacherRow.employee_name }));
+        }
+      } catch (e) {}
+    }
   }
 
   function isDuplicateSameDay() {
