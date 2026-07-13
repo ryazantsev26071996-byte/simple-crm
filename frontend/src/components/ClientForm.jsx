@@ -123,8 +123,22 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
 
   React.useEffect(() => {
     if (!initialValue?.id) return
-    apiFetch(`trial_schedule?client_id=eq.${initialValue.id}&order=date.asc&limit=1&select=date,time`)
-      .then(data => { if (Array.isArray(data) && data.length > 0) setTrialLesson(data[0]) })
+    apiFetch(`trial_schedule?client_id=eq.${initialValue.id}&order=date.desc&select=date,time,attended,rescheduled`)
+      .then(data => {
+        if (!Array.isArray(data) || data.length === 0) return
+        const today = new Date().toISOString().split('T')[0]
+        // exclude entries that were rescheduled away (original slot, now moved)
+        const active = data.filter(r => !r.rescheduled)
+        const pool = active.length > 0 ? active : data
+        // prefer unattended upcoming, then unattended past, then any latest
+        const unattended = pool.filter(r => r.attended === null || r.attended === undefined)
+        if (unattended.length > 0) {
+          const upcoming = unattended.filter(r => r.date >= today).sort((a, b) => a.date.localeCompare(b.date))
+          setTrialLesson(upcoming.length > 0 ? upcoming[0] : unattended[0])
+        } else {
+          setTrialLesson(pool[0]) // already ordered desc, so pool[0] is latest
+        }
+      })
       .catch(() => {})
   }, [initialValue?.id])
 
