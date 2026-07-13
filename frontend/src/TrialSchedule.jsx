@@ -214,8 +214,16 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
       if (clientId) {
         const entry = modal.entry;
         const displayDate = modal.date.split('-').reverse().join('.');
+        if (form.reminder_call_day && !entry?.reminder_call_day)
+          await addComment(clientId, `📞 Звонок за день совершён — ${displayDate} ${modal.time}`);
+        if (form.reminder_sms_day && !entry?.reminder_sms_day)
+          await addComment(clientId, `💬 СМС за день отправлено — ${displayDate} ${modal.time}`);
         if (form.confirmed_day && !entry?.confirmed_day)
           await addComment(clientId, `✅ Подтверждён за день — ${displayDate} ${modal.time}`);
+        if (form.reminder_call_2h && !entry?.reminder_call_2h)
+          await addComment(clientId, `📞 Звонок за 2 часа совершён — ${displayDate} ${modal.time}`);
+        if (form.reminder_sms_2h && !entry?.reminder_sms_2h)
+          await addComment(clientId, `💬 СМС за 2 часа отправлено — ${displayDate} ${modal.time}`);
         if (form.confirmed_2h && !entry?.confirmed_2h)
           await addComment(clientId, `✅ Подтверждён за 2 часа — ${displayDate} ${modal.time}`);
         if (form.attended === true && entry?.attended !== true)
@@ -224,10 +232,20 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
           await addComment(clientId, `❌ Не пришёл на пробное занятие — ${displayDate}`);
         if (form.bought === true && entry?.bought !== true)
           await addComment(clientId, `🎉 Купил абонемент после пробного`);
+        if (form.short_presentation && !entry?.short_presentation)
+          await addComment(clientId, `📋 Скинули презентацию — ${displayDate}`);
+        if (form.call_3days && !entry?.call_3days)
+          await addComment(clientId, `📞 Звонок через 3 дня совершён — ${displayDate}`);
+        if (form.bought_testdrive === true && entry?.bought_testdrive !== true)
+          await addComment(clientId, `🎯 Купил тест-драйв — ${displayDate}`);
         if (form.comment && form.comment !== (entry?.comment || ''))
           await addComment(clientId, `📝 Заметка о клиенте: ${form.comment}`);
         if (form.feedback && form.feedback !== (entry?.feedback || ''))
           await addComment(clientId, `📞 Обратная связь после звонка: ${form.feedback}`);
+        if (form.source && form.source !== (entry?.source || ''))
+          await addComment(clientId, `🔗 Источник изменён на: ${form.source}`);
+        if (form.lesson_type && form.lesson_type !== (entry?.lesson_type || ''))
+          await addComment(clientId, `🎨 Вид урока изменён на: ${form.lesson_type}`);
       }
 
       setModal(null);
