@@ -726,30 +726,6 @@ export default function Analytics() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
                 <StatCard label="Провёл ВУ"   value={s.lessonsCount} />
                 <StatCard label="Пришло на ВУ" value={s.studentsCount} />
-                <div style={{ position: "relative" }}>
-                  <button onClick={() => setOpenAttended(o => ({ ...o, [manager]: !o[manager] }))}
-                    style={{ background: "#f0fff4", border: "1px solid #a5d6a7", borderRadius: 8, padding: "10px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#2e7d32", whiteSpace: "nowrap" }}>
-                    ✅ Дошли до пробного: {s.attendedClients.length}
-                  </button>
-                  {openAttended[manager] && (
-                    <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50, background: "white", border: "1px solid #ddd", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 240, maxHeight: 260, overflowY: "auto" }}>
-                      {s.attendedClients.length === 0 ? (
-                        <div style={{ padding: "10px 14px", color: "#aaa", fontSize: 13 }}>Нет данных</div>
-                      ) : s.attendedClients.map((t, i) => {
-                        const fullClient = clients.find(c => c.id === t.client_id);
-                        return (
-                          <div key={t.client_id || i} onClick={() => { setClientModal(fullClient || { id: t.client_id, name: t.client_name, phone: t.phone }); setOpenAttended(o => ({ ...o, [manager]: false })); }}
-                            style={{ padding: "8px 14px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}
-                            onMouseEnter={e => e.currentTarget.style.background = "#f8fbff"}
-                            onMouseLeave={e => e.currentTarget.style.background = "white"}>
-                            <div style={{ fontWeight: 500 }}>{t.client_name || "—"}</div>
-                            {t.phone && <div style={{ fontSize: 11, color: "#888" }}>{t.phone}</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
                 <StatCard label="Продаж"   value={s.salesCount} />
                 <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка</div>
@@ -779,6 +755,30 @@ export default function Analytics() {
                 </div>
                 <StatCard label="Конверсия"   value={s.conversion} />
                 <StatCard label="Средний чек" value={s.avgCheck ? s.avgCheck.toLocaleString("ru-RU") + " ₽" : "—"} />
+              </div>
+              <div style={{ position: "relative", marginBottom: 12 }}>
+                <button onClick={() => setOpenAttended(o => ({ ...o, [manager]: !o[manager] }))}
+                  style={{ background: "#f0fff4", border: "1px solid #a5d6a7", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#2e7d32", whiteSpace: "nowrap" }}>
+                  ✅ Дошли до пробного: {s.attendedClients.length}
+                </button>
+                {openAttended[manager] && (
+                  <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50, background: "white", border: "1px solid #ddd", borderRadius: 8, boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 240, maxHeight: 260, overflowY: "auto" }}>
+                    {s.attendedClients.length === 0 ? (
+                      <div style={{ padding: "10px 14px", color: "#aaa", fontSize: 13 }}>Нет данных</div>
+                    ) : s.attendedClients.map((t, i) => {
+                      const fullClient = clients.find(c => c.id === t.client_id);
+                      return (
+                        <div key={t.client_id || i} onClick={() => { setClientModal(fullClient || { id: t.client_id, name: t.client_name, phone: t.phone }); setOpenAttended(o => ({ ...o, [manager]: false })); }}
+                          style={{ padding: "8px 14px", cursor: "pointer", borderBottom: "1px solid #f0f0f0", fontSize: 13 }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#f8fbff"}
+                          onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                          <div style={{ fontWeight: 500 }}>{t.client_name || "—"}</div>
+                          {t.phone && <div style={{ fontSize: 11, color: "#888" }}>{t.phone}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {s.sales.length > 0 && (
                 <div style={{ overflowX: "auto" }}>
