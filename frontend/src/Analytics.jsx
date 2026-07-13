@@ -427,6 +427,7 @@ export default function Analytics() {
     });
     const mTrials  = trials.filter(t => t.manager === manager && !t.rescheduled);
     const mAtt     = mTrials.filter(t => t.attended === true);
+    const attendedCount = new Set(mAtt.filter(t => t.client_id).map(t => t.client_id)).size;
     const nonInstRevenue = mSales.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0);
     const instRevenue    = paymentSchedule.filter(p => p.manager_name === manager).reduce((s, p) => s + (p.actual_amount || 0), 0);
     const revenue        = nonInstRevenue + instRevenue;
@@ -447,6 +448,7 @@ export default function Analytics() {
       sales:         [...mSales, ...extraInstClients],
       lessonsCount:  mAtt.length,
       studentsCount: mAtt.length,
+      attendedCount,
       salesCount:    mSales.length,
       revenue,
       plan,
@@ -505,6 +507,7 @@ export default function Analytics() {
   const schoolSalesCount = MANAGERS.reduce((s, m) => s + mgStats(m).salesCount, 0);
   const schoolAvgCheck   = schoolSalesCount > 0 ? Math.round(schoolRevenue / schoolSalesCount) : 0;
   const schoolPct        = schoolPlanTotal > 0 ? schoolRevenue / schoolPlanTotal * 100 : 0;
+  const schoolAttended   = new Set(trials.filter(t => t.attended === true && t.client_id).map(t => t.client_id)).size;
 
   const TH  = { padding: "4px 8px", background: "#f0f4ff", border: "1px solid #dde", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", textAlign: "left" };
   const TD  = { padding: "3px 8px", border: "1px solid #eee", fontSize: 11 };
@@ -719,6 +722,7 @@ export default function Analytics() {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
                 <StatCard label="Провёл ВУ"   value={s.lessonsCount} />
                 <StatCard label="Пришло на ВУ" value={s.studentsCount} />
+                <StatCard label="✅ Дошли до пробного" value={s.attendedCount} />
                 <StatCard label="Продаж"   value={s.salesCount} />
                 <div style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 150 }}>
                   <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>Выручка</div>
@@ -886,6 +890,7 @@ export default function Analytics() {
             ["Всего уроков",               monthSum.attended],
             ["Ср. кол-во учеников на 1 ВУ", avgPerSlot],
             ["CV в продажу (без отказов)", pct(totalSales, monthSum.attended)],
+            ["✅ Дошли до пробного",        schoolAttended],
           ].map(([label, value]) => (
             <div key={label} style={{ background: "#f8faff", borderRadius: 8, padding: "10px 14px", border: "1px solid #e0e8ff", minWidth: 170 }}>
               <div style={{ fontSize: 11, color: "#888", marginBottom: 2 }}>{label}</div>
