@@ -308,7 +308,7 @@ function WorkScheduleSection({ userName, supabase }) {
 
 // ─── Regulation ───────────────────────────────────────────────────────────────
 
-function RegulationCard({ filePath, deleting, onOpen, onDelete, supabase }) {
+function RegulationCard({ filePath, deleting, onOpen, onDelete, onEdit, supabase }) {
   const [hovered, setHovered] = React.useState(false);
   return (
     <div
@@ -335,6 +335,15 @@ function RegulationCard({ filePath, deleting, onOpen, onDelete, supabase }) {
             style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: "2px 4px", color: "#16a34a", lineHeight: 1 }}
           >
             📥
+          </button>
+        )}
+        {onEdit && (
+          <button
+            onClick={e => { e.stopPropagation(); onEdit(); }}
+            title="Редактировать"
+            style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: "2px 4px", color: "#4a90e2", lineHeight: 1 }}
+          >
+            ✏️
           </button>
         )}
         <button
@@ -508,20 +517,23 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
           <div style={{ color: "#9ca3af", fontSize: 13 }}>{converting ? "Конвертируем файл..." : "Загрузка..."}</div>
 
         ) : isAdmin ? (
-          hasContent ? (
+          hasContent && mode !== 'edit' ? (
             <RegulationCard
               filePath={filePath}
               deleting={deleting}
               onOpen={() => setShowModal(true)}
               onDelete={handleDelete}
+              onEdit={() => { setMode('edit'); setTimeout(() => { if (editorRef.current) editorRef.current.innerHTML = html; }, 0); }}
               supabase={supabase}
             />
 
-          ) : mode === "manual" ? (
+          ) : mode === 'manual' || mode === 'edit' ? (
             <>
-              <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 13, marginBottom: 10, padding: 0 }}>
-                ← Назад
-              </button>
+              {mode === 'manual' && (
+                <button onClick={() => setMode(null)} style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer", fontSize: 13, marginBottom: 10, padding: 0 }}>
+                  ← Назад
+                </button>
+              )}
               <RichToolbar editorRef={editorRef} onInput={() => setSaved(false)} />
               <div
                 ref={editorRef}
@@ -535,6 +547,12 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
                   style={{ padding: "7px 20px", background: "#4a90e2", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13 }}>
                   {saving ? "Сохранение..." : "Сохранить"}
                 </button>
+                {mode === 'edit' && (
+                  <button onClick={() => setMode(null)} disabled={saving}
+                    style={{ padding: "7px 16px", background: "white", color: "#6b7280", border: "1px solid #d1d5db", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+                    Отмена
+                  </button>
+                )}
                 {!saved && <span style={{ fontSize: 12, color: "#f59e0b" }}>Несохранённые изменения</span>}
               </div>
             </>
