@@ -48,6 +48,7 @@ import Schedule from "./Schedule.jsx";
 import TrialSchedule from "./TrialSchedule.jsx";
 import TeamOnline from "./TeamOnline.jsx";
 import Analytics from "./Analytics.jsx";
+import TeacherAnalytics from "./TeacherAnalytics.jsx";
 import Events from "./Events.jsx";
 import WorkSchedule from "./WorkSchedule.jsx";
 import { MergeDuplicates } from "./MergeDuplicates.jsx";
@@ -163,7 +164,7 @@ export default function App() {
 
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
-  const VIEW_NAMES = { myoffice: 'Мой кабинет', kanban: 'Канбан', list: 'Список', trial: 'Пробные', schedule: 'Занятия', analytics: 'Аналитика', grafik: 'График', students: 'Ученики', tasks: 'Задачи' };
+  const VIEW_NAMES = { myoffice: 'Мой кабинет', kanban: 'Канбан', list: 'Список', trial: 'Пробные', schedule: 'Занятия', analytics: 'Аналитика', teacheranalytics: 'Педагоги', grafik: 'График', students: 'Ученики', tasks: 'Задачи' };
 
   const availableTabs = [
     { key: 'myoffice', label: 'Мой кабинет' },
@@ -178,6 +179,9 @@ export default function App() {
     ] : []),
     ...(role === 'manager' || role === 'accountmanager' || role === 'admin' ? [
       { key: 'analytics', label: 'Аналитика' },
+    ] : []),
+    ...(role === 'admin' ? [
+      { key: 'teacheranalytics', label: 'Педагоги' },
     ] : []),
     { key: 'students', label: 'Ученики' },
     { key: 'tasks', label: 'Задачи' },
@@ -247,6 +251,7 @@ export default function App() {
                 <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
                 <button className="tabBtn" onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Пробные</button>
                 <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>
+                {role === 'admin' && <button className="tabBtn" onClick={() => setView('teacheranalytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'teacheranalytics' ? '#7c3aed' : 'white', color: view === 'teacheranalytics' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Педагоги</button>}
               </>}
               {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher') && <>
                 <button className="tabBtn" onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Занятия</button>
@@ -348,6 +353,7 @@ export default function App() {
         <div style={{ flex: (!isMobile && selectedId) ? '0 0 60%' : '1', overflow: 'auto', borderRight: (!isMobile && selectedId) ? '1px solid #eee' : 'none' }}>
           {view === 'myoffice' && <MyOffice userEmail={user?.email} userName={authorName} role={role} supabase={supabase} />}
           {view === 'analytics' && (role === 'admin' || role === 'manager' || role === 'accountmanager') && <Analytics />}
+          {view === 'teacheranalytics' && role === 'admin' && <TeacherAnalytics />}
           {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher') && <WorkSchedule />}
           {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
           {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
