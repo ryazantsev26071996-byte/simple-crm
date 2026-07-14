@@ -196,6 +196,24 @@ export default function TeacherAnalytics() {
     loyalByTeacher[e.teacher].push(e);
   }
 
+  // Section 5 — students who attended with exactly one unique teacher
+  const clientTeachersMap = {};
+  for (const r of regularRecords) {
+    if (!r.client_name || !r.teacher) continue;
+    if (!clientTeachersMap[r.client_name]) clientTeachersMap[r.client_name] = { teachers: new Set(), count: 0 };
+    clientTeachersMap[r.client_name].teachers.add(r.teacher);
+    clientTeachersMap[r.client_name].count++;
+  }
+  const singleTeacherStudents = Object.entries(clientTeachersMap)
+    .filter(([, v]) => v.teachers.size === 1)
+    .map(([client, v]) => ({ client, teacher: [...v.teachers][0], count: v.count }))
+    .sort((a, b) => b.count - a.count);
+  const singleByTeacher = {};
+  for (const e of singleTeacherStudents) {
+    if (!singleByTeacher[e.teacher]) singleByTeacher[e.teacher] = [];
+    singleByTeacher[e.teacher].push(e);
+  }
+
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear(y => y - 1); }
     else setMonth(m => m - 1);
@@ -303,6 +321,41 @@ export default function TeacherAnalytics() {
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: "#1e293b" }}>🏆 Рейтинг педагогов</div>
           <div style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>По среднему числу учеников за смену</div>
           <RatingSection stats={regularStats.filter(s => s.shifts > 0)} />
+        </div>
+
+        {/* ── Section 5: Ученики одного педагога ── */}
+        <div style={CARD}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "#1e293b" }}>👤 Ученики одного педагога</div>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>Ходили только к одному педагогу за период</div>
+          {singleTeacherStudents.length === 0 ? (
+            <div style={{ color: "#aaa", fontSize: 13 }}>Нет данных</div>
+          ) : (
+            Object.entries(singleByTeacher).map(([teacher, students]) => (
+              <div key={teacher} style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#4a90e2", marginBottom: 8 }}>
+                  {teacher} <span style={{ fontWeight: 400, color: "#888" }}>({students.length})</span>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        <th style={TH_STYLE}>Ученик</th>
+                        <th style={TH_STYLE}>Занятий</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.map((e, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? "white" : "#fafbff" }}>
+                          <td style={TD_STYLE}>{e.client}</td>
+                          <td style={{ ...TD_STYLE, fontWeight: 600, color: "#4a90e2" }}>{e.count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
       </>}
