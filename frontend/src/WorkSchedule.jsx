@@ -85,7 +85,8 @@ const TD = { padding: "5px 10px", border: "1px solid #eee", fontSize: 12 };
 
 export default function WorkSchedule() {
   const now = new Date();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const role = profile?.role || 'teacher';
   const [month,  setMonth]  = React.useState(now.getMonth() + 1);
   const [year,   setYear]   = React.useState(now.getFullYear());
   const [data,   setData]   = React.useState({});
@@ -168,6 +169,7 @@ export default function WorkSchedule() {
   }
 
   function openDay(day) {
+    if (role !== 'admin') return;
     const dateStr = dateFmt(year, month, day);
     const form = {};
     for (const names of Object.values(EMPLOYEES)) {
@@ -182,7 +184,7 @@ export default function WorkSchedule() {
   }
 
   async function handleSave() {
-    if (!modal || saving) return;
+    if (!modal || saving || role !== 'admin') return;
     setSaving(true);
     const dateStr = modal.date;
     try {
@@ -293,16 +295,16 @@ export default function WorkSchedule() {
             const isToday   = day && dateFmt(year, month, day) === today;
             const isWeekend = (i % 7) >= 5;
             return (
-              <div key={i} onClick={day ? () => openDay(day) : undefined}
+              <div key={i} onClick={day && role === 'admin' ? () => openDay(day) : undefined}
                 style={{
                   minHeight: 80, borderRadius: 4, padding: "4px 5px",
                   border: `1px solid ${isToday ? "#90caf9" : "#eee"}`,
                   background: isToday ? "#f0f7ff" : day ? "white" : "#fafafa",
-                  cursor: day ? "pointer" : "default",
+                  cursor: day && role === 'admin' ? "pointer" : "default",
                   transition: "background .1s",
                 }}
-                onMouseEnter={e => { if (day) e.currentTarget.style.background = isToday ? "#e3f2fd" : "#f5f8ff"; }}
-                onMouseLeave={e => { if (day) e.currentTarget.style.background = isToday ? "#f0f7ff" : "white"; }}>
+                onMouseEnter={e => { if (day && role === 'admin') e.currentTarget.style.background = isToday ? "#e3f2fd" : "#f5f8ff"; }}
+                onMouseLeave={e => { if (day && role === 'admin') e.currentTarget.style.background = isToday ? "#f0f7ff" : "white"; }}>
                 {day && (
                   <>
                     <div style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isToday ? "#4a90e2" : isWeekend ? "#e55" : "#333", marginBottom: 3 }}>
