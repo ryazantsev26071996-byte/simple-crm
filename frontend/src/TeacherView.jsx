@@ -49,6 +49,7 @@ function daysLeft(endDate) {
 
 export function TeacherView({ clients, onClientSelect }) {
   const [search, setSearch] = React.useState('')
+  const [contractSearch, setContractSearch] = React.useState('')
   const [sortField, setSortField] = React.useState('name')
   const [sortDir, setSortDir] = React.useState('asc')
   const [showLost, setShowLost] = React.useState(false)
@@ -62,6 +63,10 @@ export function TeacherView({ clients, onClientSelect }) {
       if (c.name?.toLowerCase().includes(q)) return true
       if (digits && (c.phone||'').replace(/\D/g,'').endsWith(digits)) return true
       return false
+    })
+    .filter(c => {
+      if (!contractSearch) return true
+      return (c.contract_number||'').toString().includes(contractSearch)
     })
     .sort((a, b) => {
       let aVal, bVal
@@ -127,6 +132,12 @@ export function TeacherView({ clients, onClientSelect }) {
             onChange={e => setSearch(e.target.value)}
             placeholder="Поиск по имени или номеру..."
             style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
+          />
+          <input
+            value={contractSearch}
+            onChange={e => setContractSearch(e.target.value)}
+            placeholder="Поиск по № договора..."
+            style={{ width: 180, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
           />
           <button
             onClick={() => setShowLost(v => !v)}
