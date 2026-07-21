@@ -180,6 +180,7 @@ export function TeacherView({ clients, onClientSelect }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #eee' }}>
+                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap', background: '#fafafa', maxWidth: 80, width: 80 }}>№ дог.</th>
                 <SortTh field="name" label="Имя" style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', borderRight: '1px solid #eee' }} />
                 <SortTh field="subscription_type" label="Абонемент" />
                 <SortTh field="lessons_left" label="Занятий осталось" />
@@ -202,6 +203,7 @@ export function TeacherView({ clients, onClientSelect }) {
                     style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
                     onMouseEnter={e => e.currentTarget.style.background = '#f9f9f9'}
                     onMouseLeave={e => e.currentTarget.style.background = 'white'}>
+                    <td style={{ padding: '10px 8px', color: '#888', fontSize: 12, maxWidth: 80, width: 80 }}>{c.contract_number || '—'}</td>
                     <td style={{ padding: '10px 12px', fontWeight: 500, position: 'sticky', left: 0, zIndex: 1, backgroundColor: 'white', borderRight: '1px solid #eee' }}>
                       {c.name}
                       {c.phone && <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{c.phone}</div>}
@@ -234,7 +236,7 @@ export function TeacherView({ clients, onClientSelect }) {
                 )
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>Ученики не найдены</td></tr>
+                <tr><td colSpan={7} style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>Ученики не найдены</td></tr>
               )}
             </tbody>
           </table>

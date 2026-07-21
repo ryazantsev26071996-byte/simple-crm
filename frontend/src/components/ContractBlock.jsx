@@ -63,6 +63,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
     requisites: client?.requisites || "",
   })
   const [saving, setSaving] = React.useState(false)
+  const [nextNumLoading, setNextNumLoading] = React.useState(false)
   const [archiving, setArchiving] = React.useState(false)
   const [history, setHistory] = React.useState([])
   const [historyOpen, setHistoryOpen] = React.useState(false)
@@ -161,6 +162,20 @@ export default function ContractBlock({ client, onUpdate, role }) {
       alert(e.message)
     } finally {
       setSchedSaving(false)
+    }
+  }
+
+  async function fetchNextContractNumber() {
+    setNextNumLoading(true)
+    try {
+      const data = await apiFetch('clients?select=contract_number&order=contract_number.desc&limit=1')
+      const maxNum = data?.[0]?.contract_number
+      const next = maxNum ? (parseInt(maxNum, 10) + 1) : 1
+      setForm(f => ({ ...f, contract_number: isNaN(next) ? '' : String(next) }))
+    } catch(e) {
+      alert(e.message)
+    } finally {
+      setNextNumLoading(false)
     }
   }
 
@@ -297,9 +312,17 @@ export default function ContractBlock({ client, onUpdate, role }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
           <div>
             <div style={labelStyle}>Номер договора</div>
-            <input style={inputStyle} value={form.contract_number} readOnly={!editing}
-              onChange={e => setForm(f => ({ ...f, contract_number: e.target.value }))}
-              placeholder={editing ? "251" : "Не заполнено"} />
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input style={{ ...inputStyle, flex: 1 }} value={form.contract_number} readOnly={!editing}
+                onChange={e => setForm(f => ({ ...f, contract_number: e.target.value }))}
+                placeholder={editing ? "251" : "Не заполнено"} />
+              {editing && (role === 'admin' || role === 'manager') && (
+                <button onClick={fetchNextContractNumber} disabled={nextNumLoading}
+                  style={{ fontSize: 11, padding: '5px 10px', borderRadius: 6, border: '1px solid #4a90e2', background: 'white', color: '#4a90e2', cursor: nextNumLoading ? 'default' : 'pointer', opacity: nextNumLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {nextNumLoading ? '...' : '📋 Следующий №'}
+                </button>
+              )}
+            </div>
           </div>
           <div>
             <div style={labelStyle}>Дата договора</div>
