@@ -49,7 +49,6 @@ function daysLeft(endDate) {
 
 export function TeacherView({ clients, onClientSelect }) {
   const [search, setSearch] = React.useState('')
-  const [contractSearch, setContractSearch] = React.useState('')
   const [sortField, setSortField] = React.useState('name')
   const [sortDir, setSortDir] = React.useState('asc')
   const [showLost, setShowLost] = React.useState(false)
@@ -64,13 +63,12 @@ export function TeacherView({ clients, onClientSelect }) {
       if (digits && (c.phone||'').replace(/\D/g,'').endsWith(digits)) return true
       return false
     })
-    .filter(c => {
-      if (!contractSearch) return true
-      return (c.contract_number||'').toString().includes(contractSearch)
-    })
     .sort((a, b) => {
       let aVal, bVal
-      if (sortField === 'lessons_left') {
+      if (sortField === 'contract_number') {
+        aVal = parseInt(a.contract_number, 10) || 0
+        bVal = parseInt(b.contract_number, 10) || 0
+      } else if (sortField === 'lessons_left') {
         aVal = a.is_unlimited ? 9999 : Math.max(0, (a.lessons_total||0)-(a.lessons_used||0))
         bVal = b.is_unlimited ? 9999 : Math.max(0, (b.lessons_total||0)-(b.lessons_used||0))
       } else if (sortField === 'days_left') {
@@ -133,12 +131,6 @@ export function TeacherView({ clients, onClientSelect }) {
             placeholder="Поиск по имени или номеру..."
             style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
           />
-          <input
-            value={contractSearch}
-            onChange={e => setContractSearch(e.target.value)}
-            placeholder="Поиск по № договора..."
-            style={{ width: 180, padding: '7px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, outline: 'none' }}
-          />
           <button
             onClick={() => setShowLost(v => !v)}
             style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #ddd', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', background: showLost ? '#e55' : 'white', color: showLost ? 'white' : '#e55', fontWeight: 500 }}
@@ -191,7 +183,7 @@ export function TeacherView({ clients, onClientSelect }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr style={{ borderBottom: '1px solid #eee' }}>
-                <th style={{ padding: '8px 8px', textAlign: 'left', fontWeight: 500, whiteSpace: 'nowrap', background: '#fafafa', maxWidth: 80, width: 80 }}>№ дог.</th>
+                <SortTh field="contract_number" label="№ дог." style={{ maxWidth: 80, width: 80, padding: '8px 8px' }} />
                 <SortTh field="name" label="Имя" style={{ position: 'sticky', left: 0, zIndex: 2, backgroundColor: 'white', borderRight: '1px solid #eee' }} />
                 <SortTh field="subscription_type" label="Абонемент" />
                 <SortTh field="lessons_left" label="Занятий осталось" />
