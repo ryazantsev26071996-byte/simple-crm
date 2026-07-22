@@ -168,16 +168,16 @@ export default function App() {
 
   const availableTabs = [
     { key: 'myoffice', label: 'Мой кабинет' },
-    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' ? [
+    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor' ? [
       { key: 'kanban', label: 'Канбан' },
       { key: 'list', label: 'Список' },
       { key: 'trial', label: 'Пробные' },
     ] : []),
-    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' ? [
+    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor' ? [
       { key: 'schedule', label: 'Занятия' },
       { key: 'grafik', label: 'График' },
     ] : []),
-    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' ? [
+    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor' ? [
       { key: 'analytics', label: 'Аналитика' },
     ] : []),
     ...(role === 'admin' ? [
@@ -246,14 +246,14 @@ export default function App() {
             <strong style={{ fontSize: 15 }}>Simple CRM</strong>
             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <button className="tabBtn" onClick={() => setView('myoffice')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'myoffice' ? '#7c3aed' : 'white', color: view === 'myoffice' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Мой кабинет</button>
-              {(role === 'manager' || role === 'accountmanager' || role === 'admin') && <>
+              {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <>
                 <button className="tabBtn" onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
                 <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
                 <button className="tabBtn" onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Пробные</button>
                 <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>
                 {role === 'admin' && <button className="tabBtn" onClick={() => setView('teacheranalytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'teacheranalytics' ? '#7c3aed' : 'white', color: view === 'teacheranalytics' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Педагоги</button>}
               </>}
-              {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher') && <>
+              {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <>
                 <button className="tabBtn" onClick={() => setView('schedule')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'schedule' ? '#4a90e2' : 'white', color: view === 'schedule' ? 'white' : '#333', cursor: 'pointer' }}>Занятия</button>
                 <button className="tabBtn" onClick={() => setView('grafik')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'grafik' ? '#7c3aed' : 'white', color: view === 'grafik' ? 'white' : '#7c3aed', cursor: 'pointer' }}>График</button>
               </>}
@@ -352,13 +352,13 @@ export default function App() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: (!isMobile && selectedId) ? '0 0 60%' : '1', overflow: 'auto', borderRight: (!isMobile && selectedId) ? '1px solid #eee' : 'none' }}>
           {view === 'myoffice' && <MyOffice userEmail={user?.email} userName={authorName} role={role} supabase={supabase} />}
-          {view === 'analytics' && (role === 'admin' || role === 'manager' || role === 'accountmanager') && <Analytics />}
+          {view === 'analytics' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && <Analytics />}
           {view === 'teacheranalytics' && role === 'admin' && <TeacherAnalytics />}
-          {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher') && <WorkSchedule />}
-          {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
-          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
+          {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher' || role === 'supervisor') && <WorkSchedule />}
+          {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
+          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
 
-          {(role === 'manager' || role === 'accountmanager' || role === 'admin') && view === 'list' && (
+          {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
               <ClientForm mode="Новый клиент" disabled={false} submitLabel="Добавить"
                 onSubmit={async (payload) => {
@@ -482,7 +482,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {(role === 'admin' || role === 'manager' || role === 'accountmanager') && (
+                {(role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && (
                   <button onClick={async () => {
                     if (!window.confirm('Удалить клиента ' + selectedClient.name + '?')) return;
                     const { error } = await (await import('./supabase.js')).supabase.from('clients').delete().eq('id', selectedClient.id);
@@ -497,7 +497,7 @@ export default function App() {
               </div>
             </div>
 
-            {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
+            {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
                 onSubmit={async (payload) => {
                   setError("");
@@ -508,10 +508,10 @@ export default function App() {
                 }}
               />
             )}
-            {selectedClient?.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin') && (
+            {selectedClient?.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <StudentInfoBlock client={selectedClient} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
-            {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
+            {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ContractBlock client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
             {['ученик', 'пробный месяц', 'тест-драйв'].includes(selectedClient?.stage) && (

@@ -305,7 +305,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={() => setWeekStart(new Date())} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #4a90e2", background: "#4a90e2", color: "white", cursor: "pointer", fontSize: 12 }}>Сегодня</button>
-          {role === "admin" && <button onClick={() => setShowBlocks(true)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
+          {(role === "admin" || role === "supervisor") && <button onClick={() => setShowBlocks(true)} style={{ padding: "6px 12px", borderRadius: 6, border: "1px solid #888", background: "white", cursor: "pointer", fontSize: 12 }}>⚙️ Слоты</button>}
         </div>
       </div>
 
@@ -366,7 +366,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
                                 </div>
                               </div>
                             ))}
-                            {!isFull&&(role==="manager"||role==="accountmanager"||role==="admin")&&(
+                            {!isFull&&(role==="manager"||role==="accountmanager"||role==="admin"||role==="supervisor")&&(
                               <button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>
                                 + {MAX_PER_SLOT-entries.length} мест
                               </button>
@@ -545,7 +545,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
               <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
                 {saving?"Сохранение...":(modal.entry?"Сохранить":"Записать на пробное")}
               </button>
-              {modal.entry&&(role==="manager"||role==="accountmanager"||role==="admin")&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
+              {modal.entry&&(role==="manager"||role==="accountmanager"||role==="admin"||role==="supervisor")&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
             </div>
           </div>
         </div>

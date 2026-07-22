@@ -169,7 +169,7 @@ export default function WorkSchedule() {
   }
 
   function openDay(day) {
-    if (role !== 'admin') return;
+    if (role !== 'admin' && role !== 'supervisor') return;
     const dateStr = dateFmt(year, month, day);
     const form = {};
     for (const names of Object.values(EMPLOYEES)) {
@@ -184,7 +184,7 @@ export default function WorkSchedule() {
   }
 
   async function handleSave() {
-    if (!modal || saving || role !== 'admin') return;
+    if (!modal || saving || (role !== 'admin' && role !== 'supervisor')) return;
     setSaving(true);
     const dateStr = modal.date;
     try {
@@ -295,16 +295,16 @@ export default function WorkSchedule() {
             const isToday   = day && dateFmt(year, month, day) === today;
             const isWeekend = (i % 7) >= 5;
             return (
-              <div key={i} onClick={day && role === 'admin' ? () => openDay(day) : undefined}
+              <div key={i} onClick={day && (role === 'admin' || role === 'supervisor') ? () => openDay(day) : undefined}
                 style={{
                   minHeight: 80, borderRadius: 4, padding: "4px 5px",
                   border: `1px solid ${isToday ? "#90caf9" : "#eee"}`,
                   background: isToday ? "#f0f7ff" : day ? "white" : "#fafafa",
-                  cursor: day && role === 'admin' ? "pointer" : "default",
+                  cursor: day && (role === 'admin' || role === 'supervisor') ? "pointer" : "default",
                   transition: "background .1s",
                 }}
-                onMouseEnter={e => { if (day && role === 'admin') e.currentTarget.style.background = isToday ? "#e3f2fd" : "#f5f8ff"; }}
-                onMouseLeave={e => { if (day && role === 'admin') e.currentTarget.style.background = isToday ? "#f0f7ff" : "white"; }}>
+                onMouseEnter={e => { if (day && (role === 'admin' || role === 'supervisor')) e.currentTarget.style.background = isToday ? "#e3f2fd" : "#f5f8ff"; }}
+                onMouseLeave={e => { if (day && (role === 'admin' || role === 'supervisor')) e.currentTarget.style.background = isToday ? "#f0f7ff" : "white"; }}>
                 {day && (
                   <>
                     <div style={{ fontSize: 12, fontWeight: isToday ? 700 : 400, color: isToday ? "#4a90e2" : isWeekend ? "#e55" : "#333", marginBottom: 3 }}>

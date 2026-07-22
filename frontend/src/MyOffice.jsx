@@ -4,7 +4,7 @@ import { RecurringTasksAdmin, TodayRecurringTasks } from "./RecurringTasks.jsx";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const ROLE_LABELS = { admin: "Администратор", manager: "Менеджер", accountmanager: "Аккаунт-менеджер", teacher: "Педагог" };
+const ROLE_LABELS = { admin: "Администратор", supervisor: "Супервайзер", manager: "Менеджер", accountmanager: "Аккаунт-менеджер", teacher: "Педагог" };
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
 const TARGET_LABELS = { all: "Все", teacher: "Педагоги", manager: "Менеджеры", account_manager: "Аккаунт-менеджеры" };
@@ -932,7 +932,7 @@ function TasksSection({ userName, supabase }) {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function MyOffice({ userEmail, userName, role, supabase }) {
-  const isAdmin = role === "admin";
+  const isAdmin = role === "admin" || role === "supervisor";
   const [employees, setEmployees] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
   const [selectedRole, setSelectedRole] = React.useState(null);
@@ -949,7 +949,10 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   const viewRole     = selectedRole || role;
   const viewEmail    = viewedProfile?.email || (selectedId ? null : userEmail);
 
-  const otherEmployees = employees.filter(e => e.full_name !== userName);
+  const otherEmployees = employees.filter(e =>
+    e.full_name !== userName &&
+    (role !== 'supervisor' || e.email !== 'crm@artschool.ru')
+  );
 
   return (
     <div style={{ maxWidth: 760, margin: "0 auto", padding: "24px 16px" }}>
