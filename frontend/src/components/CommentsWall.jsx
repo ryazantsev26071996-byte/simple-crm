@@ -127,9 +127,9 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
     }
   }
 
-  const canComment = role === "teacher" || role === "admin" || role === "manager" || role === "accountmanager";
+  const canComment = role === "teacher" || role === "admin" || role === "manager" || role === "accountmanager" || role === "supervisor";
   const isActiveStudent = ["ученик", "пробный месяц", "тест-драйв"].includes(client?.stage);
-  const canFreeze = role === "manager" || role === "accountmanager" || role === "admin" || role === "teacher";
+  const canFreeze = role === "manager" || role === "accountmanager" || role === "admin" || role === "teacher" || role === "supervisor";
 
   const lessonsLeft = client?.is_unlimited ? Infinity : (client?.lessons_total || 0) - (client?.lessons_used || 0);
   const freezeLeft = (client?.freeze_days_total || 0) - (client?.freeze_days_used || 0);
@@ -235,7 +235,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
   }
 
   function canEditComment(comment) {
-    return role === 'admin' || comment.author_id === currentUserId;
+    return role === 'admin' || role === 'supervisor' || comment.author_id === currentUserId;
   }
 
   return (
