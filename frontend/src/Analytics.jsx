@@ -8,7 +8,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const MANAGERS = ["Салампи", "Татьяна"];
-const ACCOUNT_MANAGERS = ["Арина", "Вероника"];
+const ACCOUNT_MANAGERS = []; // Арина и Вероника уволены — уволенных сотрудников из аналитики убираем, история их продаж в базе сохраняется
 const STAGES = ["новая заявка","ндз","записан на пробное","на следующий месяц","был не купил","не пришел","дожимать","продажа","ученик","бронь","тест-драйв","пробный месяц","рассылка","на МК или ОД","корявый лид","расторжение","кончился абонемент"];
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKS = [
@@ -829,6 +829,7 @@ export default function Analytics() {
       </div>
 
       {/* ── Account managers ── */}
+      {ACCOUNT_MANAGERS.length > 0 && (
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Аккаунт-менеджеры</div>
         {ACCOUNT_MANAGERS.map(name => {
@@ -907,6 +908,7 @@ export default function Analytics() {
           );
         })}
       </div>
+      )}
       </div> {/* end flex right column */}
       </div> {/* end flex container */}
 
