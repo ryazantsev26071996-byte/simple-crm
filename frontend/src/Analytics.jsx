@@ -675,9 +675,21 @@ export default function Analytics() {
                 ].filter(Boolean);
               })}
               <tr style={{ background: "#dde8ff" }}>
-                {["ИТОГО", monthSum.newLeads, monthSum.badLeads, monthSum.normalLeads, monthSum.recorded, monthSum.attended].map((v, i) =>
-                  <td key={i} style={{...TDt, background:"#dde8ff", textAlign: i ? "center" : "left"}}>{v}</td>
-                )}
+                <td style={{...TDt, background:"#dde8ff", textAlign:"left"}}>ИТОГО</td>
+                <td style={{...TDt, background:"#dde8ff", textAlign:"center", ...(monthSum.newLeads ? { color: "#4a90e2", textDecoration: "underline", cursor: "pointer" } : {})}}
+                  onClick={monthSum.newLeads ? () => { setLeadsModal({ monthAll: true, filter: "all" }); setLeadsEditRow(null); } : undefined}>
+                  {monthSum.newLeads}
+                </td>
+                <td style={{...TDt, background:"#dde8ff", textAlign:"center", ...(monthSum.badLeads ? { color: "#4a90e2", textDecoration: "underline", cursor: "pointer" } : {})}}
+                  onClick={monthSum.badLeads ? () => { setLeadsModal({ monthAll: true, filter: "bad" }); setLeadsEditRow(null); } : undefined}>
+                  {monthSum.badLeads}
+                </td>
+                <td style={{...TDt, background:"#dde8ff", textAlign:"center", ...(monthSum.normalLeads ? { color: "#4a90e2", textDecoration: "underline", cursor: "pointer" } : {})}}
+                  onClick={monthSum.normalLeads ? () => { setLeadsModal({ monthAll: true, filter: "normal" }); setLeadsEditRow(null); } : undefined}>
+                  {monthSum.normalLeads}
+                </td>
+                <td style={{...TDt, background:"#dde8ff", textAlign:"center"}}>{monthSum.recorded}</td>
+                <td style={{...TDt, background:"#dde8ff", textAlign:"center"}}>{monthSum.attended}</td>
                 {role === "admin" && <td style={{...TDt, background:"#dde8ff", padding: "6px 4px"}} />}
               </tr>
             </tbody>
@@ -1041,15 +1053,27 @@ export default function Analytics() {
       })()}
 
       {leadsModal && (() => {
-        const dayClients = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === leadsModal.dateStr);
-        const ds = leadsModal.dateStr;
-        const displayDate = `${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
+        let dayClients, title, emptyText;
+        if (leadsModal.monthAll) {
+          const yearMonthStr = `${year}-${String(month).padStart(2,"0")}`;
+          dayClients = clients.filter(c => c.lead_date && c.lead_date.slice(0,7) === yearMonthStr);
+          if (leadsModal.filter === "bad") dayClients = dayClients.filter(c => c.stage === "корявый лид");
+          if (leadsModal.filter === "normal") dayClients = dayClients.filter(c => c.stage !== "корявый лид");
+          const filterLabel = leadsModal.filter === "bad" ? "Корявые лиды" : leadsModal.filter === "normal" ? "Нормальные лиды" : "Все заявки";
+          title = `${filterLabel} — ${MONTH_NAMES[month-1]} ${year}`;
+          emptyText = "Нет заявок за этот месяц";
+        } else {
+          dayClients = clients.filter(c => c.lead_date && c.lead_date.slice(0,10) === leadsModal.dateStr);
+          const ds = leadsModal.dateStr;
+          title = `Заявки за ${ds.slice(8,10)}.${ds.slice(5,7)}.${ds.slice(0,4)}`;
+          emptyText = "Нет заявок за этот день";
+        }
         const inp = { width: "100%", padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12, boxSizing: "border-box" };
         return (
           <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ background: "white", borderRadius: 12, width: "90%", maxWidth: 820, maxHeight: "90vh", display: "flex", flexDirection: "column", padding: 20 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexShrink: 0 }}>
-                <strong style={{ fontSize: 15 }}>Заявки за {displayDate}</strong>
+                <strong style={{ fontSize: 15 }}>{title} ({dayClients.length})</strong>
                 <button onClick={() => { setLeadsModal(null); setLeadsEditRow(null); }} style={{ fontSize: 22, background: "none", border: "none", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
               </div>
               <div style={{ overflowY: "auto", flex: 1 }}>
@@ -1059,7 +1083,7 @@ export default function Analytics() {
                   </thead>
                   <tbody>
                     {dayClients.length === 0 && (
-                      <tr><td colSpan={5} style={{ padding: "20px", textAlign: "center", color: "#aaa" }}>Нет заявок за этот день</td></tr>
+                      <tr><td colSpan={5} style={{ padding: "20px", textAlign: "center", color: "#aaa" }}>{emptyText}</td></tr>
                     )}
                     {dayClients.map(c => {
                       const isEditing = leadsEditRow === c.id;
