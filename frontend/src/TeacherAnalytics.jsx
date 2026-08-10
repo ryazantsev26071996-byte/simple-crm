@@ -144,6 +144,210 @@ function RatingSection({ stats }) {
   );
 }
 
+// ── Feedback section constants ─────────────────────────────────────────────────
+const FB_STATUS_LABEL = { new: "Новый", in_progress: "В работе", resolved: "Решено" };
+const FB_STATUS_COLOR = { new: "#e55", in_progress: "#f59e0b", resolved: "#27ae60" };
+const FB_STATUS_NEXT  = { new: "in_progress", in_progress: "resolved", resolved: "new" };
+const FB_STATUS_NEXT_LABEL = { new: "→ В работе", in_progress: "→ Решено", resolved: "→ Новый" };
+
+function getAuthUser() {
+  try {
+    const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
+    const p = JSON.parse(localStorage.getItem(key) || "{}");
+    return { id: p?.user?.id || null, name: p?.user?.user_metadata?.full_name || p?.user?.email || "" };
+  } catch { return { id: null, name: "" }; }
+}
+
+async function fbFetch(path, method, body) {
+  const token = await getToken();
+  const opts = {
+    method,
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=representation" },
+  };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, opts);
+  if (method === "DELETE" && res.status === 204) return null;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+  return data;
+}
+
+// ── FeedbackSection ────────────────────────────────────────────────────────────
+function FeedbackSection({ teacherNames }) {
+  const [feedback, setFeedback]       = React.useState([]);
+  const [fbLoading, setFbLoading]     = React.useState(true);
+  const [fbTeacher, setFbTeacher]     = React.useState("");
+  const [fbStudent, setFbStudent]     = React.useState("");
+  const [fbRating, setFbRating]       = React.useState(0);
+  const [fbText, setFbText]           = React.useState("");
+  const [fbSubmitting, setFbSubmitting] = React.useState(false);
+  const [fbError, setFbError]         = React.useState("");
+  const [fbFilter, setFbFilter]       = React.useState("active");
+
+  React.useEffect(() => { loadFeedback(); }, []);
+
+  async function loadFeedback() {
+    setFbLoading(true);
+    try {
+      const data = await apiFetch("teacher_feedback?order=created_at.desc&select=*");
+      setFeedback(Array.isArray(data) ? data : []);
+    } catch (e) { setFbError(e.message); }
+    finally { setFbLoading(false); }
+  }
+
+  async function handleSubmit() {
+    if (!fbTeacher || fbSubmitting) return;
+    setFbSubmitting(true);
+    setFbError("");
+    try {
+      const { id: authorId, name: authorName } = getAuthUser();
+      const result = await fbFetch("teacher_feedback", "POST", {
+        teacher_name: fbTeacher,
+        student_name: fbStudent || null,
+        rating: fbRating || null,
+        text: fbText || null,
+        author_id: authorId,
+        author_name: authorName,
+      });
+      const row = Array.isArray(result) ? result[0] : result;
+      setFeedback(prev => [row, ...prev]);
+      setFbTeacher(""); setFbStudent(""); setFbRating(0); setFbText("");
+    } catch (e) { setFbError(e.message); }
+    finally { setFbSubmitting(false); }
+  }
+
+  async function handleStatusCycle(item) {
+    const next = FB_STATUS_NEXT[item.status] || "new";
+    try {
+      await fbFetch(`teacher_feedback?id=eq.${item.id}`, "PATCH", { status: next });
+      setFeedback(prev => prev.map(f => f.id === item.id ? { ...f, status: next } : f));
+    } catch (e) { setFbError(e.message); }
+  }
+
+  async function handleDelete(item) {
+    if (!window.confirm("Удалить запись?")) return;
+    try {
+      await fbFetch(`teacher_feedback?id=eq.${item.id}`, "DELETE");
+      setFeedback(prev => prev.filter(f => f.id !== item.id));
+    } catch (e) { setFbError(e.message); }
+  }
+
+  const displayed = fbFilter === "all"
+    ? feedback
+    : feedback.filter(f => f.status === "new" || f.status === "in_progress");
+
+  const grouped = {};
+  for (const f of displayed) {
+    if (!grouped[f.teacher_name]) grouped[f.teacher_name] = [];
+    grouped[f.teacher_name].push(f);
+  }
+
+  return (
+    <div style={CARD}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, color: "#1e293b" }}>💬 Обратная связь от учеников</div>
+
+      {/* ── Add form ── */}
+      <div style={{ background: "#f8fbff", borderRadius: 10, padding: "14px 16px", marginBottom: 20, border: "1px solid #e0e7ff" }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: "#4a90e2" }}>Добавить запись</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+          <div style={{ flex: "1 1 160px" }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Педагог *</div>
+            <select value={fbTeacher} onChange={e => setFbTeacher(e.target.value)}
+              style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
+              <option value="">Выберите педагога</option>
+              {teacherNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <div style={{ flex: "1 1 160px" }}>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Ученик</div>
+            <input value={fbStudent} onChange={e => setFbStudent(e.target.value)} placeholder="Имя ученика"
+              style={{ width: "100%", padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Оценка</div>
+            <div style={{ display: "flex", gap: 3 }}>
+              {[1,2,3,4,5].map(n => (
+                <button key={n} type="button" onClick={() => setFbRating(fbRating === n ? 0 : n)}
+                  style={{ width: 30, height: 30, borderRadius: "50%", border: "1px solid #ddd", background: fbRating >= n ? "#f59e0b" : "white", color: fbRating >= n ? "white" : "#bbb", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: 0 }}>
+                  ★
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <textarea value={fbText} onChange={e => setFbText(e.target.value)} placeholder="Комментарий..."
+          style={{ width: "100%", minHeight: 70, padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box", marginBottom: 10 }} />
+        {fbError && <div style={{ color: "#e55", fontSize: 12, marginBottom: 8 }}>{fbError}</div>}
+        <button type="button" onClick={handleSubmit} disabled={!fbTeacher || fbSubmitting}
+          style={{ padding: "6px 18px", borderRadius: 6, border: "none", background: fbTeacher ? "#4a90e2" : "#ccc", color: "white", cursor: fbTeacher ? "pointer" : "default", fontSize: 13, fontWeight: 500 }}>
+          {fbSubmitting ? "Сохранение..." : "Добавить"}
+        </button>
+      </div>
+
+      {/* ── Filter ── */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
+        {[["active", "Активные"], ["all", "Все"]].map(([val, label]) => (
+          <button key={val} type="button" onClick={() => setFbFilter(val)}
+            style={{ padding: "4px 14px", borderRadius: 20, border: `1px solid ${fbFilter === val ? "#4a90e2" : "#ddd"}`, background: fbFilter === val ? "#e8f0fe" : "white", color: fbFilter === val ? "#4a90e2" : "#666", cursor: "pointer", fontSize: 12, fontWeight: fbFilter === val ? 600 : 400 }}>
+            {label}
+          </button>
+        ))}
+        <span style={{ fontSize: 12, color: "#aaa" }}>({displayed.length})</span>
+      </div>
+
+      {fbLoading && <div style={{ color: "#aaa", fontSize: 13 }}>Загрузка...</div>}
+
+      {!fbLoading && displayed.length === 0 && (
+        <div style={{ color: "#aaa", fontSize: 13 }}>Нет записей{fbFilter === "active" ? " с активным статусом" : ""}</div>
+      )}
+
+      {/* ── Grouped list ── */}
+      {!fbLoading && Object.entries(grouped).map(([teacher, items]) => (
+        <div key={teacher} style={{ marginBottom: 20 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: "#4a90e2", marginBottom: 8 }}>
+            {teacher} <span style={{ fontWeight: 400, color: "#888" }}>({items.length})</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {items.map(f => (
+              <div key={f.id} style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: "10px 14px", display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: f.text ? 6 : 2 }}>
+                    {f.student_name && <span style={{ fontWeight: 600, fontSize: 13 }}>{f.student_name}</span>}
+                    {f.rating && <span style={{ color: "#f59e0b", fontSize: 14, letterSpacing: 1 }}>{"★".repeat(f.rating)}{"☆".repeat(5 - f.rating)}</span>}
+                    <span style={{
+                      background: FB_STATUS_COLOR[f.status] + "22",
+                      color: FB_STATUS_COLOR[f.status],
+                      border: `1px solid ${FB_STATUS_COLOR[f.status]}55`,
+                      borderRadius: 6, padding: "1px 8px", fontSize: 11, fontWeight: 600,
+                    }}>
+                      {FB_STATUS_LABEL[f.status] || f.status}
+                    </span>
+                  </div>
+                  {f.text && <div style={{ fontSize: 13, color: "#333", marginBottom: 4, whiteSpace: "pre-wrap" }}>{f.text}</div>}
+                  <div style={{ fontSize: 11, color: "#aaa" }}>
+                    {f.author_name && <span>{f.author_name} · </span>}
+                    {f.created_at && new Date(f.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 4, flexShrink: 0, alignItems: "center" }}>
+                  <button type="button" onClick={() => handleStatusCycle(f)}
+                    style={{ fontSize: 11, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#555", whiteSpace: "nowrap" }}>
+                    {FB_STATUS_NEXT_LABEL[f.status] || "→"}
+                  </button>
+                  <button type="button" onClick={() => handleDelete(f)}
+                    style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e55" }}>
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function TeacherAnalytics() {
   const now = new Date();
@@ -178,6 +382,7 @@ export default function TeacherAnalytics() {
   const mkRecords = records.filter(r => MK_TYPES.includes(r.lesson_type));
   const regularStats = buildTeacherStats(regularRecords);
   const mkStats = buildTeacherStats(mkRecords);
+  const allTeachers = [...new Set([...regularStats, ...mkStats].map(s => s.teacher).filter(t => t && t !== "—"))].sort();
 
   // Section 3 — loyalty: count per (teacher, client_name), filter > threshold
   const loyaltyMap = {};
@@ -359,6 +564,10 @@ export default function TeacherAnalytics() {
         </div>
 
       </>}
+
+      {/* ── Section 6: Обратная связь от учеников ── */}
+      <FeedbackSection teacherNames={allTeachers} />
+
     </div>
   );
 }
