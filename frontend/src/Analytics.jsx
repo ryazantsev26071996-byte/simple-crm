@@ -974,6 +974,7 @@ export default function Analytics() {
           role={role}
           authorName={authorName}
           userId={user?.id}
+          userEmail={user?.email}
           asModal={true}
           onClose={() => setClientModal(null)}
           onUpdate={updated => setClientModal(updated)}

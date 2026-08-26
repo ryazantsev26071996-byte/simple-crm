@@ -72,6 +72,9 @@ export default function App() {
   React.useEffect(() => { localStorage.setItem('crm_view', view); }, [view]);
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
+  const [showInlineHistory, setShowInlineHistory] = React.useState(false);
+  const [inlineHistoryLogs, setInlineHistoryLogs] = React.useState([]);
+  const [inlineHistoryLoading, setInlineHistoryLoading] = React.useState(false);
   const [showMerge, setShowMerge] = React.useState(false);
   const [allTasks, setAllTasks] = React.useState([]);
   const [showTaskBell, setShowTaskBell] = React.useState(false);
@@ -355,8 +358,8 @@ export default function App() {
           {view === 'analytics' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && <Analytics />}
           {view === 'teacheranalytics' && role === 'admin' && <TeacherAnalytics />}
           {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher' || role === 'supervisor') && <WorkSchedule />}
-          {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
-          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
+          {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
+          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
 
           {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
@@ -482,6 +485,17 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {user?.email === 'auracommunitynq@gmail.com' && (
+                  <button onClick={async () => {
+                    setShowInlineHistory(true);
+                    setInlineHistoryLoading(true);
+                    const { data } = await supabase.from('audit_log').select('*').eq('entity', 'client').eq('entity_id', selectedClient.id).order('created_at', { ascending: false });
+                    setInlineHistoryLogs(data || []);
+                    setInlineHistoryLoading(false);
+                  }} style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #7c3aed', background: 'white', cursor: 'pointer', color: '#7c3aed' }}>
+                    🕓 История
+                  </button>
+                )}
                 {(role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && (
                   <button onClick={async () => {
                     if (!window.confirm('Удалить клиента ' + selectedClient.name + '?')) return;
@@ -502,8 +516,14 @@ export default function App() {
                 onSubmit={async (payload) => {
                   setError("");
                   try {
+                    const oldLessonsUsed = selectedClient?.lessons_used ?? 0;
                     const updated = await updateClient({ role, name: authorName }, selectedClient.id, payload);
                     setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+                    if (Number(payload.lessons_used) !== oldLessonsUsed) {
+                      try {
+                        await supabase.from('audit_log').insert({ action: 'lessons_edited', entity: 'client', entity_id: selectedClient.id, old_value: String(oldLessonsUsed), new_value: String(payload.lessons_used), performed_by: user?.id, performed_by_name: authorName });
+                      } catch {}
+                    }
                   } catch (err) { setError(err.message); }
                 }}
               />
@@ -541,6 +561,57 @@ export default function App() {
       </div>
 
 
+      {showInlineHistory && selectedClient && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 12, width: '90%', maxWidth: 680, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>🕓 История: {selectedClient.name}</div>
+              <button onClick={() => setShowInlineHistory(false)} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+            <div style={{ overflowY: 'auto', flex: 1, padding: 20 }}>
+              {inlineHistoryLoading && <div style={{ color: '#888' }}>Загрузка...</div>}
+              {!inlineHistoryLoading && (() => {
+                const lessonLogs = inlineHistoryLogs.filter(l => l.action === 'lessons_deducted' || l.action === 'lessons_edited');
+                const otherLogs = inlineHistoryLogs.filter(l => l.action !== 'lessons_deducted' && l.action !== 'lessons_edited');
+                const fmt = iso => { if (!iso) return ''; const d = new Date(iso); return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+                return (
+                  <>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: '#333' }}>Списано занятий</div>
+                    {lessonLogs.length === 0 && <div style={{ color: '#aaa', fontSize: 13, marginBottom: 16 }}>Нет записей.</div>}
+                    {lessonLogs.map(log => (
+                      <div key={log.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
+                        <div style={{ fontSize: 13, marginBottom: 4 }}>
+                          <span style={{ color: '#4a90e2', fontWeight: 500 }}>{log.performed_by_name}</span>
+                          {' · '}<span style={{ color: '#888', fontSize: 12 }}>{log.action === 'lessons_edited' ? '✏️ ручная правка' : '📉 списание'}</span>
+                          {' · '}<span style={{ color: '#aaa', fontSize: 12 }}>{fmt(log.created_at)}</span>
+                        </div>
+                        {log.old_value && <div style={{ fontSize: 12, color: '#888', background: '#fff5f5', padding: '4px 8px', borderRadius: 5, marginBottom: 3, borderLeft: '3px solid #fcc' }}><span style={{ color: '#e55', fontWeight: 500 }}>Было: </span>{log.old_value}</div>}
+                        {log.new_value && <div style={{ fontSize: 12, color: '#888', background: '#f5fff5', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid #cfc' }}><span style={{ color: '#2a9', fontWeight: 500 }}>Стало: </span>{log.new_value}</div>}
+                      </div>
+                    ))}
+                    {otherLogs.length > 0 && (
+                      <>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginTop: 20, marginBottom: 10, color: '#333' }}>Все изменения</div>
+                        {otherLogs.map(log => (
+                          <div key={log.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
+                            <div style={{ fontSize: 13, marginBottom: 4 }}>
+                              <span style={{ color: '#4a90e2', fontWeight: 500 }}>{log.performed_by_name}</span>
+                              {' · '}<span style={{ color: '#888', fontSize: 12 }}>{log.action}</span>
+                              {' · '}<span style={{ color: '#aaa', fontSize: 12 }}>{fmt(log.created_at)}</span>
+                            </div>
+                            {log.old_value && <div style={{ fontSize: 12, color: '#888', background: '#fff5f5', padding: '4px 8px', borderRadius: 5, marginBottom: 3, borderLeft: '3px solid #fcc' }}><span style={{ color: '#e55', fontWeight: 500 }}>Было: </span>{log.old_value}</div>}
+                            {log.new_value && <div style={{ fontSize: 12, color: '#888', background: '#f5fff5', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid #cfc' }}><span style={{ color: '#2a9', fontWeight: 500 }}>Стало: </span>{log.new_value}</div>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
       {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
       {showMerge && <MergeDuplicates onClose={() => setShowMerge(false)} onMerged={reloadClients} />}

@@ -46,7 +46,7 @@ function fmt(date) { const d = new Date(date); return d.getFullYear() + "-" + St
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 
-export default function TrialSchedule({ clients, role, authorName, userId, onClientsChange }) {
+export default function TrialSchedule({ clients, role, authorName, userId, userEmail, onClientsChange }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
@@ -559,6 +559,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, onCli
           role={role}
           authorName={authorName}
           userId={userId}
+          userEmail={userEmail}
           asModal={true}
           onClose={() => setClientModal(null)}
           onUpdate={(updated) => { setClientModal(updated); setAllClients(prev => prev.map(c => c.id === updated.id ? updated : c)); if (onClientsChange) onClientsChange(updated); }}

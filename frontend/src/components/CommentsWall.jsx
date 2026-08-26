@@ -160,6 +160,14 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
         });
         const result = await res.json();
         if (!res.ok) throw new Error(result.message || JSON.stringify(result));
+        if (updates.lessons_used !== undefined) {
+          try {
+            await logAudit('lessons_deducted', 'client', client.id,
+              String(client?.lessons_used || 0),
+              `${updates.lessons_used} (−${lessons} за ${lessonDate})`,
+              currentUserId, authorName);
+          } catch {}
+        }
         if (onClientUpdate) onClientUpdate({ ...client, ...updates });
       }
 
