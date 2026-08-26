@@ -485,7 +485,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {user?.email === 'auracommunitynq@gmail.com' && (
+                {user?.email === 'crm@artschool.ru' && (
                   <button onClick={async () => {
                     setShowInlineHistory(true);
                     setInlineHistoryLoading(true);

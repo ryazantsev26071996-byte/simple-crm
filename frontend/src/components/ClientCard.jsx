@@ -124,7 +124,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {userEmail === 'auracommunitynq@gmail.com' && (
+          {userEmail === 'crm@artschool.ru' && (
             <button onClick={() => setShowHistory(true)}
               style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #7c3aed', background: 'white', cursor: 'pointer', color: '#7c3aed' }}>
               🕓 История
