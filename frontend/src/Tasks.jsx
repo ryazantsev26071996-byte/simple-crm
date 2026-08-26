@@ -35,9 +35,13 @@ const STATUS_COLORS = { new: "#4a90e2", in_progress: "#e67e22", done: "#27ae60",
 const PRIORITY_ICONS = { high: "🔴", medium: "🟡", low: "🟢" };
 const PRIORITY_LABELS = { high: "Высокий", medium: "Средний", low: "Низкий" };
 
+function localDateStr(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function getDueDateColor(dueDate, isDone) {
   if (isDone) return "#ccc";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   if (dueDate < today) return "#e53935";
   if (dueDate === today) return "#e67e22";
   return "#888";
@@ -48,7 +52,7 @@ function getNextDueDate(dueDate, repeatType) {
   if (repeatType === "daily") d.setDate(d.getDate() + 1);
   else if (repeatType === "weekly") d.setDate(d.getDate() + 7);
   else if (repeatType === "monthly") d.setMonth(d.getMonth() + 1);
-  return d.toISOString().slice(0, 10);
+  return localDateStr(d);
 }
 
 export default function Tasks({ user, profile, onClientSelect }) {
@@ -81,7 +85,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
   async function loadRecurringTasks() {
     if (!myName) return;
     try {
-      const date = new Date().toISOString().slice(0, 10);
+      const date = localDateStr();
       const insts = await apiFetch(`recurring_task_instances?assigned_to=eq.${encodeURIComponent(myName)}&date=eq.${date}&is_completed=eq.false&select=id,task_id,date,is_completed`);
       setRecurringInstances(insts || []);
       if (!insts || insts.length === 0) return;
@@ -175,9 +179,11 @@ export default function Tasks({ user, profile, onClientSelect }) {
     } catch {}
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const endOfWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const today = localDateStr();
+  const tomorrowD = new Date(); tomorrowD.setDate(tomorrowD.getDate() + 1);
+  const tomorrow = localDateStr(tomorrowD);
+  const endOfWeekD = new Date(); endOfWeekD.setDate(endOfWeekD.getDate() + 7);
+  const endOfWeek = localDateStr(endOfWeekD);
 
   const filteredTasks = tasks.filter(t => {
     const isDone = t.status === "done" || t.completed;
@@ -391,7 +397,7 @@ function TaskCard({ task, onEdit, onStatusChange, onClientSelect }) {
   const isDone = task.status === "done" || task.completed;
   const checklist = Array.isArray(task.checklist) ? task.checklist : [];
   const checkedCount = checklist.filter(i => i.checked).length;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const status = task.status || (isDone ? "done" : "new");
 
   return (
