@@ -578,17 +578,21 @@ export default function App() {
                   <>
                     <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: '#333' }}>Списано занятий</div>
                     {lessonLogs.length === 0 && <div style={{ color: '#aaa', fontSize: 13, marginBottom: 16 }}>Нет записей.</div>}
-                    {lessonLogs.map(log => (
-                      <div key={log.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                        <div style={{ fontSize: 13, marginBottom: 4 }}>
-                          <span style={{ color: '#4a90e2', fontWeight: 500 }}>{log.performed_by_name}</span>
-                          {' · '}<span style={{ color: '#888', fontSize: 12 }}>{log.action === 'lessons_edited' ? '✏️ ручная правка' : '📉 списание'}</span>
-                          {' · '}<span style={{ color: '#aaa', fontSize: 12 }}>{fmt(log.created_at)}</span>
+                    {lessonLogs.map(log => {
+                      const isBackfilled = log.new_value?.startsWith('восстановлено');
+                      return (
+                        <div key={log.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0', opacity: isBackfilled ? 0.72 : 1 }}>
+                          <div style={{ fontSize: 13, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ color: '#4a90e2', fontWeight: 500 }}>{log.performed_by_name || '—'}</span>
+                            <span style={{ color: '#888', fontSize: 12 }}>{log.action === 'lessons_edited' ? '✏️ ручная правка' : '📉 списание'}</span>
+                            {isBackfilled && <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3, background: '#f0f0f0', color: '#aaa', border: '1px solid #ddd' }}>восстановлено</span>}
+                            <span style={{ color: '#aaa', fontSize: 12 }}>{fmt(log.created_at)}</span>
+                          </div>
+                          {log.old_value && <div style={{ fontSize: 12, color: '#888', background: '#fff5f5', padding: '4px 8px', borderRadius: 5, marginBottom: 3, borderLeft: '3px solid #fcc' }}><span style={{ color: '#e55', fontWeight: 500 }}>Было: </span>{log.old_value}</div>}
+                          {log.new_value && <div style={{ fontSize: 12, color: '#888', background: isBackfilled ? '#fafafa' : '#f5fff5', padding: '4px 8px', borderRadius: 5, borderLeft: `3px solid ${isBackfilled ? '#ddd' : '#cfc'}` }}><span style={{ color: isBackfilled ? '#999' : '#2a9', fontWeight: 500 }}>Стало: </span>{log.new_value}</div>}
                         </div>
-                        {log.old_value && <div style={{ fontSize: 12, color: '#888', background: '#fff5f5', padding: '4px 8px', borderRadius: 5, marginBottom: 3, borderLeft: '3px solid #fcc' }}><span style={{ color: '#e55', fontWeight: 500 }}>Было: </span>{log.old_value}</div>}
-                        {log.new_value && <div style={{ fontSize: 12, color: '#888', background: '#f5fff5', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid #cfc' }}><span style={{ color: '#2a9', fontWeight: 500 }}>Стало: </span>{log.new_value}</div>}
-                      </div>
-                    ))}
+                      );
+                    })}
                     {otherLogs.length > 0 && (
                       <>
                         <div style={{ fontWeight: 600, fontSize: 13, marginTop: 20, marginBottom: 10, color: '#333' }}>Все изменения</div>
