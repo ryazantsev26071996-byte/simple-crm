@@ -8,7 +8,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKDAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const TEACHERS = ["Софья","Юлия","Екатерина","Александра","Анастасия","Дарья"];
-const ACCOUNTS = ["Арина","Вероника"];
+const ACCOUNTS = [];
 
 const CHIP_COLORS = ["#4a90e2","#e67e22","#2a9d8f","#7c3aed","#e55","#1b9a59","#c0392b","#2980b9"];
 

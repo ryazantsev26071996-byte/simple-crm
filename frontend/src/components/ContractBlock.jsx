@@ -354,7 +354,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
               <select style={inputStyle} value={form.registered_by}
                 onChange={e => setForm(f => ({ ...f, registered_by: e.target.value }))}>
                 <option value="">— выбрать —</option>
-                {["Арина","Вероника","Салампи","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
+                {["Салампи","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
               </select>
             ) : (
               <input style={inputStyle} value={form.registered_by} readOnly placeholder="Не заполнено" />

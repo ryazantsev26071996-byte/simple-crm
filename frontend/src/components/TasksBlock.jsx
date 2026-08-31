@@ -3,7 +3,7 @@ import React from "react";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const ASSIGNEES = ['Арина', 'Вероника', 'Татьяна', 'Салампи', 'Юлия', 'Екатерина', 'Александра', 'Софья', 'Анастасия', 'Дарья'];
+const ASSIGNEES = ['Татьяна', 'Салампи', 'Юлия', 'Екатерина', 'Александра', 'Софья', 'Анастасия', 'Дарья'];
 
 async function getToken() {
   try {
