@@ -90,6 +90,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
   const [recurringInstances, setRecurringInstances] = React.useState([]);
   const [recurringTaskMap, setRecurringTaskMap] = React.useState({});
   const [recurringLogMap, setRecurringLogMap] = React.useState({});
+  const [assigneeFilter, setAssigneeFilter] = React.useState("all");
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
   const [sortCol, setSortCol] = React.useState(null);
   const [sortDir, setSortDir] = React.useState("asc");
@@ -206,6 +207,11 @@ export default function Tasks({ user, profile, onClientSelect }) {
     } catch {}
   }
 
+  const assigneeOptions = React.useMemo(() =>
+    [...new Set(tasks.map(t => t.assigned_to).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")),
+    [tasks]
+  );
+
   const today = localDateStr();
   const tomorrowD = new Date(); tomorrowD.setDate(tomorrowD.getDate() + 1);
   const tomorrow = localDateStr(tomorrowD);
@@ -220,6 +226,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
       else { if (t.status !== statusFilter) return false; }
     }
     if (priorityFilter !== "all" && t.priority !== priorityFilter) return false;
+    if (effectiveScope === "all" && assigneeFilter !== "all" && t.assigned_to !== assigneeFilter) return false;
     return true;
   });
 
@@ -346,7 +353,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
         {isAdmin && (
           <div style={{ display: "flex", borderRadius: 6, border: "1px solid #ddd", overflow: "hidden" }}>
             {[["mine", "Мои задачи"], ["all", "Все задачи"]].map(([val, label]) => (
-              <button key={val} onClick={() => setScope(val)}
+              <button key={val} onClick={() => { setScope(val); if (val === "mine") setAssigneeFilter("all"); }}
                 style={{ padding: "5px 12px", fontSize: 12, border: "none", background: scope === val ? "#4a90e2" : "white", color: scope === val ? "white" : "#333", cursor: "pointer", borderLeft: val === "all" ? "1px solid #ddd" : "none" }}>
                 {label}
               </button>
@@ -368,6 +375,13 @@ export default function Tasks({ user, profile, onClientSelect }) {
           <option value="medium">🟡 Средний</option>
           <option value="low">🟢 Низкий</option>
         </select>
+        {effectiveScope === "all" && (
+          <select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)}
+            style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 12, outline: "none" }}>
+            <option value="all">Все сотрудники</option>
+            {assigneeOptions.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        )}
         <button onClick={() => { setEditingTask(null); setShowModal(true); }}
           style={{ marginLeft: "auto", padding: "5px 16px", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           + Задача
