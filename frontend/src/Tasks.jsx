@@ -56,7 +56,7 @@ function getNextDueDate(dueDate, repeatType) {
 }
 
 export default function Tasks({ user, profile, onClientSelect }) {
-  const isAdmin = user?.email === "crm@artschool.ru";
+  const isAdmin = user?.email === "crm@artschool.ru" || profile?.role === "supervisor";
   const myName = profile?.full_name || "";
 
   const [tasks, setTasks] = React.useState([]);
