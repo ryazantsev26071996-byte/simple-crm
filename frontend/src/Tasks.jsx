@@ -34,6 +34,8 @@ const STATUS_LABELS = { new: "Новая", in_progress: "В работе", done:
 const STATUS_COLORS = { new: "#4a90e2", in_progress: "#e67e22", done: "#27ae60", postponed: "#95a5a6" };
 const PRIORITY_ICONS = { high: "🔴", medium: "🟡", low: "🟢" };
 const PRIORITY_LABELS = { high: "Высокий", medium: "Средний", low: "Низкий" };
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+const STATUS_ORDER = { new: 0, in_progress: 1, postponed: 2, done: 3 };
 
 function localDateStr(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -55,6 +57,23 @@ function getNextDueDate(dueDate, repeatType) {
   return localDateStr(d);
 }
 
+const TH_BASE = {
+  padding: "9px 10px",
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: "uppercase",
+  letterSpacing: ".04em",
+  color: "#7c8ca0",
+  textAlign: "left",
+  borderBottom: "2px solid #e8eaf0",
+  whiteSpace: "nowrap",
+  background: "white",
+  userSelect: "none",
+  position: "sticky",
+  top: 0,
+  zIndex: 2,
+};
+
 export default function Tasks({ user, profile, onClientSelect }) {
   const isAdmin = user?.email === "crm@artschool.ru" || profile?.role === "supervisor";
   const myName = profile?.full_name || "";
@@ -69,8 +88,17 @@ export default function Tasks({ user, profile, onClientSelect }) {
   const [profiles, setProfiles] = React.useState([]);
   const [doneOpen, setDoneOpen] = React.useState(false);
   const [recurringInstances, setRecurringInstances] = React.useState([]);
-  const [recurringTaskMap, setRecurringTaskMap]     = React.useState({});
-  const [recurringLogMap, setRecurringLogMap]       = React.useState({});
+  const [recurringTaskMap, setRecurringTaskMap] = React.useState({});
+  const [recurringLogMap, setRecurringLogMap] = React.useState({});
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
+  const [sortCol, setSortCol] = React.useState(null);
+  const [sortDir, setSortDir] = React.useState("asc");
+
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const effectiveScope = isAdmin ? scope : "mine";
 
@@ -161,7 +189,6 @@ export default function Tasks({ user, profile, onClientSelect }) {
       const data = await apiFetch(q);
       setTasks(data || []);
     } catch {
-      // fallback without join if FK not configured
       try {
         let q = "tasks?order=due_date.asc.nullslast,created_at.asc";
         if (effectiveScope === "mine" && myName) q += `&assigned_to=eq.${encodeURIComponent(myName)}`;
@@ -197,21 +224,21 @@ export default function Tasks({ user, profile, onClientSelect }) {
   });
 
   const groups = {
-    overdue:  { label: "Просрочено",         color: "#e53935", tasks: [] },
-    today:    { label: "Сегодня",             color: "#e67e22", tasks: [] },
-    tomorrow: { label: "Завтра",              color: "#d97706", tasks: [] },
-    thisWeek: { label: "На этой неделе",      color: "#4a90e2", tasks: [] },
-    later:    { label: "Позже",               color: "#555",    tasks: [] },
-    noDate:   { label: "Без даты",            color: "#888",    tasks: [] },
-    done:     { label: "Выполнено",           color: "#27ae60", tasks: [] },
+    overdue:  { label: "Просрочено",    color: "#e53935", tasks: [] },
+    today:    { label: "Сегодня",       color: "#e67e22", tasks: [] },
+    tomorrow: { label: "Завтра",        color: "#d97706", tasks: [] },
+    thisWeek: { label: "На этой неделе", color: "#4a90e2", tasks: [] },
+    later:    { label: "Позже",         color: "#555",    tasks: [] },
+    noDate:   { label: "Без даты",      color: "#888",    tasks: [] },
+    done:     { label: "Выполнено",     color: "#27ae60", tasks: [] },
   };
 
   filteredTasks.forEach(t => {
     const isDone = t.status === "done" || t.completed;
-    if (isDone)              { groups.done.tasks.push(t); return; }
-    if (!t.due_date)         { groups.noDate.tasks.push(t); return; }
-    if (t.due_date < today)  { groups.overdue.tasks.push(t); return; }
-    if (t.due_date === today) { groups.today.tasks.push(t); return; }
+    if (isDone)               { groups.done.tasks.push(t); return; }
+    if (!t.due_date)          { groups.noDate.tasks.push(t); return; }
+    if (t.due_date < today)   { groups.overdue.tasks.push(t); return; }
+    if (t.due_date === today)  { groups.today.tasks.push(t); return; }
     if (t.due_date === tomorrow) { groups.tomorrow.tasks.push(t); return; }
     if (t.due_date <= endOfWeek) { groups.thisWeek.tasks.push(t); return; }
     groups.later.tasks.push(t);
@@ -275,8 +302,45 @@ export default function Tasks({ user, profile, onClientSelect }) {
     setShowModal(false);
   }
 
+  function toggleSort(col) {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  }
+
+  function applySort(list) {
+    if (!sortCol) return list;
+    return [...list].sort((a, b) => {
+      let av, bv;
+      if (sortCol === "priority") {
+        av = PRIORITY_ORDER[a.priority] ?? 99;
+        bv = PRIORITY_ORDER[b.priority] ?? 99;
+      } else if (sortCol === "status") {
+        av = STATUS_ORDER[a.status] ?? 99;
+        bv = STATUS_ORDER[b.status] ?? 99;
+      } else if (sortCol === "due_date") {
+        av = a.due_date || "9999";
+        bv = b.due_date || "9999";
+      } else if (sortCol === "assigned_to") {
+        av = a.assigned_to || "";
+        bv = b.assigned_to || "";
+      } else {
+        return 0;
+      }
+      const cmp = typeof av === "number" ? av - bv : av.localeCompare(bv, "ru");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }
+
+  function SortArrow({ col }) {
+    if (sortCol !== col) return <span style={{ color: "#d0d4e0", fontSize: 10, marginLeft: 2 }}>↕</span>;
+    return <span style={{ color: "#4a90e2", fontSize: 10, marginLeft: 2 }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  const groupEntries = Object.entries(groups);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+
       {/* Filter bar */}
       <div style={{ display: "flex", gap: 8, padding: "10px 16px", borderBottom: "1px solid #eee", alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
         {isAdmin && (
@@ -310,10 +374,12 @@ export default function Tasks({ user, profile, onClientSelect }) {
         </button>
       </div>
 
-      {/* Task list */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+      {/* Scrollable content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "10px 8px" : "0 0 12px 0" }}>
+
+        {/* Recurring tasks (shown in "mine" scope only) */}
         {effectiveScope === "mine" && recurringInstances.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ margin: isMobile ? "0 0 16px 0" : "12px 16px 16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: "#7c3aed" }}>🔁 Повторяющиеся задачи на сегодня</span>
               <span style={{ fontSize: 11, background: "#7c3aed", color: "white", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>{recurringInstances.length}</span>
@@ -346,6 +412,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
             })}
           </div>
         )}
+
         {loading && (
           <div style={{ color: "#aaa", fontSize: 13, textAlign: "center", padding: "40px 0" }}>Загрузка...</div>
         )}
@@ -355,28 +422,111 @@ export default function Tasks({ user, profile, onClientSelect }) {
             <div style={{ fontSize: 14 }}>Задач нет</div>
           </div>
         )}
-        {!loading && Object.entries(groups).map(([key, group]) => {
-          if (group.tasks.length === 0) return null;
-          const isDoneGroup = key === "done";
-          return (
-            <div key={key} style={{ marginBottom: 20 }}>
-              <div
-                onClick={isDoneGroup ? () => setDoneOpen(v => !v) : undefined}
-                style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, cursor: isDoneGroup ? "pointer" : "default", userSelect: "none" }}>
-                <span style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: group.color }}>{group.label}</span>
-                <span style={{ fontSize: 11, background: group.color, color: "white", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>{group.tasks.length}</span>
-                {isDoneGroup && <span style={{ fontSize: 11, color: "#aaa", marginLeft: 2 }}>{doneOpen ? "▲" : "▼"}</span>}
-              </div>
-              {(!isDoneGroup || doneOpen) && group.tasks.map(t => (
-                <TaskCard key={t.id} task={t}
-                  onEdit={() => { setEditingTask(t); setShowModal(true); }}
-                  onStatusChange={handleStatusChange}
-                  onClientSelect={onClientSelect}
-                />
-              ))}
-            </div>
-          );
-        })}
+
+        {/* ── Mobile: stacked cards ── */}
+        {!loading && filteredTasks.length > 0 && isMobile && (
+          <div>
+            {groupEntries.map(([key, group]) => {
+              if (group.tasks.length === 0) return null;
+              const isDoneGroup = key === "done";
+              return (
+                <div key={key} style={{ marginBottom: 20 }}>
+                  <div
+                    onClick={isDoneGroup ? () => setDoneOpen(v => !v) : undefined}
+                    style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, cursor: isDoneGroup ? "pointer" : "default", userSelect: "none" }}>
+                    <span style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: ".05em", color: group.color }}>{group.label}</span>
+                    <span style={{ fontSize: 11, background: group.color, color: "white", borderRadius: 10, padding: "1px 7px", fontWeight: 600 }}>{group.tasks.length}</span>
+                    {isDoneGroup && <span style={{ fontSize: 11, color: "#aaa", marginLeft: 2 }}>{doneOpen ? "▲" : "▼"}</span>}
+                  </div>
+                  {(!isDoneGroup || doneOpen) && group.tasks.map(t => (
+                    <TaskCard key={t.id} task={t}
+                      onEdit={() => { setEditingTask(t); setShowModal(true); }}
+                      onStatusChange={handleStatusChange}
+                      onClientSelect={onClientSelect}
+                    />
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Desktop: table ── */}
+        {!loading && filteredTasks.length > 0 && !isMobile && (
+          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: 38 }} />
+              <col />
+              <col style={{ width: 160 }} />
+              <col style={{ width: 148 }} />
+              <col style={{ width: 88 }} />
+              <col style={{ width: 112 }} />
+              <col style={{ width: 96 }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={{ ...TH_BASE, cursor: "default" }}></th>
+                <th style={{ ...TH_BASE, cursor: "default" }}>Название</th>
+                <th style={{ ...TH_BASE, cursor: "default" }}>Клиент</th>
+                <th style={{ ...TH_BASE, cursor: "pointer" }} onClick={() => toggleSort("assigned_to")}>
+                  Ответственный<SortArrow col="assigned_to" />
+                </th>
+                <th style={{ ...TH_BASE, cursor: "pointer" }} onClick={() => toggleSort("due_date")}>
+                  Срок<SortArrow col="due_date" />
+                </th>
+                <th style={{ ...TH_BASE, cursor: "pointer" }} onClick={() => toggleSort("status")}>
+                  Статус<SortArrow col="status" />
+                </th>
+                <th style={{ ...TH_BASE, cursor: "pointer", textAlign: "center" }} onClick={() => toggleSort("priority")}>
+                  Приоритет<SortArrow col="priority" />
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupEntries.map(([key, group]) => {
+                if (group.tasks.length === 0) return null;
+                const isDoneGroup = key === "done";
+                const rows = applySort(group.tasks);
+                return (
+                  <React.Fragment key={key}>
+                    <tr
+                      onClick={isDoneGroup ? () => setDoneOpen(v => !v) : undefined}
+                      style={{ cursor: isDoneGroup ? "pointer" : "default", userSelect: "none" }}>
+                      <td colSpan={7} style={{
+                        padding: "9px 12px 7px",
+                        background: "#f7f8fc",
+                        borderTop: "2px solid #e8eaf0",
+                        borderBottom: "1px solid #e8eaf0",
+                      }}>
+                        <span style={{ fontWeight: 700, fontSize: 11, textTransform: "uppercase", letterSpacing: ".06em", color: group.color }}>
+                          {group.label}
+                        </span>
+                        <span style={{
+                          fontSize: 11, background: group.color, color: "white",
+                          borderRadius: 10, padding: "1px 7px", fontWeight: 600, marginLeft: 7,
+                        }}>
+                          {group.tasks.length}
+                        </span>
+                        {isDoneGroup && (
+                          <span style={{ fontSize: 11, color: "#aaa", marginLeft: 7 }}>
+                            {doneOpen ? "▲" : "▼"}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                    {(!isDoneGroup || doneOpen) && rows.map(t => (
+                      <TaskRow key={t.id} task={t}
+                        onEdit={() => { setEditingTask(t); setShowModal(true); }}
+                        onStatusChange={handleStatusChange}
+                        onClientSelect={onClientSelect}
+                      />
+                    ))}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {showModal && (
@@ -392,6 +542,126 @@ export default function Tasks({ user, profile, onClientSelect }) {
     </div>
   );
 }
+
+// ── Desktop table row ────────────────────────────────────────────────────────
+
+function TaskRow({ task, onEdit, onStatusChange, onClientSelect }) {
+  const isDone = task.status === "done" || task.completed;
+  const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+  const checkedCount = checklist.filter(i => i.checked).length;
+  const today = localDateStr();
+  const status = task.status || (isDone ? "done" : "new");
+
+  return (
+    <tr
+      onClick={onEdit}
+      style={{ cursor: "pointer", borderBottom: "1px solid #f0f2f7", background: "white" }}
+      onMouseEnter={e => e.currentTarget.style.background = "#f5f7ff"}
+      onMouseLeave={e => e.currentTarget.style.background = "white"}>
+
+      {/* Done checkbox */}
+      <td style={{ padding: "10px 6px", textAlign: "center", verticalAlign: "middle" }}>
+        <div
+          onClick={e => { e.stopPropagation(); onStatusChange(task, isDone ? "new" : "done"); }}
+          style={{
+            width: 18, height: 18, borderRadius: 4,
+            border: `2px solid ${isDone ? "#27ae60" : "#c8cdd8"}`,
+            background: isDone ? "#27ae60" : "white",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", margin: "0 auto",
+          }}>
+          {isDone && <span style={{ color: "white", fontSize: 11, lineHeight: 1 }}>✓</span>}
+        </div>
+      </td>
+
+      {/* Название */}
+      <td style={{ padding: "10px 10px", verticalAlign: "middle", overflow: "hidden" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+          <span style={{
+            fontSize: 13, fontWeight: 500,
+            color: isDone ? "#aaa" : "#1e293b",
+            textDecoration: isDone ? "line-through" : "none",
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {task.text}
+          </span>
+          {task.repeat_type && task.repeat_type !== "none" && (
+            <span title={`Повтор: ${task.repeat_type}`} style={{ fontSize: 11, flexShrink: 0 }}>🔁</span>
+          )}
+          {checklist.length > 0 && (
+            <span style={{ fontSize: 11, color: checkedCount === checklist.length ? "#27ae60" : "#94a3b8", flexShrink: 0, whiteSpace: "nowrap" }}>
+              ☑ {checkedCount}/{checklist.length}
+            </span>
+          )}
+        </div>
+        {task.description && (
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {task.description}
+          </div>
+        )}
+      </td>
+
+      {/* Клиент */}
+      <td style={{ padding: "10px 10px", verticalAlign: "middle", overflow: "hidden" }}>
+        {task.client?.name ? (
+          <span
+            onClick={e => { if (onClientSelect && task.client_id) { e.stopPropagation(); onClientSelect(task.client_id); } }}
+            style={{
+              fontSize: 12, color: "#4a90e2",
+              cursor: onClientSelect && task.client_id ? "pointer" : "default",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block",
+            }}>
+            {task.client.name}
+          </span>
+        ) : <span style={{ color: "#c8cdd8", fontSize: 13 }}>—</span>}
+      </td>
+
+      {/* Ответственный */}
+      <td style={{ padding: "10px 10px", verticalAlign: "middle", fontSize: 12, color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {task.assigned_to || <span style={{ color: "#c8cdd8", fontSize: 13 }}>—</span>}
+      </td>
+
+      {/* Срок */}
+      <td style={{ padding: "10px 10px", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+        {task.due_date ? (
+          <span style={{
+            fontSize: 12,
+            color: getDueDateColor(task.due_date, isDone),
+            fontWeight: !isDone && task.due_date <= today ? 600 : 400,
+          }}>
+            {new Date(task.due_date + "T00:00:00").toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })}
+            {task.due_time && <span style={{ fontSize: 11 }}> {task.due_time}</span>}
+          </span>
+        ) : <span style={{ color: "#c8cdd8", fontSize: 13 }}>—</span>}
+      </td>
+
+      {/* Статус */}
+      <td style={{ padding: "10px 10px", verticalAlign: "middle" }}>
+        <span style={{
+          display: "inline-block",
+          fontSize: 11, padding: "3px 9px", borderRadius: 12,
+          background: (STATUS_COLORS[status] || "#888") + "1a",
+          color: STATUS_COLORS[status] || "#888",
+          fontWeight: 600, whiteSpace: "nowrap",
+          border: `1px solid ${(STATUS_COLORS[status] || "#888")}33`,
+        }}>
+          {STATUS_LABELS[status] || status}
+        </span>
+      </td>
+
+      {/* Приоритет */}
+      <td style={{ padding: "10px 10px", verticalAlign: "middle", textAlign: "center" }}>
+        {task.priority ? (
+          <span title={PRIORITY_LABELS[task.priority]} style={{ fontSize: 15 }}>
+            {PRIORITY_ICONS[task.priority]}
+          </span>
+        ) : <span style={{ color: "#c8cdd8", fontSize: 13 }}>—</span>}
+      </td>
+    </tr>
+  );
+}
+
+// ── Mobile card (unchanged layout) ──────────────────────────────────────────
 
 function TaskCard({ task, onEdit, onStatusChange, onClientSelect }) {
   const isDone = task.status === "done" || task.completed;
@@ -423,7 +693,7 @@ function TaskCard({ task, onEdit, onStatusChange, onClientSelect }) {
           )}
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "2px 10px", alignItems: "center" }}>
-          {(task.client?.name) && (
+          {task.client?.name && (
             <span
               onClick={e => { if (onClientSelect && task.client_id) { e.stopPropagation(); onClientSelect(task.client_id); } }}
               style={{ fontSize: 11, color: "#4a90e2", cursor: onClientSelect && task.client_id ? "pointer" : "default" }}>
@@ -452,6 +722,8 @@ function TaskCard({ task, onEdit, onStatusChange, onClientSelect }) {
     </div>
   );
 }
+
+// ── Modal (unchanged) ────────────────────────────────────────────────────────
 
 const iStyle = { width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid #e0e0e0", fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 const lStyle = { fontSize: 11, color: "#888", marginBottom: 3, fontWeight: 500, display: "block" };
