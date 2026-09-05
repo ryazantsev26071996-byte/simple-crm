@@ -265,7 +265,7 @@ function WorkScheduleSection({ userName, supabase }) {
   return (
     <Card>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <SectionTitle>🕐 Мои смены</SectionTitle>
+        <SectionTitle>🕐 Когда я работаю</SectionTitle>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button onClick={prevMonth} style={navBtn}>‹</button>
           <span style={{ fontSize: 13, fontWeight: 600, color: "#374151", minWidth: 110, textAlign: "center" }}>{MONTH_NAMES[month - 1]} {year}</span>

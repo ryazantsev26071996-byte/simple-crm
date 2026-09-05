@@ -69,7 +69,7 @@ function TeacherTable({ stats, monthCount }) {
       <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
         <thead>
           <tr>
-            {["Педагог","Всего посещений","Кол-во смен","Среднее за смену","Среднее за месяц"].map(h => (
+            {["Педагог","Всего посещений","Кол-во дней","Среднее за день","Среднее за месяц"].map(h => (
               <th key={h} style={TH_STYLE}>{h}</th>
             ))}
           </tr>
@@ -134,7 +134,7 @@ function RatingSection({ stats }) {
         }}>
           <div style={{ fontSize: 28, marginBottom: 4 }}>{MEDALS[i] || `#${i+1}`}</div>
           <div style={{ fontWeight: 700, fontSize: 15, color: "#1e293b", marginBottom: 6 }}>{s.teacher}</div>
-          <div style={{ fontSize: 12, color: "#64748b" }}>Среднее за смену</div>
+          <div style={{ fontSize: 12, color: "#64748b" }}>Среднее за день</div>
           <div style={{ fontSize: 22, fontWeight: 700, color: i === 0 ? "#f59e0b" : "#4a90e2", marginBottom: 4 }}>{s.avgPerShift}</div>
           <div style={{ fontSize: 12, color: "#64748b" }}>Всего посещений: <strong>{s.total}</strong></div>
           <div style={{ fontSize: 12, color: "#64748b" }}>Смен: <strong>{s.shifts}</strong></div>
@@ -524,7 +524,7 @@ export default function TeacherAnalytics() {
         {/* ── Section 4: Рейтинг педагогов ── */}
         <div style={CARD}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: "#1e293b" }}>🏆 Рейтинг педагогов</div>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>По среднему числу учеников за смену</div>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>По среднему числу учеников за день</div>
           <RatingSection stats={regularStats.filter(s => s.shifts > 0)} />
         </div>
 
