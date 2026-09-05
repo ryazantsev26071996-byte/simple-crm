@@ -325,7 +325,7 @@ function RegulationCard({ filePath, deleting, onOpen, onDelete, onEdit, supabase
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 22 }}>📋</span>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>Регламент</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>Рекомендации</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {filePath && (
@@ -511,7 +511,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
   return (
     <>
       <Card>
-        <SectionTitle>📋 Регламент</SectionTitle>
+        <SectionTitle>📋 Рекомендации по работе</SectionTitle>
 
         {loading || converting ? (
           <div style={{ color: "#9ca3af", fontSize: 13 }}>{converting ? "Конвертируем файл..." : "Загрузка..."}</div>
@@ -581,7 +581,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
           hasContent ? (
             <RegulationCard onOpen={() => setShowModal(true)} />
           ) : (
-            <div style={{ color: "#9ca3af", fontSize: 13 }}>Регламент не добавлен</div>
+            <div style={{ color: "#9ca3af", fontSize: 13 }}>Рекомендации по работе не добавлены</div>
           )
         )}
       </Card>
@@ -610,7 +610,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
       )}
 
       {showModal && (
-        <Modal title={`${employeeName} — Регламент`} onClose={() => setShowModal(false)} wide>
+        <Modal title={`${employeeName} — Рекомендации по работе`} onClose={() => setShowModal(false)} wide>
           <div dangerouslySetInnerHTML={{ __html: html }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
         </Modal>
       )}
