@@ -25,11 +25,12 @@ function formatTime(iso) {
 }
 
 async function logAudit(action, entity, entityId, oldValue, newValue, userId, userName) {
-  await supabase.from('audit_log').insert({
+  const { error } = await supabase.from('audit_log').insert({
     action, entity, entity_id: entityId,
     old_value: oldValue, new_value: newValue,
     performed_by: userId, performed_by_name: userName
   });
+  if (error) console.error('audit_log insert failed:', error);
 }
 
 export default function CommentsWall({ role, authorName, comments, onCreate, onCommentsChange, client, onClientUpdate, currentUserId }) {

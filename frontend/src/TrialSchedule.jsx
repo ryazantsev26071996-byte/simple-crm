@@ -278,8 +278,8 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ stage: newStage }) });
         if (onClientsChange) onClientsChange({ id: Number(clientId), stage: newStage });
         try {
-          await apiFetch('audit_log', { method: 'POST', body: JSON.stringify({ action: 'stage_changed', entity: 'client', entity_id: Number(clientId), old_value: oldStage, new_value: newStage, performed_by: userId || null, performed_by_name: authorName || null }) });
-        } catch {}
+          await apiFetch('audit_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ action: 'stage_changed', entity: 'client', entity_id: Number(clientId), old_value: oldStage, new_value: newStage, performed_by: userId || null, performed_by_name: authorName || null }) });
+        } catch (err) { console.error('audit_log insert failed:', err); }
       }
 
       if (clientId) {

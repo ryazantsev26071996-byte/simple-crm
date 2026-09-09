@@ -409,8 +409,9 @@ export default function App() {
                   await updateClient({ role, name: authorName }, id, { stage });
                   if (stage !== oldStage) {
                     try {
-                      await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: id, old_value: oldStage, new_value: stage, performed_by: user?.id, performed_by_name: authorName });
-                    } catch {}
+                      const { error } = await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: id, old_value: oldStage, new_value: stage, performed_by: user?.id, performed_by_name: authorName });
+                      if (error) console.error('audit_log insert failed:', error);
+                    } catch (err) { console.error('audit_log insert failed:', err); }
                   }
                 } catch (err) {
                   setError(err.message);
@@ -558,13 +559,15 @@ export default function App() {
                     setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
                     if (payload.stage && payload.stage !== oldStage) {
                       try {
-                        await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: selectedClient.id, old_value: oldStage || null, new_value: payload.stage, performed_by: user?.id, performed_by_name: authorName });
-                      } catch {}
+                        const { error } = await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: selectedClient.id, old_value: oldStage || null, new_value: payload.stage, performed_by: user?.id, performed_by_name: authorName });
+                        if (error) console.error('audit_log insert failed:', error);
+                      } catch (err) { console.error('audit_log insert failed:', err); }
                     }
                     if (Number(payload.lessons_used) !== oldLessonsUsed) {
                       try {
-                        await supabase.from('audit_log').insert({ action: 'lessons_edited', entity: 'client', entity_id: selectedClient.id, old_value: String(oldLessonsUsed), new_value: String(payload.lessons_used), performed_by: user?.id, performed_by_name: authorName });
-                      } catch {}
+                        const { error } = await supabase.from('audit_log').insert({ action: 'lessons_edited', entity: 'client', entity_id: selectedClient.id, old_value: String(oldLessonsUsed), new_value: String(payload.lessons_used), performed_by: user?.id, performed_by_name: authorName });
+                        if (error) console.error('audit_log insert failed:', error);
+                      } catch (err) { console.error('audit_log insert failed:', err); }
                     }
                   } catch (err) { setError(err.message); }
                 }}

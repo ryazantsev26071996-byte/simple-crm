@@ -30,8 +30,9 @@ export default function MailingsPopup({ client, onClose }) {
     const campName = campaigns.find(c => c.id === Number(selectedCampaign))?.name || '';
     await supabase.from('client_mailings').insert({ client_id: client.id, campaign_id: Number(selectedCampaign), status_id: defaultStatus });
     try {
-      await supabase.from('audit_log').insert({ action: 'added_to_mailing', entity: 'client', entity_id: client.id, old_value: null, new_value: campName });
-    } catch {}
+      const { error } = await supabase.from('audit_log').insert({ action: 'added_to_mailing', entity: 'client', entity_id: client.id, old_value: null, new_value: campName });
+      if (error) console.error('audit_log insert failed:', error);
+    } catch (err) { console.error('audit_log insert failed:', err); }
     setAdding(false);
     setSelectedCampaign('');
     load();
