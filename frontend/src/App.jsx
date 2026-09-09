@@ -280,8 +280,6 @@ export default function App() {
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {!isMobile && <span style={{ fontSize: 13, color: "#666" }}>{authorName} ({role})</span>}
-          {!isMobile && role === 'admin' && <button onClick={() => setShowImport(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a' }}>📤 Импорт</button>}
-          {!isMobile && role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍 Дубли</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowSettings(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#555' }}>⚙️ Настройки</button>}
@@ -347,8 +345,6 @@ export default function App() {
               </button>
             ))}
             {role === 'admin' && <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 8, paddingTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <button onClick={() => { setShowImport(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ffb3d9', cursor: 'pointer', textAlign: 'left' }}>📤 Импорт</button>
-              <button onClick={() => { exportToExcel(clients); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#7be8c0', cursor: 'pointer', textAlign: 'left' }}>📥 Экспорт</button>
               <button onClick={() => { setShowMerge(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ffd580', cursor: 'pointer', textAlign: 'left' }}>🔍 Дубли</button>
               <button onClick={() => { setShowAudit(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#80b8ff', cursor: 'pointer', textAlign: 'left' }}>📋 Журнал</button>
               <button onClick={() => { setShowSettings(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ccc', cursor: 'pointer', textAlign: 'left' }}>⚙️ Настройки</button>
@@ -681,6 +677,12 @@ export default function App() {
                 <input type="checkbox" checked={stageEditMode} onChange={e => setStageEditMode(e.target.checked)}
                   style={{ width: 36, height: 20, flexShrink: 0, cursor: 'pointer' }} />
               </label>
+              <div style={{ borderTop: '1px solid #f0f0f0', marginTop: 16, paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => { setShowImport(true); setShowSettings(false); }}
+                  style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#e8a', textAlign: 'left' }}>📤 Импорт клиентов</button>
+                <button onClick={() => { exportToExcel(clients); setShowSettings(false); }}
+                  style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#2a9', textAlign: 'left' }}>📥 Экспорт в Excel</button>
+              </div>
             </div>
           </div>
         </div>
