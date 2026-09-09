@@ -79,6 +79,9 @@ export default function App() {
   const [inlineHistoryLogs, setInlineHistoryLogs] = React.useState([]);
   const [inlineHistoryLoading, setInlineHistoryLoading] = React.useState(false);
   const [showMerge, setShowMerge] = React.useState(false);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [stageEditMode, setStageEditMode] = React.useState(() => localStorage.getItem('crm_stage_edit_mode') === 'true');
+  React.useEffect(() => { localStorage.setItem('crm_stage_edit_mode', String(stageEditMode)); }, [stageEditMode]);
   const [showInlineMailings, setShowInlineMailings] = React.useState(false);
   const [allTasks, setAllTasks] = React.useState([]);
   const [showTaskBell, setShowTaskBell] = React.useState(false);
@@ -281,6 +284,7 @@ export default function App() {
           {!isMobile && role === 'admin' && <button onClick={() => exportToExcel(clients)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#2a9' }}>📥 Экспорт</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowMerge(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#e8a000' }}>🔍 Дубли</button>}
           {!isMobile && role === 'admin' && <button onClick={() => setShowAudit(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#4a90e2' }}>📋 Журнал</button>}
+          {!isMobile && role === 'admin' && <button onClick={() => setShowSettings(true)} style={{ fontSize: 12, padding: '4px 10px', borderRadius: 6, border: '1px solid #ddd', cursor: 'pointer', color: '#555' }}>⚙️ Настройки</button>}
           <div ref={bellRef} style={{ position: 'relative' }}>
             <button onClick={() => setShowTaskBell(v => !v)}
               style={{ fontSize: 16, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', position: 'relative', lineHeight: 1 }}>
@@ -347,6 +351,7 @@ export default function App() {
               <button onClick={() => { exportToExcel(clients); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#7be8c0', cursor: 'pointer', textAlign: 'left' }}>📥 Экспорт</button>
               <button onClick={() => { setShowMerge(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ffd580', cursor: 'pointer', textAlign: 'left' }}>🔍 Дубли</button>
               <button onClick={() => { setShowAudit(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#80b8ff', cursor: 'pointer', textAlign: 'left' }}>📋 Журнал</button>
+              <button onClick={() => { setShowSettings(true); setShowMobileMenu(false); }} style={{ fontSize: 15, padding: '12px 16px', borderRadius: 10, border: 'none', background: 'rgba(255,255,255,0.07)', color: '#ccc', cursor: 'pointer', textAlign: 'left' }}>⚙️ Настройки</button>
             </div>}
           </div>
           <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.1)', flexShrink: 0 }}>
@@ -397,6 +402,8 @@ export default function App() {
           {!loadingClients && view === 'kanban' && role !== 'teacher' && (
             <KanbanBoard clients={clients} role={role} onClientSelect={handleClientSelect}
               taskBadges={taskBadges}
+              stageEditMode={stageEditMode}
+              onClientsReload={reloadClients}
               onStageChange={async (id, stage) => {
                 const oldStage = clients.find(c => c.id === id)?.stage || null;
                 setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c));
@@ -657,6 +664,27 @@ export default function App() {
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
       {showMerge && <MergeDuplicates onClose={() => setShowMerge(false)} onMerged={reloadClients} />}
       {showInlineMailings && selectedClient && <MailingsPopup client={selectedClient} onClose={() => setShowInlineMailings(false)} />}
+      {showSettings && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={() => setShowSettings(false)}>
+          <div style={{ background: 'white', borderRadius: 12, width: '90%', maxWidth: 420, padding: 0, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <strong style={{ fontSize: 15 }}>⚙️ Настройки</strong>
+              <button onClick={() => setShowSettings(false)} style={{ fontSize: 20, background: 'none', border: 'none', cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+            <div style={{ padding: 20 }}>
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 500 }}>Редактор стадий канбана</div>
+                  <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>Позволяет двигать и переименовывать колонки стадий прямо в канбане</div>
+                </div>
+                <input type="checkbox" checked={stageEditMode} onChange={e => setStageEditMode(e.target.checked)}
+                  style={{ width: 36, height: 20, flexShrink: 0, cursor: 'pointer' }} />
+              </label>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

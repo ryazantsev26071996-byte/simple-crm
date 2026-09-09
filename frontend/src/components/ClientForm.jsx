@@ -1,5 +1,6 @@
 import React from "react";
 import { supabase } from '../supabase'
+import { useClientStages } from '../hooks/useClientStages.js'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -57,12 +58,6 @@ function renderVk(value) {
   return <a href={href} target="_blank" rel="noopener noreferrer" style={linkStyle}>{truncate(value)}</a>
 }
 
-const STAGES = [
-  'новая заявка','ндз','записан на пробное','на следующий месяц','был не купил',
-  'не пришел','дожимать','продажа','ученик','бронь','тест-драйв',
-  'пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение','кончился абонемент',
-]
-
 const SUBSCRIPTIONS = [
   { name: 'Отдыхай с бонусами', lessons: 61, freeze: 14, months: 6, unlimited: false },
   { name: 'Изучай с бонусами', lessons: 113, freeze: 30, months: 9, unlimited: false },
@@ -99,6 +94,7 @@ function addDays(date, days) {
 }
 
 export default function ClientForm({ mode, initialValue, disabled, onSubmit, submitLabel, onOpenClient }) {
+  const { stageNames: STAGES } = useClientStages();
   const [form, setForm] = React.useState({
     name: initialValue?.name || "",
     phone: initialValue?.phone || "",

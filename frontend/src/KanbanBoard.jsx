@@ -2,12 +2,7 @@ import { useState } from 'react'
 import React from 'react'
 import { supabase } from './supabase'
 import ClientForm from './components/ClientForm.jsx'
-
-const STAGES = [
-  'новая заявка','ндз','записан на пробное','на следующий месяц','был не купил',
-  'не пришел','дожимать','продажа','ученик','бронь','тест-драйв',
-  'пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение','кончился абонемент',
-]
+import { useClientStages } from './hooks/useClientStages.js'
 
 const TEACHER_STAGES = ['ученик', 'пробный месяц', 'тест-драйв']
 
@@ -42,11 +37,12 @@ function ClientFormInline({ onSubmit, onOpenClient }) {
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated, taskBadges = {} }) {
+export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated, taskBadges = {}, stageEditMode = false, onClientsReload }) {
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [filterMonth, setFilterMonth] = useState('all')
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768)
+  const { stages, loading: stagesLoading, reload: reloadStages } = useClientStages()
 
   React.useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768)
@@ -54,8 +50,51 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
     return () => window.removeEventListener('resize', handler)
   }, [])
 
-  const visibleStages = role === 'teacher' ? TEACHER_STAGES : STAGES
+  const editMode = stageEditMode && role === 'admin'
+  const visibleStageObjs = role === 'teacher'
+    ? TEACHER_STAGES.map(name => ({ id: name, name }))
+    : stages
+  const visibleStages = visibleStageObjs.map(s => s.name)
   const currentYear = new Date().getFullYear()
+
+  async function moveStage(stageId, direction) {
+    const idx = stages.findIndex(s => s.id === stageId)
+    const otherIdx = direction === 'left' ? idx - 1 : idx + 1
+    if (idx < 0 || otherIdx < 0 || otherIdx >= stages.length) return
+    const a = stages[idx], b = stages[otherIdx]
+    try {
+      await Promise.all([
+        supabase.from('client_stages').update({ sort_order: b.sort_order }).eq('id', a.id),
+        supabase.from('client_stages').update({ sort_order: a.sort_order }).eq('id', b.id),
+      ])
+      await reloadStages()
+    } catch (e) { alert(e.message) }
+  }
+
+  async function renameStage(stageId, oldName) {
+    const newName = window.prompt('Новое название стадии:', oldName)
+    if (!newName || !newName.trim() || newName.trim() === oldName) return
+    const name = newName.trim()
+    try {
+      await supabase.from('client_stages').update({ name }).eq('id', stageId)
+      const affected = clients.filter(c => c.stage === oldName).length
+      if (affected > 0) {
+        await supabase.from('clients').update({ stage: name }).eq('stage', oldName)
+      }
+      await reloadStages()
+      if (affected > 0 && onClientsReload) await onClientsReload()
+    } catch (e) { alert(e.message) }
+  }
+
+  async function addStage() {
+    const name = window.prompt('Название новой стадии:')
+    if (!name || !name.trim()) return
+    const maxOrder = stages.reduce((m, s) => Math.max(m, s.sort_order || 0), -1)
+    try {
+      await supabase.from('client_stages').insert({ name: name.trim(), sort_order: maxOrder + 1 })
+      await reloadStages()
+    } catch (e) { alert(e.message) }
+  }
 
   function matchesMonth(client) {
     if (filterMonth === 'all') return true
@@ -106,19 +145,40 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
         {search && <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>Найдено: {filteredClients.length}</div>}
       </div>
 
-      <div className="kanbanScroll" style={{ display: 'flex', overflowX: 'auto', height: 'calc(100vh - 120px)', alignItems: 'flex-start', gap: 10, padding: '12px 16px' }}>
-        {visibleStages.map(stage => (
-          <Column
-            key={stage}
-            stage={stage}
-            clients={filteredClients.filter(c => c.stage === stage)}
-            onClientSelect={onClientSelect}
-            onDrop={(id, newStage) => onStageChange(id, newStage)}
-            totalAmount={getStageTotalAmount(stage)}
-            isMobile={isMobile}
-            taskBadges={taskBadges}
-          />
-        ))}
+      {editMode && (
+        <div style={{ padding: '6px 16px', background: '#fff8e1', borderBottom: '1px solid #ffe0a3', fontSize: 12, color: '#8a6d00' }}>
+          ✏️ Редактор стадий включён — используйте стрелки и значок карандаша в шапках колонок
+        </div>
+      )}
+      <div className="kanbanScroll" style={{ display: 'flex', overflowX: 'auto', height: editMode ? 'calc(100vh - 152px)' : 'calc(100vh - 120px)', alignItems: 'flex-start', gap: 10, padding: '12px 16px' }}>
+        {stagesLoading && role !== 'teacher' && <div style={{ color: '#888', fontSize: 13, padding: 16 }}>Загрузка стадий...</div>}
+        {visibleStageObjs.map((stageObj, i) => {
+          const stage = stageObj.name
+          return (
+            <Column
+              key={stageObj.id}
+              stage={stage}
+              clients={filteredClients.filter(c => c.stage === stage)}
+              onClientSelect={onClientSelect}
+              onDrop={(id, newStage) => onStageChange(id, newStage)}
+              totalAmount={getStageTotalAmount(stage)}
+              isMobile={isMobile}
+              taskBadges={taskBadges}
+              editMode={editMode}
+              canMoveLeft={editMode && i > 0}
+              canMoveRight={editMode && i < visibleStageObjs.length - 1}
+              onMoveLeft={() => moveStage(stageObj.id, 'left')}
+              onMoveRight={() => moveStage(stageObj.id, 'right')}
+              onRename={() => renameStage(stageObj.id, stage)}
+            />
+          )
+        })}
+        {editMode && (
+          <button onClick={addStage} title="Добавить стадию"
+            style={{ minWidth: 48, height: 48, borderRadius: 8, border: '2px dashed #ccc', background: 'transparent', cursor: 'pointer', color: '#bbb', fontSize: 24, flexShrink: 0, alignSelf: 'flex-start' }}>
+            +
+          </button>
+        )}
       </div>
 
       {showAddModal && (
@@ -142,7 +202,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
   );
 }
 
-function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile, taskBadges = {} }) {
+function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile, taskBadges = {}, editMode = false, canMoveLeft = false, canMoveRight = false, onMoveLeft, onMoveRight, onRename }) {
   const [over, setOver] = useState(false)
   const bg = over ? '#e8f4ff' : '#f5f5f5'
   const colWidth = isMobile ? 280 : 200
@@ -155,6 +215,16 @@ function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile,
       style={{ display: 'flex', flexDirection: 'column', height: '100%', minWidth: colWidth, maxWidth: colMaxWidth, flexShrink: 0, background: bg, borderRadius: 8, border: over ? '2px dashed #4a90e2' : '2px solid transparent' }}
     >
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: bg, padding: '8px 8px 4px', borderRadius: '8px 8px 0 0' }}>
+        {editMode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 3 }}>
+            <button onClick={onMoveLeft} disabled={!canMoveLeft} title="Сдвинуть влево"
+              style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: canMoveLeft ? 'pointer' : 'default', opacity: canMoveLeft ? 1 : 0.3, color: '#555' }}>◀</button>
+            <button onClick={onMoveRight} disabled={!canMoveRight} title="Сдвинуть вправо"
+              style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: canMoveRight ? 'pointer' : 'default', opacity: canMoveRight ? 1 : 0.3, color: '#555' }}>▶</button>
+            <button onClick={onRename} title="Переименовать"
+              style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#bbb' }}>✏️</button>
+          </div>
+        )}
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', display: 'flex', justifyContent: 'space-between' }}>
           <span>{stage}</span>
           <span style={{ background: clients.length > 0 ? '#4a90e2' : '#ddd', color: clients.length > 0 ? 'white' : '#555', borderRadius: 20, padding: '1px 6px', fontSize: 11 }}>{clients.length}</span>

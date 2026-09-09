@@ -3,13 +3,13 @@ import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
 import ClientCard from "./components/ClientCard.jsx";
 import TeamOnline from "./TeamOnline.jsx";
+import { useClientStages } from "./hooks/useClientStages.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const MANAGERS = ["Салампи", "Татьяна"];
 const ACCOUNT_MANAGERS = []; // Арина и Вероника уволены — уволенных сотрудников из аналитики убираем, история их продаж в базе сохраняется
-const STAGES = ["новая заявка","ндз","записан на пробное","на следующий месяц","был не купил","не пришел","дожимать","продажа","ученик","бронь","тест-драйв","пробный месяц","рассылка","на МК или ОД","корявый лид","расторжение","кончился абонемент"];
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKS = [
   { label: "ИТОГИ 1", from: 1,  to: 7  },
@@ -177,6 +177,7 @@ export default function Analytics() {
   const { profile, user } = useAuth();
   const role = profile?.role || "teacher";
   const authorName = profile?.full_name || "";
+  const { stageNames: STAGES } = useClientStages();
 
   const now = new Date();
   const [month, setMonth] = React.useState(now.getMonth() + 1);

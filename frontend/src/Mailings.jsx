@@ -120,6 +120,24 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
     } catch (e) { alert(e.message); }
   }
 
+  async function moveCampaign(id, direction) {
+    const idx = campaigns.findIndex(c => c.id === id);
+    const otherIdx = direction === "left" ? idx - 1 : idx + 1;
+    if (idx < 0 || otherIdx < 0 || otherIdx >= campaigns.length) return;
+    const a = campaigns[idx], b = campaigns[otherIdx];
+    const next = [...campaigns];
+    next[idx] = { ...a, sort_order: b.sort_order };
+    next[otherIdx] = { ...b, sort_order: a.sort_order };
+    next.sort((x, y) => (x.sort_order || 0) - (y.sort_order || 0));
+    setCampaigns(next);
+    try {
+      await Promise.all([
+        apiFetch(`mailing_campaigns?id=eq.${a.id}`, { method: "PATCH", body: JSON.stringify({ sort_order: b.sort_order }) }),
+        apiFetch(`mailing_campaigns?id=eq.${b.id}`, { method: "PATCH", body: JSON.stringify({ sort_order: a.sort_order }) }),
+      ]);
+    } catch (e) { alert(e.message); loadAll(); }
+  }
+
   // ── Status CRUD ────────────────────────────────────────────────────────────
 
   async function addStatus() {
@@ -197,7 +215,7 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
 
       {/* ── Kanban board ── */}
       <div style={{ display: "flex", overflowX: "auto", flex: 1, gap: 10, padding: "12px 16px", alignItems: "flex-start" }}>
-        {campaigns.map(camp => {
+        {campaigns.map((camp, campIdx) => {
           const cards = mailings.filter(m => m.campaign_id === camp.id);
           const isOver = dragOver === camp.id;
           return (
@@ -228,6 +246,10 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
                       {camp.name}
                     </span>
                     <span style={{ background: cards.length > 0 ? "#e67e22" : "#ddd", color: cards.length > 0 ? "white" : "#555", borderRadius: 20, padding: "1px 6px", fontSize: 11, flexShrink: 0 }}>{cards.length}</span>
+                    <button onClick={() => moveCampaign(camp.id, "left")} disabled={campIdx === 0} title="Сдвинуть влево"
+                      style={{ fontSize: 10, padding: "1px 2px", background: "none", border: "none", cursor: campIdx === 0 ? "default" : "pointer", opacity: campIdx === 0 ? 0.3 : 1, color: "#555", lineHeight: 1, flexShrink: 0 }}>◀</button>
+                    <button onClick={() => moveCampaign(camp.id, "right")} disabled={campIdx === campaigns.length - 1} title="Сдвинуть вправо"
+                      style={{ fontSize: 10, padding: "1px 2px", background: "none", border: "none", cursor: campIdx === campaigns.length - 1 ? "default" : "pointer", opacity: campIdx === campaigns.length - 1 ? 0.3 : 1, color: "#555", lineHeight: 1, flexShrink: 0 }}>▶</button>
                     <button onClick={() => { setEditingCampaignId(camp.id); setEditingCampaignName(camp.name); }}
                       title="Переименовать"
                       style={{ fontSize: 10, padding: "1px 3px", background: "none", border: "none", cursor: "pointer", color: "#bbb", lineHeight: 1, flexShrink: 0 }}>✏️</button>

@@ -1,6 +1,7 @@
 import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
+import { useClientStages } from "./hooks/useClientStages.js";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 4;
@@ -9,7 +10,6 @@ const MANAGERS = ["Салампи", "Татьяна"];
 const ACCOUNT_MANAGERS = [];
 const RECORDERS = ["Татьяна", "Салампи", "Администратор-VIP"];
 const SOURCES = ["Квизы", "Сайт", "Авито", "Соц сети", "Рекомендация", "Оффлайн", "Партнерка", "Звонок", "Другое"];
-const STAGES = ['новая заявка','ндз','записан на пробное','на следующий месяц','был не купил','не пришел','дожимать','продажа','ученик','бронь','тест-драйв','пробный месяц','рассылка','на МК или ОД','корявый лид','расторжение','кончился абонемент'];
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -47,6 +47,7 @@ function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "
 function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 
 export default function TrialSchedule({ clients, role, authorName, userId, userEmail, onClientsChange }) {
+  const { stageNames: STAGES } = useClientStages();
   const [showBlocks, setShowBlocks] = React.useState(false);
   const [weekStart, setWeekStart] = React.useState(new Date());
   const [slots, setSlots] = React.useState([]);
