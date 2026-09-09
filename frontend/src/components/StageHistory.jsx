@@ -23,13 +23,17 @@ export default function StageHistory({ clientId, role, currentStage }) {
   if (role === 'teacher') return null;
   if (loading) return null;
 
+  const firstStageLog = logs.find(l => l.action === 'stage_changed');
   const items = logs.length === 0
     ? [{ label: currentStage || '—', date: null, type: 'stage' }]
-    : logs.map(l => ({
-        label: l.action === 'added_to_mailing' ? `📧 ${l.new_value || ''}` : (l.new_value || '—'),
-        date: l.created_at,
-        type: l.action === 'added_to_mailing' ? 'mailing' : 'stage',
-      }));
+    : [
+        ...(firstStageLog?.old_value ? [{ label: firstStageLog.old_value, date: null, type: 'stage' }] : []),
+        ...logs.map(l => ({
+          label: l.action === 'added_to_mailing' ? `📧 ${l.new_value || ''}` : (l.new_value || '—'),
+          date: l.created_at,
+          type: l.action === 'added_to_mailing' ? 'mailing' : 'stage',
+        })),
+      ];
 
   return (
     <div style={{ marginBottom: 12, padding: '8px 12px', background: '#f8f9fa', borderRadius: 8, border: '1px solid #eee' }}>
