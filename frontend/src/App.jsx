@@ -401,7 +401,6 @@ export default function App() {
                 const oldStage = clients.find(c => c.id === id)?.stage || null;
                 setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c));
                 if (id === selectedId) setSelectedId(null);
-                setTimeout(() => handleClientSelect(id), 50);
                 try {
                   await updateClient({ role, name: authorName }, id, { stage });
                   if (stage !== oldStage) {
@@ -413,6 +412,7 @@ export default function App() {
                   setError(err.message);
                   setClients(prev => prev.map(c => c.id === id ? { ...c, stage: oldStage } : c));
                 }
+                handleClientSelect(id);
               }}
               onAddClient={() => setView('list')}
               onClientCreated={async (payload) => {
