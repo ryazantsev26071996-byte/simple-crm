@@ -55,6 +55,7 @@ import { MergeDuplicates } from "./MergeDuplicates.jsx";
 import Tasks from "./Tasks.jsx";
 import MyOffice from "./MyOffice.jsx";
 import Mailings from "./Mailings.jsx";
+import MailingsPopup from "./components/MailingsPopup.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -77,6 +78,7 @@ export default function App() {
   const [inlineHistoryLogs, setInlineHistoryLogs] = React.useState([]);
   const [inlineHistoryLoading, setInlineHistoryLoading] = React.useState(false);
   const [showMerge, setShowMerge] = React.useState(false);
+  const [showInlineMailings, setShowInlineMailings] = React.useState(false);
   const [allTasks, setAllTasks] = React.useState([]);
   const [showTaskBell, setShowTaskBell] = React.useState(false);
   const bellRef = React.useRef(null);
@@ -489,6 +491,12 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {role === 'admin' && (
+                  <button onClick={() => setShowInlineMailings(true)}
+                    style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #e67e22', background: 'white', cursor: 'pointer', color: '#e67e22' }}>
+                    📧 Рассылки
+                  </button>
+                )}
                 {user?.email === 'crm@artschool.ru' && (
                   <button onClick={async () => {
                     setShowInlineHistory(true);
@@ -623,6 +631,7 @@ export default function App() {
       {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
       {showMerge && <MergeDuplicates onClose={() => setShowMerge(false)} onMerged={reloadClients} />}
+      {showInlineMailings && selectedClient && <MailingsPopup client={selectedClient} onClose={() => setShowInlineMailings(false)} />}
     </div>
   );
 }
