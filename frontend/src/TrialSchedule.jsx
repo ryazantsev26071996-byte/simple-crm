@@ -105,7 +105,14 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
     if (entry) {
-      setForm({ ...entry, newStage: 'записан на пробное' });
+      // If rescheduled_to equals the entry's own date it's a corrupted self-reschedule — clear it
+      const selfReschedule = entry.rescheduled && entry.rescheduled_to === entry.date;
+      setForm({
+        ...entry,
+        newStage: 'записан на пробное',
+        rescheduled: selfReschedule ? false : (entry.rescheduled || false),
+        rescheduled_to: selfReschedule ? "" : (entry.rescheduled_to || ""),
+      });
     } else {
       setForm({ client_id: "", client_name: "", phone: "", source: "", stage: "записан на пробное",
         lesson_type: "", manager: "", account_manager: "", recorded_by: "", comment: "",
@@ -168,6 +175,33 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         if (onClientsChange) onClientsChange(created);
       }
 
+      // Resolve the moved entry: create a new one or update the existing linked one
+      let movedToId = modal.entry?.moved_to_id ?? null;
+      const targetDate = form.rescheduled_to || null;
+      const targetTime = form.rescheduled_time || modal.time;
+      if (form.rescheduled && targetDate) {
+        if (movedToId) {
+          await apiFetch(`trial_schedule?id=eq.${movedToId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ date: targetDate, time: targetTime }),
+          });
+        } else {
+          const created = await apiFetch("trial_schedule", {
+            method: "POST",
+            body: JSON.stringify({
+              date: targetDate, time: targetTime,
+              client_id: clientId || null, client_name: clientName || null,
+              phone: form.phone || null, source: form.source || null,
+              lesson_type: form.lesson_type || null, manager: form.manager || null,
+              account_manager: form.account_manager || null, recorded_by: form.recorded_by || null,
+            }),
+          });
+          movedToId = (Array.isArray(created) ? created[0] : created).id;
+        }
+      } else if (!form.rescheduled) {
+        movedToId = null;
+      }
+
       const payload = {
         date: modal.date, time: modal.time,
         client_id: clientId || null, client_name: clientName || null,
@@ -188,7 +222,9 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         bought_testdrive: form.bought_testdrive,
         feedback: form.feedback || null,
         rescheduled: form.rescheduled || false,
-        rescheduled_to: form.rescheduled_to || null,
+        rescheduled_to: (form.rescheduled && targetDate) ? targetDate : null,
+        rescheduled_time: (form.rescheduled && targetDate) ? targetTime : null,
+        moved_to_id: movedToId,
       };
 
       if (modal.entry) {
@@ -199,25 +235,6 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
           const displayDate = modal.date.split('-').reverse().join('.');
           await addComment(clientId, `📅 Записан на пробное занятие — ${displayDate} в ${modal.time}`);
         }
-      }
-
-      // Create a new entry on the new date when first marking as rescheduled
-      if (form.rescheduled && form.rescheduled_to && !modal.entry?.rescheduled) {
-        await apiFetch("trial_schedule", {
-          method: "POST",
-          body: JSON.stringify({
-            date: form.rescheduled_to,
-            time: form.rescheduled_time || modal.time,
-            client_id: clientId || null,
-            client_name: clientName || null,
-            phone: form.phone || null,
-            source: form.source || null,
-            lesson_type: form.lesson_type || null,
-            manager: form.manager || null,
-            account_manager: form.account_manager || null,
-            recorded_by: form.recorded_by || null,
-          }),
-        });
       }
 
       // Купил/не купил — менять стадию
