@@ -57,6 +57,7 @@ import MyOffice from "./MyOffice.jsx";
 import Mailings from "./Mailings.jsx";
 import MailingsPopup from "./components/MailingsPopup.jsx";
 import StageHistory from "./components/StageHistory.jsx";
+import TeacherAbonementCard from "./components/TeacherAbonementCard.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -505,8 +506,8 @@ export default function App() {
               <div>
                 <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{selectedClient.name}</div>
                 <div style={{ fontSize: 13, color: '#888' }}>
-                  {selectedClient.phone && <span>{selectedClient.phone} · </span>}
-                  {selectedClient.source && <span>{selectedClient.source} · </span>}
+                  {role !== 'teacher' && selectedClient.phone && <span>{selectedClient.phone} · </span>}
+                  {role !== 'teacher' && selectedClient.source && <span>{selectedClient.source} · </span>}
                   <span>{selectedClient.stage || '—'}</span>
                 </div>
               </div>
@@ -544,6 +545,7 @@ export default function App() {
             </div>
 
             {role !== 'teacher' && <StageHistory clientId={selectedClient.id} role={role} currentStage={selectedClient.stage} />}
+            {role === 'teacher' && <TeacherAbonementCard client={selectedClient} />}
 
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
@@ -568,7 +570,7 @@ export default function App() {
                 }}
               />
             )}
-            {selectedClient?.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
+            {((selectedClient?.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor')) || role === 'teacher') && (
               <StudentInfoBlock client={selectedClient} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (

@@ -27,6 +27,7 @@ import { createComment, getComments, updateClient } from "../api.js";
 import { supabase } from "../supabase";
 import MailingsPopup from "./MailingsPopup.jsx";
 import StageHistory from "./StageHistory.jsx";
+import TeacherAbonementCard from "./TeacherAbonementCard.jsx";
 
 async function logAudit(action, entity, entityId, oldValue, newValue, userId, userName) {
   await supabase.from('audit_log').insert({
@@ -125,8 +126,8 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
         <div>
           <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{client.name}</div>
           <div style={{ fontSize: 13, color: '#888' }}>
-            {client.phone && <span>{renderContact(client.phone)} · </span>}
-            {client.source && <span>{client.source} · </span>}
+            {role !== 'teacher' && client.phone && <span>{renderContact(client.phone)} · </span>}
+            {role !== 'teacher' && client.source && <span>{client.source} · </span>}
             <span>{client.stage || '—'}</span>
           </div>
         </div>
@@ -161,6 +162,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
         {error && <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
         {role !== 'teacher' && <StageHistory clientId={client.id} role={role} currentStage={client.stage} />}
+        {role === 'teacher' && <TeacherAbonementCard client={client} />}
 
         {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <ClientForm mode="Редактировать" initialValue={client} disabled={false} submitLabel="Сохранить"
@@ -186,7 +188,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
           />
         )}
 
-        {client.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin') && (
+        {((client.stage === 'ученик' && (role === 'manager' || role === 'accountmanager' || role === 'admin')) || role === 'teacher') && (
           <StudentInfoBlock client={client} onUpdate={onUpdate} />
         )}
 

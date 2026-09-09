@@ -54,7 +54,7 @@ export function TeacherView({ clients, onClientSelect }) {
   const [showLost, setShowLost] = React.useState(false)
 
   const filtered = clients
-    .filter(c => TEACHER_STAGES.includes(c.stage) && c.subscription_type)
+    .filter(c => TEACHER_STAGES.includes(c.stage))
     .filter(c => {
       if (!search) return true
       const q = search.toLowerCase()
