@@ -26,6 +26,7 @@ import LearningStrategy from "./LearningStrategy.jsx";
 import { createComment, getComments, updateClient } from "../api.js";
 import { supabase } from "../supabase";
 import MailingsPopup from "./MailingsPopup.jsx";
+import StageHistory from "./StageHistory.jsx";
 
 async function logAudit(action, entity, entityId, oldValue, newValue, userId, userName) {
   await supabase.from('audit_log').insert({
@@ -159,13 +160,21 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
       <div style={{ overflowY: 'auto', flex: 1 }}>
         {error && <div style={{ color: 'red', fontSize: 13, marginBottom: 8 }}>{error}</div>}
 
+        {role !== 'teacher' && <StageHistory clientId={client.id} role={role} currentStage={client.stage} />}
+
         {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <ClientForm mode="Редактировать" initialValue={client} disabled={false} submitLabel="Сохранить"
             onSubmit={async (payload) => {
               try {
+                const oldStage = client?.stage;
                 const oldLessonsUsed = client?.lessons_used ?? 0;
                 const updated = await updateClient({ role, name: authorName }, client.id, payload);
                 if (onUpdate) onUpdate(updated);
+                if (payload.stage && payload.stage !== oldStage) {
+                  try {
+                    await logAudit('stage_changed', 'client', client.id, oldStage || null, payload.stage, userId, authorName);
+                  } catch {}
+                }
                 if (Number(payload.lessons_used) !== oldLessonsUsed) {
                   try {
                     await logAudit('lessons_edited', 'client', client.id,

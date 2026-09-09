@@ -27,7 +27,11 @@ export default function MailingsPopup({ client, onClose }) {
   async function handleAdd() {
     if (!selectedCampaign) return;
     const defaultStatus = statuses[0]?.id ?? null;
+    const campName = campaigns.find(c => c.id === Number(selectedCampaign))?.name || '';
     await supabase.from('client_mailings').insert({ client_id: client.id, campaign_id: Number(selectedCampaign), status_id: defaultStatus });
+    try {
+      await supabase.from('audit_log').insert({ action: 'added_to_mailing', entity: 'client', entity_id: client.id, old_value: null, new_value: campName });
+    } catch {}
     setAdding(false);
     setSelectedCampaign('');
     load();

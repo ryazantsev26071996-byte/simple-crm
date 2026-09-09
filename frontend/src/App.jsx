@@ -56,6 +56,7 @@ import Tasks from "./Tasks.jsx";
 import MyOffice from "./MyOffice.jsx";
 import Mailings from "./Mailings.jsx";
 import MailingsPopup from "./components/MailingsPopup.jsx";
+import StageHistory from "./components/StageHistory.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -396,7 +397,23 @@ export default function App() {
           {!loadingClients && view === 'kanban' && role !== 'teacher' && (
             <KanbanBoard clients={clients} role={role} onClientSelect={handleClientSelect}
               taskBadges={taskBadges}
-              onStageChange={(id, stage) => { setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c)); if (id === selectedId) setSelectedId(null); setTimeout(() => handleClientSelect(id), 50); }}
+              onStageChange={async (id, stage) => {
+                const oldStage = clients.find(c => c.id === id)?.stage || null;
+                setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c));
+                if (id === selectedId) setSelectedId(null);
+                setTimeout(() => handleClientSelect(id), 50);
+                try {
+                  await updateClient({ role, name: authorName }, id, { stage });
+                  if (stage !== oldStage) {
+                    try {
+                      await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: id, old_value: oldStage, new_value: stage, performed_by: user?.id, performed_by_name: authorName });
+                    } catch {}
+                  }
+                } catch (err) {
+                  setError(err.message);
+                  setClients(prev => prev.map(c => c.id === id ? { ...c, stage: oldStage } : c));
+                }
+              }}
               onAddClient={() => setView('list')}
               onClientCreated={async (payload) => {
                 const newClient = await createClient({ role, name: authorName }, payload);
@@ -523,14 +540,22 @@ export default function App() {
               </div>
             </div>
 
+            {role !== 'teacher' && <StageHistory clientId={selectedClient.id} role={role} currentStage={selectedClient.stage} />}
+
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
+                    const oldStage = selectedClient?.stage;
                     const oldLessonsUsed = selectedClient?.lessons_used ?? 0;
                     const updated = await updateClient({ role, name: authorName }, selectedClient.id, payload);
                     setClients((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+                    if (payload.stage && payload.stage !== oldStage) {
+                      try {
+                        await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: selectedClient.id, old_value: oldStage || null, new_value: payload.stage, performed_by: user?.id, performed_by_name: authorName });
+                      } catch {}
+                    }
                     if (Number(payload.lessons_used) !== oldLessonsUsed) {
                       try {
                         await supabase.from('audit_log').insert({ action: 'lessons_edited', entity: 'client', entity_id: selectedClient.id, old_value: String(oldLessonsUsed), new_value: String(payload.lessons_used), performed_by: user?.id, performed_by_name: authorName });

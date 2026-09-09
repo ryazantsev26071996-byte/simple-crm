@@ -273,8 +273,12 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
       // Купил/не купил — менять стадию
       if (clientId && form.bought !== null && form.bought !== modal.entry?.bought) {
         const newStage = form.bought === true ? 'ученик' : 'был не купил';
+        const oldStage = allClients.find(c => c.id === Number(clientId))?.stage || null;
         await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ stage: newStage }) });
         if (onClientsChange) onClientsChange({ id: Number(clientId), stage: newStage });
+        try {
+          await apiFetch('audit_log', { method: 'POST', body: JSON.stringify({ action: 'stage_changed', entity: 'client', entity_id: Number(clientId), old_value: oldStage, new_value: newStage, performed_by: userId || null, performed_by_name: authorName || null }) });
+        } catch {}
       }
 
       if (clientId) {
