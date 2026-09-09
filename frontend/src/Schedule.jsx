@@ -145,7 +145,9 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
           try { await apiFetch("audit_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ action: 'lessons_deducted', entity: 'client', entity_id: cl.id, old_value: String(cl.lessons_used||0), new_value: `${(cl.lessons_used||0)+1} (−1 за ${modal.date})`, performed_by: userId||null, performed_by_name: authorName||null }) }); } catch (err) { console.error('audit_log insert failed:', err); }
         }
         if (!duplicate || form.lesson_comment.trim()) {
-          const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ");
+          const deducted = cl && !cl.is_unlimited;
+          const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ")
+            + (deducted ? ` [списано занятий: 1]` : "");
           await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText }) });
         }
       }
