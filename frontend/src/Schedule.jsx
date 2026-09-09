@@ -208,14 +208,15 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                           <>
                             {entries.map(e => (
                               <div key={e.id} style={{marginBottom:4,width:"100%",boxSizing:"border-box"}}>
-                                <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",background:e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
-                                  <span style={{fontSize:12,fontWeight:600,color:"#333",display:"block",marginBottom:2,whiteSpace:"normal",wordBreak:"break-word"}}>
+                                <div onClick={() => openModal(fmt(d),time,e)} style={{padding:"4px 10px 6px",borderRadius:6,fontSize:11,cursor:"pointer",opacity:e.cancelled?0.65:1,background:e.cancelled?"#f5f5f5":e.attended===true?"#e8f5e9":e.attended===false?"#fff3e0":"#f3f0ff",border:`1px solid ${e.cancelled?"#bdbdbd":e.attended===true?"#a5d6a7":e.attended===false?"#ffcc80":"#d1c4e9"}`}}>
+                                  {e.cancelled&&<div style={{color:"#c62828",fontSize:10,fontWeight:700,marginBottom:2}}>🚫 Отменено</div>}
+                                  <span style={{fontSize:12,fontWeight:600,color:e.cancelled?"#888":"#333",display:"block",marginBottom:2,whiteSpace:"normal",wordBreak:"break-word"}}>
                                     {e.client_name||"—"}
                                   </span>
                                   {e.lesson_type&&<div style={{color:"#888",fontSize:11}}>{e.lesson_type}</div>}
                                   {e.teacher&&<div style={{color:"#4a90e2",fontSize:11}}>{e.teacher}</div>}
-                                  {e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
-                                  {e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
+                                  {!e.cancelled&&e.attended===true&&<span style={{color:"#2e7d32"}}>✓ пришёл</span>}
+                                  {!e.cancelled&&e.attended===false&&<span style={{color:"#e65100"}}>✗ не пришёл</span>}
                                   {e.walk_in&&<span style={{color:"#7b1fa2"}}> 🚶</span>}
                                   {e.comment&&<div style={{color:"#666",fontSize:10,whiteSpace:"pre-wrap",marginTop:2}}>{e.comment}</div>}
                                 </div>

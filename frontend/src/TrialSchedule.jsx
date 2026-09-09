@@ -175,6 +175,32 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         if (onClientsChange) onClientsChange(created);
       }
 
+      // Create linked schedule row for "К педагогу" trials (once only — guarded by schedule_id)
+      let scheduleId = modal.entry?.schedule_id ?? null;
+      if (form.lesson_type === "К педагогу" && !scheduleId) {
+        let autoTeacher = null;
+        let needsTeacherNote = false;
+        try {
+          const ws = await apiFetch(`work_schedule?date=eq.${modal.date}&select=employee_name,employee_role,start_time,end_time`);
+          if (Array.isArray(ws)) {
+            const teachers = ws.filter(r => r.employee_role === 'Педагоги' && r.start_time <= modal.time && modal.time <= r.end_time);
+            if (teachers.length === 1) autoTeacher = teachers[0].employee_name;
+            else needsTeacherNote = true;
+          }
+        } catch {}
+        const schedComment = [needsTeacherNote ? "⚠️ Педагог не определён автоматически" : null, form.comment || null].filter(Boolean).join("\n") || null;
+        const newSched = await apiFetch("schedule", {
+          method: "POST",
+          body: JSON.stringify({
+            date: modal.date, time: modal.time,
+            client_id: clientId || null, client_name: clientName || null,
+            lesson_type: "К педагогу", teacher: autoTeacher,
+            comment: schedComment,
+          }),
+        });
+        scheduleId = (Array.isArray(newSched) ? newSched[0] : newSched).id;
+      }
+
       // Resolve the moved entry: create a new one or update the existing linked one
       let movedToId = modal.entry?.moved_to_id ?? null;
       const targetDate = form.rescheduled_to || null;
@@ -197,6 +223,12 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
             }),
           });
           movedToId = (Array.isArray(created) ? created[0] : created).id;
+        }
+        if (scheduleId) {
+          await apiFetch(`schedule?id=eq.${scheduleId}`, {
+            method: "PATCH",
+            body: JSON.stringify({ date: targetDate, time: targetTime }),
+          });
         }
       } else if (!form.rescheduled) {
         movedToId = null;
@@ -225,6 +257,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         rescheduled_to: (form.rescheduled && targetDate) ? targetDate : null,
         rescheduled_time: (form.rescheduled && targetDate) ? targetTime : null,
         moved_to_id: movedToId,
+        schedule_id: scheduleId,
       };
 
       if (modal.entry) {
@@ -289,6 +322,11 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
 
   async function handleDelete() {
     if (!modal.entry || !window.confirm("Удалить запись?")) return;
+    if (modal.entry.schedule_id) {
+      try {
+        await apiFetch(`schedule?id=eq.${modal.entry.schedule_id}`, { method: "PATCH", body: JSON.stringify({ cancelled: true }) });
+      } catch {}
+    }
     await apiFetch(`trial_schedule?id=eq.${modal.entry.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     setModal(null);
     loadSlots();
