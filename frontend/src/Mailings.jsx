@@ -49,6 +49,16 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
   const [editingStatusId, setEditingStatusId] = React.useState(null);
   const [editingStatusName, setEditingStatusName] = React.useState("");
   const [newStatusName, setNewStatusName] = React.useState("");
+  const [lastCommentByClient, setLastCommentByClient] = React.useState({});
+  const [trialDateByClient, setTrialDateByClient] = React.useState({});
+
+  const [filterSource, setFilterSource] = React.useState("");
+  const [filterLeadFrom, setFilterLeadFrom] = React.useState("");
+  const [filterLeadTo, setFilterLeadTo] = React.useState("");
+  const [filterInteractionFrom, setFilterInteractionFrom] = React.useState("");
+  const [filterInteractionTo, setFilterInteractionTo] = React.useState("");
+  const [filterTrialFrom, setFilterTrialFrom] = React.useState("");
+  const [filterTrialTo, setFilterTrialTo] = React.useState("");
 
   async function loadAll() {
     setLoading(true);
@@ -61,6 +71,7 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
       setCampaigns(Array.isArray(c) ? c : []);
       setStatuses(Array.isArray(s) ? s : []);
       setMailings(Array.isArray(m) ? m : []);
+      await loadExtras(Array.isArray(m) ? m : []);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -69,6 +80,27 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
     try {
       const m = await apiFetch("client_mailings?select=id,client_id,campaign_id,status_id,added_at&order=added_at.asc");
       setMailings(Array.isArray(m) ? m : []);
+      await loadExtras(Array.isArray(m) ? m : []);
+    } catch (e) { console.error(e); }
+  }
+
+  // Last comment date and trial-signup date aren't stored on the client row itself,
+  // so fetch them separately, scoped only to clients currently in some campaign.
+  async function loadExtras(mailingRows) {
+    const ids = [...new Set(mailingRows.map(m => m.client_id))];
+    if (ids.length === 0) { setLastCommentByClient({}); setTrialDateByClient({}); return; }
+    const idList = ids.join(",");
+    try {
+      const [comments, trials] = await Promise.all([
+        apiFetch(`comments?client_id=in.(${idList})&select=client_id,created_at&order=created_at.desc`),
+        apiFetch(`trial_schedule?client_id=in.(${idList})&select=client_id,date&order=date.desc`),
+      ]);
+      const lastComment = {};
+      (Array.isArray(comments) ? comments : []).forEach(c => { if (!lastComment[c.client_id]) lastComment[c.client_id] = c.created_at; });
+      const lastTrial = {};
+      (Array.isArray(trials) ? trials : []).forEach(t => { if (!lastTrial[t.client_id]) lastTrial[t.client_id] = t.date; });
+      setLastCommentByClient(lastComment);
+      setTrialDateByClient(lastTrial);
     } catch (e) { console.error(e); }
   }
 
@@ -77,6 +109,39 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
   function clientFor(clientId) {
     return clients.find(c => c.id === clientId) || { id: clientId, name: `Клиент #${clientId}`, phone: "" };
   }
+
+  const sourceOptions = React.useMemo(() =>
+    [...new Set(clients.map(c => c.source).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru')),
+  [clients]);
+
+  function inRange(dateStr, from, to) {
+    if (!dateStr) return false;
+    const d = dateStr.slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  }
+
+  const hasActiveFilters = filterSource || filterLeadFrom || filterLeadTo || filterInteractionFrom || filterInteractionTo || filterTrialFrom || filterTrialTo;
+
+  function resetFilters() {
+    setFilterSource(""); setFilterLeadFrom(""); setFilterLeadTo("");
+    setFilterInteractionFrom(""); setFilterInteractionTo("");
+    setFilterTrialFrom(""); setFilterTrialTo("");
+  }
+
+  function matchesFilters(mailing) {
+    if (!hasActiveFilters) return true;
+    const client = clientFor(mailing.client_id);
+    if (filterSource && client.source !== filterSource) return false;
+    if ((filterLeadFrom || filterLeadTo) && !inRange(client.lead_date, filterLeadFrom, filterLeadTo)) return false;
+    if ((filterInteractionFrom || filterInteractionTo) && !inRange(lastCommentByClient[mailing.client_id], filterInteractionFrom, filterInteractionTo)) return false;
+    if ((filterTrialFrom || filterTrialTo) && !inRange(trialDateByClient[mailing.client_id], filterTrialFrom, filterTrialTo)) return false;
+    return true;
+  }
+
+  const filteredMailings = React.useMemo(() => mailings.filter(matchesFilters),
+    [mailings, filterSource, filterLeadFrom, filterLeadTo, filterInteractionFrom, filterInteractionTo, filterTrialFrom, filterTrialTo, lastCommentByClient, trialDateByClient, clients]);
 
   function statusColor(statusId) {
     const idx = statuses.findIndex(s => s.id === statusId);
@@ -205,7 +270,9 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", borderBottom: "1px solid #eee", flexShrink: 0 }}>
         <strong style={{ fontSize: 15 }}>📧 Рассылки</strong>
-        <span style={{ fontSize: 12, color: "#aaa" }}>всего карточек: {mailings.length}</span>
+        <span style={{ fontSize: 12, color: "#aaa" }}>
+          {hasActiveFilters ? `показано: ${filteredMailings.length} из ${mailings.length}` : `всего карточек: ${mailings.length}`}
+        </span>
         <div style={{ flex: 1 }} />
         <button onClick={() => setShowStatusManager(true)}
           style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#555" }}>
@@ -213,10 +280,58 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
         </button>
       </div>
 
+      {/* ── Filters ── */}
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: 14, padding: "10px 16px", borderBottom: "1px solid #eee", flexShrink: 0, background: "#fafafa" }}>
+        <div>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Источник</div>
+          <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+            style={{ fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", outline: "none", cursor: "pointer" }}>
+            <option value="">Все источники</option>
+            {sourceOptions.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Дата прихода лида</div>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <input type="date" value={filterLeadFrom} onChange={e => setFilterLeadFrom(e.target.value)}
+              style={{ fontSize: 12, padding: "5px 6px", borderRadius: 6, border: "1px solid #ddd", outline: "none" }} />
+            <span style={{ color: "#ccc", fontSize: 12 }}>—</span>
+            <input type="date" value={filterLeadTo} onChange={e => setFilterLeadTo(e.target.value)}
+              style={{ fontSize: 12, padding: "5px 6px", borderRadius: 6, border: "1px solid #ddd", outline: "none" }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Последнее взаимодействие</div>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <input type="date" value={filterInteractionFrom} onChange={e => setFilterInteractionFrom(e.target.value)}
+              style={{ fontSize: 12, padding: "5px 6px", borderRadius: 6, border: "1px solid #ddd", outline: "none" }} />
+            <span style={{ color: "#ccc", fontSize: 12 }}>—</span>
+            <input type="date" value={filterInteractionTo} onChange={e => setFilterInteractionTo(e.target.value)}
+              style={{ fontSize: 12, padding: "5px 6px", borderRadius: 6, border: "1px solid #ddd", outline: "none" }} />
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 3 }}>Дата записи на пробное</div>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <input type="date" value={filterTrialFrom} onChange={e => setFilterTrialFrom(e.target.value)}
+              style={{ fontSize: 12, padding: "5px 6px", borderRadius: 6, border: "1px solid #ddd", outline: "none" }} />
+            <span style={{ color: "#ccc", fontSize: 12 }}>—</span>
+            <input type="date" value={filterTrialTo} onChange={e => setFilterTrialTo(e.target.value)}
+              style={{ fontSize: 12, padding: "5px 6px", borderRadius: 6, border: "1px solid #ddd", outline: "none" }} />
+          </div>
+        </div>
+        {hasActiveFilters && (
+          <button onClick={resetFilters}
+            style={{ fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#e55", alignSelf: "flex-end" }}>
+            ✕ Сбросить
+          </button>
+        )}
+      </div>
+
       {/* ── Kanban board ── */}
       <div style={{ display: "flex", overflowX: "auto", flex: 1, gap: 10, padding: "12px 16px", alignItems: "flex-start" }}>
         {campaigns.map((camp, campIdx) => {
-          const cards = mailings.filter(m => m.campaign_id === camp.id);
+          const cards = filteredMailings.filter(m => m.campaign_id === camp.id);
           const isOver = dragOver === camp.id;
           return (
             <div key={camp.id}
