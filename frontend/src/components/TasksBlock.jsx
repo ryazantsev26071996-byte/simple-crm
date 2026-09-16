@@ -1,9 +1,8 @@
 import React from "react";
+import TaskModal from "./TaskModal";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-const ASSIGNEES = ['Татьяна', 'Салампи', 'Юлия', 'Екатерина', 'Александра', 'Софья', 'Анастасия', 'Дарья'];
 
 async function getToken() {
   try {
@@ -30,82 +29,103 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-export default function TasksBlock({ clientId }) {
+function writeAuditLog(entry, currentUserId, authorName) {
+  apiFetch("audit_log", {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ ...entry, performed_by: currentUserId, performed_by_name: authorName }),
+  }).catch(() => {});
+}
+
+export default function TasksBlock({ client, currentUserId, authorName }) {
+  const clientId = client?.id;
   const [tasks, setTasks] = React.useState([]);
+  const [profiles, setProfiles] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [showAdd, setShowAdd] = React.useState(false);
-  const [newText, setNewText] = React.useState('');
-  const [newAssigned, setNewAssigned] = React.useState('');
-  const [newDue, setNewDue] = React.useState('');
-  const [saving, setSaving] = React.useState(false);
+  const [showModal, setShowModal] = React.useState(false);
+  const [editingTask, setEditingTask] = React.useState(null);
 
   const today = new Date().toISOString().slice(0, 10);
 
   React.useEffect(() => {
     if (!clientId) return;
     load();
+    loadProfiles();
   }, [clientId]);
 
   async function load() {
     setLoading(true);
     try {
-      const data = await apiFetch(`tasks?client_id=eq.${clientId}&order=due_date.asc,created_at.asc`);
+      const data = await apiFetch(`tasks?client_id=eq.${clientId}&order=due_date.asc.nullslast,created_at.asc`);
       setTasks(data || []);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
 
-  async function addTask() {
-    if (!newText.trim()) return;
-    setSaving(true);
+  async function loadProfiles() {
     try {
-      const data = await apiFetch(`tasks`, {
-        method: 'POST',
-        body: JSON.stringify({
-          client_id: clientId,
-          text: newText.trim(),
-          assigned_to: newAssigned || null,
-          due_date: newDue || null,
-          completed: false,
-        }),
-      });
-      const added = Array.isArray(data) ? data[0] : data;
-      if (added) setTasks(prev => [...prev, added]);
-      setNewText(''); setNewAssigned(''); setNewDue(''); setShowAdd(false);
-    } catch (e) { console.error(e); }
-    setSaving(false);
+      const data = await apiFetch("profiles?select=id,full_name&order=full_name.asc");
+      setProfiles((data || []).filter(p => p.full_name));
+    } catch {}
   }
 
-  async function toggleComplete(task) {
-    const next = !task.completed;
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: next } : t));
+  async function handleSave(formData) {
+    if (editingTask?.id) {
+      await apiFetch(`tasks?id=eq.${editingTask.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(formData) });
+      if ((editingTask.status || "new") !== formData.status)
+        writeAuditLog({ action: "task_status_changed", entity: "task", entity_id: String(editingTask.id), old_value: editingTask.status || "new", new_value: formData.status }, currentUserId, authorName);
+      if ((editingTask.assigned_to || "") !== (formData.assigned_to || ""))
+        writeAuditLog({ action: "task_assigned", entity: "task", entity_id: String(editingTask.id), old_value: editingTask.assigned_to || "—", new_value: formData.assigned_to || "—" }, currentUserId, authorName);
+      if (!!editingTask.is_important !== !!formData.is_important)
+        writeAuditLog({ action: "task_important_changed", entity: "task", entity_id: String(editingTask.id), new_value: formData.is_important ? "важная" : "обычная" }, currentUserId, authorName);
+    } else {
+      await apiFetch("tasks", { method: "POST", body: JSON.stringify({ ...formData, client_id: clientId, completed: formData.status === "done" }) });
+    }
+    await load();
+    setShowModal(false);
+    setEditingTask(null);
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("Удалить задачу?")) return;
+    await apiFetch(`tasks?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    setTasks(prev => prev.filter(t => t.id !== id));
+    setShowModal(false);
+    setEditingTask(null);
+  }
+
+  async function toggleComplete(task, e) {
+    e.stopPropagation();
+    const nextStatus = (task.status === "done" || task.completed) ? "new" : "done";
+    const nextCompleted = nextStatus === "done";
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: nextStatus, completed: nextCompleted } : t));
     try {
-      await apiFetch(`tasks?id=eq.${task.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ completed: next }),
-      });
-    } catch (e) {
-      console.error(e);
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: task.completed } : t));
+      await apiFetch(`tasks?id=eq.${task.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: nextStatus, completed: nextCompleted }) });
+      writeAuditLog({ action: "task_status_changed", entity: "task", entity_id: String(task.id), old_value: task.status || "new", new_value: nextStatus }, currentUserId, authorName);
+    } catch (err) {
+      console.error(err);
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status, completed: task.completed } : t));
     }
   }
 
   function taskStyle(task) {
-    if (task.completed) return { color: '#bbb', textDecoration: 'line-through' };
+    const isDone = task.status === "done" || task.completed;
+    if (isDone) return { color: '#bbb', textDecoration: 'line-through' };
     if (task.due_date && task.due_date < today) return { color: '#e53935', fontWeight: 500 };
     if (task.due_date && task.due_date === today) return { color: '#e67e22', fontWeight: 500 };
     return { color: '#333' };
   }
 
   function dueLabelColor(task) {
-    if (task.completed) return '#ccc';
+    const isDone = task.status === "done" || task.completed;
+    if (isDone) return '#ccc';
     if (task.due_date && task.due_date < today) return '#e53935';
     if (task.due_date && task.due_date === today) return '#e67e22';
     return '#aaa';
   }
 
-  const incomplete = tasks.filter(t => !t.completed);
-  const completed  = tasks.filter(t => t.completed);
+  const incomplete = tasks.filter(t => !(t.status === "done" || t.completed));
+  const completed  = tasks.filter(t => (t.status === "done" || t.completed));
   const ordered    = [...incomplete, ...completed];
 
   return (
@@ -119,61 +139,38 @@ export default function TasksBlock({ clientId }) {
             </span>
           )}
         </div>
-        <button onClick={() => setShowAdd(v => !v)}
+        <button onClick={() => { setEditingTask(null); setShowModal(true); }}
           style={{ fontSize: 20, lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', color: '#4a90e2', padding: '0 2px' }}>+</button>
       </div>
 
-      {showAdd && (
-        <div style={{ background: '#f8f9ff', borderRadius: 8, padding: 10, marginBottom: 8, border: '1px solid #e0e7ff' }}>
-          <input
-            value={newText}
-            onChange={e => setNewText(e.target.value)}
-            placeholder="Текст задачи *"
-            autoFocus
-            onKeyDown={e => e.key === 'Enter' && addTask()}
-            style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #ddd', fontSize: 13, marginBottom: 6, boxSizing: 'border-box', outline: 'none' }}
-          />
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-            <select value={newAssigned} onChange={e => setNewAssigned(e.target.value)}
-              style={{ flex: 1, minWidth: 110, padding: '5px 6px', borderRadius: 6, border: '1px solid #ddd', fontSize: 12 }}>
-              <option value="">Ответственный</option>
-              {ASSIGNEES.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-            <input type="date" value={newDue} onChange={e => setNewDue(e.target.value)}
-              style={{ flex: 1, minWidth: 110, padding: '5px 6px', borderRadius: 6, border: '1px solid #ddd', fontSize: 12 }} />
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={addTask} disabled={saving || !newText.trim()}
-              style={{ flex: 1, padding: '6px 0', borderRadius: 6, background: '#4a90e2', color: 'white', border: 'none', cursor: newText.trim() ? 'pointer' : 'default', fontSize: 12, fontWeight: 500, opacity: newText.trim() ? 1 : 0.5 }}>
-              {saving ? 'Сохранение...' : 'Добавить'}
-            </button>
-            <button onClick={() => { setShowAdd(false); setNewText(''); setNewAssigned(''); setNewDue(''); }}
-              style={{ padding: '6px 12px', borderRadius: 6, background: 'white', border: '1px solid #ddd', cursor: 'pointer', fontSize: 12 }}>
-              Отмена
-            </button>
-          </div>
-        </div>
-      )}
-
       {loading && <div style={{ color: '#aaa', fontSize: 12, padding: '4px 0' }}>Загрузка...</div>}
 
-      {!loading && tasks.length === 0 && !showAdd && (
+      {!loading && tasks.length === 0 && (
         <div style={{ color: '#ccc', fontSize: 12 }}>Задач нет</div>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {ordered.map(task => (
-          <div key={task.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 2px', borderRadius: 6 }}>
-            <input type="checkbox" checked={!!task.completed} onChange={() => toggleComplete(task)}
+          <div key={task.id}
+            onClick={() => { setEditingTask(task); setShowModal(true); }}
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 2px', borderRadius: 6, cursor: 'pointer' }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <input type="checkbox" checked={task.status === "done" || !!task.completed} onChange={(e) => toggleComplete(task, e)}
+              onClick={e => e.stopPropagation()}
               style={{ marginTop: 3, flexShrink: 0, cursor: 'pointer', accentColor: '#4a90e2' }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, ...taskStyle(task), wordBreak: 'break-word' }}>{task.text}</div>
+              <div style={{ fontSize: 13, ...taskStyle(task), wordBreak: 'break-word', display: 'flex', alignItems: 'center', gap: 5 }}>
+                {task.is_important && <span title="Важная задача" style={{ fontSize: 12 }}>🔥</span>}
+                {task.text}
+              </div>
               {(task.assigned_to || task.due_date) && (
                 <div style={{ fontSize: 11, marginTop: 1, display: 'flex', gap: 8 }}>
                   {task.assigned_to && <span style={{ color: '#999' }}>{task.assigned_to}</span>}
                   {task.due_date && (
                     <span style={{ color: dueLabelColor(task) }}>
                       {new Date(task.due_date + 'T00:00:00').toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+                      {task.due_time && ` ${task.due_time}`}
                     </span>
                   )}
                 </div>
@@ -182,6 +179,20 @@ export default function TasksBlock({ clientId }) {
           </div>
         ))}
       </div>
+
+      {showModal && (
+        <TaskModal
+          task={editingTask}
+          profiles={profiles}
+          defaultAssignee=""
+          defaultClient={client}
+          currentUserName={authorName}
+          currentUserId={currentUserId}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onClose={() => { setShowModal(false); setEditingTask(null); }}
+        />
+      )}
     </div>
   );
 }

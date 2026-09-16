@@ -249,7 +249,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {client?.id && <TasksBlock clientId={client.id} />}
+      {client?.id && <TasksBlock client={client} currentUserId={currentUserId} authorName={authorName} />}
       <div style={{ flexShrink: 0, borderBottom: '1px solid #eee', paddingBottom: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontWeight: 500, fontSize: 14 }}>Комментарии</div>
