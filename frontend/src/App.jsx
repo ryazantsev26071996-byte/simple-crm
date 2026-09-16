@@ -33,7 +33,7 @@ async function apiFetch(path, options = {}) {
 import ClientForm from "./components/ClientForm.jsx";
 import CommentsWall from "./components/CommentsWall.jsx";
 import { KanbanBoard } from "./KanbanBoard.jsx";
-import { createClient, createComment, getClients, getComments, updateClient } from "./api.js";
+import { createClient, createComment, getClients, getComments, updateClient, getNextContractNumber } from "./api.js";
 import { useAuth } from "./AuthContext";
 import { LoginPage } from "./LoginPage";
 import { supabase } from "./supabase";
@@ -402,11 +402,19 @@ export default function App() {
               stageEditMode={stageEditMode}
               onClientsReload={reloadClients}
               onStageChange={async (id, stage) => {
-                const oldStage = clients.find(c => c.id === id)?.stage || null;
-                setClients(prev => prev.map(c => c.id === id ? { ...c, stage } : c));
+                const target = clients.find(c => c.id === id);
+                const oldStage = target?.stage || null;
+                const payload = { stage };
+                if (stage !== oldStage && stage?.trim().toLowerCase() === 'ученики' && !target?.contract_number) {
+                  try {
+                    const nextNum = await getNextContractNumber();
+                    payload.contract_number = String(nextNum);
+                  } catch (err) { console.error('contract number auto-assign failed:', err); }
+                }
+                setClients(prev => prev.map(c => c.id === id ? { ...c, ...payload } : c));
                 if (id === selectedId) setSelectedId(null);
                 try {
-                  await updateClient({ role, name: authorName }, id, { stage });
+                  await updateClient({ role, name: authorName }, id, payload);
                   if (stage !== oldStage) {
                     try {
                       const { error } = await supabase.from('audit_log').insert({ action: 'stage_changed', entity: 'client', entity_id: id, old_value: oldStage, new_value: stage, performed_by: user?.id, performed_by_name: authorName });
@@ -415,7 +423,7 @@ export default function App() {
                   }
                 } catch (err) {
                   setError(err.message);
-                  setClients(prev => prev.map(c => c.id === id ? { ...c, stage: oldStage } : c));
+                  setClients(prev => prev.map(c => c.id === id ? { ...c, stage: oldStage, contract_number: target?.contract_number ?? null } : c));
                 }
                 handleClientSelect(id);
               }}

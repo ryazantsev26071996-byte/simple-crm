@@ -23,7 +23,7 @@ import CommentsWall from "./CommentsWall.jsx";
 import StudentInfoBlock from "./StudentInfoBlock.jsx";
 import ContractBlock from "./ContractBlock.jsx";
 import LearningStrategy from "./LearningStrategy.jsx";
-import { createComment, getComments, updateClient } from "../api.js";
+import { createComment, getComments, updateClient, getNextContractNumber } from "../api.js";
 import { supabase } from "../supabase";
 import MailingsPopup from "./MailingsPopup.jsx";
 import StageHistory from "./StageHistory.jsx";
@@ -171,6 +171,11 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
               try {
                 const oldStage = client?.stage;
                 const oldLessonsUsed = client?.lessons_used ?? 0;
+                if (payload.stage && payload.stage !== oldStage && payload.stage.trim().toLowerCase() === 'ученики' && !client?.contract_number && !payload.contract_number) {
+                  try {
+                    payload = { ...payload, contract_number: String(await getNextContractNumber()) };
+                  } catch {}
+                }
                 const updated = await updateClient({ role, name: authorName }, client.id, payload);
                 if (onUpdate) onUpdate(updated);
                 if (payload.stage && payload.stage !== oldStage) {

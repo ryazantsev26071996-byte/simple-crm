@@ -48,6 +48,16 @@ export async function createClient(user, payload) {
   return Array.isArray(data) ? data[0] : data
 }
 
+export async function getNextContractNumber() {
+  const data = await apiFetch('clients?select=contract_number&contract_number=not.is.null')
+  let max = 0
+  ;(data || []).forEach(row => {
+    const n = parseInt(row.contract_number, 10)
+    if (!isNaN(n) && n > max) max = n
+  })
+  return max + 1
+}
+
 export async function updateClient(user, id, payload) {
   const data = await apiFetch(`clients?id=eq.${id}`, {
     method: 'PATCH',

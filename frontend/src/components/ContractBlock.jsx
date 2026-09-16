@@ -35,6 +35,16 @@ async function apiFetch(path, options = {}) {
   return data
 }
 
+async function getNextContractNumber() {
+  const data = await apiFetch('clients?select=contract_number&contract_number=not.is.null')
+  let max = 0
+  ;(data || []).forEach(row => {
+    const n = parseInt(row.contract_number, 10)
+    if (!isNaN(n) && n > max) max = n
+  })
+  return max + 1
+}
+
 const PAYMENT_METHODS = ['Наличные', 'Карта', 'Рассрочка школы', 'Рассрочка банка', 'Перевод']
 const BROKERS = ['Совкомбанк', 'Тинькофф', 'Сбер', 'ПСБ', 'Альфа', 'Хоум', 'Другой']
 
@@ -168,10 +178,8 @@ export default function ContractBlock({ client, onUpdate, role }) {
   async function fetchNextContractNumber() {
     setNextNumLoading(true)
     try {
-      const data = await apiFetch('clients?select=contract_number&order=contract_number.desc&limit=1')
-      const maxNum = data?.[0]?.contract_number
-      const next = maxNum ? (parseInt(maxNum, 10) + 1) : 1
-      setForm(f => ({ ...f, contract_number: isNaN(next) ? '' : String(next) }))
+      const next = await getNextContractNumber()
+      setForm(f => ({ ...f, contract_number: String(next) }))
     } catch(e) {
       alert(e.message)
     } finally {
