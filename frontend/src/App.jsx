@@ -196,7 +196,7 @@ export default function App() {
     ] : []),
     { key: 'students', label: 'Ученики' },
     { key: 'tasks', label: 'Задачи' },
-    ...(role === 'admin' ? [{ key: 'mailings', label: 'Рассылки' }] : []),
+    ...(role === 'admin' || role === 'manager' || role === 'supervisor' ? [{ key: 'mailings', label: 'Рассылки' }] : []),
   ];
 
 
@@ -275,7 +275,7 @@ export default function App() {
                 Задачи
                 {myTasksBadge > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{myTasksBadge}</span>}
               </button>
-              {role === 'admin' && <button className="tabBtn" onClick={() => setView('mailings')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'mailings' ? '#e67e22' : 'white', color: view === 'mailings' ? 'white' : '#e67e22', cursor: 'pointer' }}>Рассылки</button>}
+              {(role === 'admin' || role === 'manager' || role === 'supervisor') && <button className="tabBtn" onClick={() => setView('mailings')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'mailings' ? '#e67e22' : 'white', color: view === 'mailings' ? 'white' : '#e67e22', cursor: 'pointer' }}>Рассылки</button>}
             </div>
           </div>
         )}
@@ -368,7 +368,7 @@ export default function App() {
           {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher' || role === 'supervisor') && <WorkSchedule />}
           {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
           {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
-          {view === 'mailings' && role === 'admin' && <Mailings clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated?.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? { ...c, ...updated } : c) : [updated, ...prev]; }); }} />}
+          {view === 'mailings' && (role === 'admin' || role === 'manager' || role === 'supervisor') && <Mailings clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated?.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? { ...c, ...updated } : c) : [updated, ...prev]; }); }} />}
 
           {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
@@ -521,7 +521,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {role === 'admin' && (
+                {(role === 'admin' || role === 'manager' || role === 'supervisor') && (
                   <button onClick={() => setShowInlineMailings(true)}
                     style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #e67e22', background: 'white', cursor: 'pointer', color: '#e67e22' }}>
                     📧 Рассылки
