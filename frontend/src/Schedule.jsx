@@ -92,6 +92,8 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     } catch(e) {}
   }
 
+  const [slotsReady, setSlotsReady] = React.useState(false);
+
   async function loadSlots() {
     setLoading(true);
     try {
@@ -99,18 +101,19 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       setSlots(data);
     } catch(e) { console.error(e); }
     setLoading(false);
+    setSlotsReady(true);
   }
 
   React.useEffect(() => { loadSlots(); loadBlocks(); }, [weekStart]);
 
   const restoredModalRef = React.useRef(false);
   React.useEffect(() => {
-    if (!pendingModalRestore || restoredModalRef.current || loading) return;
+    if (!pendingModalRestore || restoredModalRef.current || !slotsReady) return;
     restoredModalRef.current = true;
     const entry = slots.find(s => s.date === pendingModalRestore.date && s.time === pendingModalRestore.time
       && (pendingModalRestore.entryId ? s.id === pendingModalRestore.entryId : true)) || null;
     openModal(pendingModalRestore.date, pendingModalRestore.time, entry);
-  }, [slots, loading]);
+  }, [slots, slotsReady]);
 
   React.useEffect(() => {
     if (!pendingClientRestore) return;
