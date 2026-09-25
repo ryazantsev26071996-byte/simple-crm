@@ -49,7 +49,13 @@ function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 export default function TrialSchedule({ clients, role, authorName, userId, userEmail, onClientsChange }) {
   const { stageNames: STAGES } = useClientStages();
   const [showBlocks, setShowBlocks] = React.useState(false);
-  const [weekStart, setWeekStart] = React.useState(new Date());
+  const [pendingModalRestore] = React.useState(() => {
+    try { const raw = localStorage.getItem('crm_trial_modal'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  const [weekStart, setWeekStart] = React.useState(() => {
+    if (pendingModalRestore?.date) { const d = new Date(pendingModalRestore.date); if (!isNaN(d)) return d; }
+    return new Date();
+  });
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [modal, setModal] = React.useState(null);
@@ -58,7 +64,24 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
+  const [pendingClientRestore, setPendingClientRestore] = React.useState(() => {
+    const raw = localStorage.getItem('crm_trial_client_modal_id');
+    return raw ? Number(raw) : null;
+  });
   const commentRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (modal) {
+      try { localStorage.setItem('crm_trial_modal', JSON.stringify({ date: modal.date, time: modal.time, entryId: modal.entry?.id ?? null })); } catch {}
+    } else {
+      localStorage.removeItem('crm_trial_modal');
+    }
+  }, [modal]);
+
+  React.useEffect(() => {
+    if (clientModal) localStorage.setItem('crm_trial_client_modal_id', String(clientModal.id));
+    else localStorage.removeItem('crm_trial_client_modal_id');
+  }, [clientModal]);
 
   React.useEffect(() => {
     if (commentRef.current) {
@@ -100,6 +123,21 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
   }
 
   React.useEffect(() => { loadSlots(); loadBlocks(); }, [weekStart]);
+
+  const restoredModalRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!pendingModalRestore || restoredModalRef.current || loading) return;
+    restoredModalRef.current = true;
+    const entry = slots.find(s => s.date === pendingModalRestore.date && s.time === pendingModalRestore.time
+      && (pendingModalRestore.entryId ? s.id === pendingModalRestore.entryId : true)) || null;
+    openModal(pendingModalRestore.date, pendingModalRestore.time, entry);
+  }, [slots, loading]);
+
+  React.useEffect(() => {
+    if (!pendingClientRestore) return;
+    const cl = allClients.find(c => c.id === pendingClientRestore);
+    if (cl) { setClientModal(cl); setPendingClientRestore(null); }
+  }, [allClients, pendingClientRestore]);
 
   async function openModal(date, time, entry = null) {
     setModal({ date, time, entry });

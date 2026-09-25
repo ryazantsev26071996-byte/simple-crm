@@ -66,7 +66,10 @@ export default function App() {
   const authorName = profile?.full_name || user?.email || "";
 
   const [clients, setClients] = React.useState([]);
-  const [selectedId, setSelectedId] = React.useState(null);
+  const [selectedId, setSelectedId] = React.useState(() => {
+    const saved = localStorage.getItem('crm_selected_client_id');
+    return saved ? Number(saved) : null;
+  });
   const [comments, setComments] = React.useState([]);
   const [loadingClients, setLoadingClients] = React.useState(false);
   const [loadingComments, setLoadingComments] = React.useState(false);
@@ -74,6 +77,10 @@ export default function App() {
   const [view, setView] = React.useState(() => { const saved = localStorage.getItem('crm_view'); return saved || 'myoffice'; });
 
   React.useEffect(() => { localStorage.setItem('crm_view', view); }, [view]);
+  React.useEffect(() => {
+    if (selectedId) localStorage.setItem('crm_selected_client_id', String(selectedId));
+    else localStorage.removeItem('crm_selected_client_id');
+  }, [selectedId]);
   const [showAudit, setShowAudit] = React.useState(false);
   const [showImport, setShowImport] = React.useState(false);
   const [showInlineHistory, setShowInlineHistory] = React.useState(false);

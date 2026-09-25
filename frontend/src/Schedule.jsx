@@ -47,7 +47,13 @@ function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 export default function Schedule({ clients, role, authorName, userId, userEmail, onClientsChange }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
   const [showEvents, setShowEvents] = React.useState(false);
-  const [weekStart, setWeekStart] = React.useState(new Date());
+  const [pendingModalRestore] = React.useState(() => {
+    try { const raw = localStorage.getItem('crm_schedule_modal'); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  const [weekStart, setWeekStart] = React.useState(() => {
+    if (pendingModalRestore?.date) { const d = new Date(pendingModalRestore.date); if (!isNaN(d)) return d; }
+    return new Date();
+  });
   const [slots, setSlots] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [modal, setModal] = React.useState(null);
@@ -55,6 +61,23 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   const [clientSearch, setClientSearch] = React.useState("");
   const [showSuggestions, setShowSuggestions] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
+  const [pendingClientRestore, setPendingClientRestore] = React.useState(() => {
+    const raw = localStorage.getItem('crm_schedule_client_modal_id');
+    return raw ? Number(raw) : null;
+  });
+
+  React.useEffect(() => {
+    if (modal) {
+      try { localStorage.setItem('crm_schedule_modal', JSON.stringify({ date: modal.date, time: modal.time, entryId: modal.entry?.id ?? null })); } catch {}
+    } else {
+      localStorage.removeItem('crm_schedule_modal');
+    }
+  }, [modal]);
+
+  React.useEffect(() => {
+    if (clientModal) localStorage.setItem('crm_schedule_client_modal_id', String(clientModal.id));
+    else localStorage.removeItem('crm_schedule_client_modal_id');
+  }, [clientModal]);
 
   const days = getWeekDays(weekStart);
   const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -79,6 +102,21 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   }
 
   React.useEffect(() => { loadSlots(); loadBlocks(); }, [weekStart]);
+
+  const restoredModalRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!pendingModalRestore || restoredModalRef.current || loading) return;
+    restoredModalRef.current = true;
+    const entry = slots.find(s => s.date === pendingModalRestore.date && s.time === pendingModalRestore.time
+      && (pendingModalRestore.entryId ? s.id === pendingModalRestore.entryId : true)) || null;
+    openModal(pendingModalRestore.date, pendingModalRestore.time, entry);
+  }, [slots, loading]);
+
+  React.useEffect(() => {
+    if (!pendingClientRestore) return;
+    const cl = clients.find(c => c.id === pendingClientRestore);
+    if (cl) { setClientModal(cl); setPendingClientRestore(null); }
+  }, [clients, pendingClientRestore]);
 
   function openClientModal(clientId) {
     const cl = clients.find(c => c.id === clientId);
