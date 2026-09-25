@@ -114,7 +114,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
     loadProfiles();
     if (effectiveScope === "mine") loadRecurringTasks();
     else setRecurringInstances([]);
-  }, [user?.id, effectiveScope]);
+  }, [user?.id, effectiveScope, myName]);
 
   async function loadRecurringTasks() {
     if (!myName) return;
@@ -181,13 +181,17 @@ export default function Tasks({ user, profile, onClientSelect }) {
     setLoading(true);
     try {
       let q = "tasks?order=due_date.asc.nullslast,created_at.asc&select=*,client:clients(id,name)";
-      if (effectiveScope === "mine" && myName) q += `&assigned_to=eq.${encodeURIComponent(myName)}`;
+      // Важно: если scope="mine", фильтр ставим ВСЕГДА, даже если имя ещё не
+      // подгрузилось — иначе запрос без фильтра вернёт вообще все задачи всех
+      // сотрудников. Пустое имя подставляем как заведомо непустое условие,
+      // чтобы в этом случае список был пустым, а не "все задачи".
+      if (effectiveScope === "mine") q += `&assigned_to=eq.${encodeURIComponent(myName || "__none__")}`;
       const data = await apiFetch(q);
       setTasks(data || []);
     } catch {
       try {
         let q = "tasks?order=due_date.asc.nullslast,created_at.asc";
-        if (effectiveScope === "mine" && myName) q += `&assigned_to=eq.${encodeURIComponent(myName)}`;
+        if (effectiveScope === "mine") q += `&assigned_to=eq.${encodeURIComponent(myName || "__none__")}`;
         const data = await apiFetch(q);
         setTasks(data || []);
       } catch (e2) { console.error(e2); }
