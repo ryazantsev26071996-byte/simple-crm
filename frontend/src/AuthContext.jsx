@@ -9,10 +9,38 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let settled = false
+
+    // Защита от зависшего getSession(): если Supabase не ответил за 6 секунд
+    // (частая причина — протухшая/битая сессия в localStorage, блокирующая
+    // внутренний refresh-lock клиента), сбрасываем сохранённую сессию и
+    // показываем экран входа вместо бесконечного спиннера.
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      console.warn('Supabase getSession() завис — сбрасываем сохранённую сессию')
+      try {
+        Object.keys(localStorage).forEach((key) => {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) localStorage.removeItem(key)
+        })
+      } catch {}
+      setUser(null)
+      setProfile(null)
+      setLoading(false)
+    }, 6000)
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
       setUser(session?.user ?? null)
       if (session?.user) fetchProfile(session.user.id)
       else setLoading(false)
+    }).catch(() => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -22,7 +50,26 @@ export function AuthProvider({ children }) {
         else { setProfile(null); setLoading(false) }
       }
     )
-    return () => subscription.unsubscribe()
+    return () => { clearTimeout(timeout); subscription.unsubscribe() }
+  }, [])
+
+  // Когда вкладка долго висела в фоне, браузер замораживает таймеры,
+  // из-за чего автообновление токена Supabase может не сработать вовремя —
+  // после этого запросы с протухшим токеном молча не проходят, пока страницу
+  // не обновишь вручную. Принудительно проверяем/обновляем сессию при
+  // возврате вкладки в фокус.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.getSession().catch(() => {})
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
   }, [])
 
   async function fetchProfile(userId) {
