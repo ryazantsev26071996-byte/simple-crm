@@ -389,7 +389,7 @@ export default function App() {
 
           {view === 'tasks' && (
             <Tasks user={user} profile={profile}
-              onClientSelect={(id) => { handleClientSelect(id); setView('kanban'); }} />
+              onClientSelect={(id) => handleClientSelect(id)} />
           )}
 
           {!loadingClients && view === 'students' && (
