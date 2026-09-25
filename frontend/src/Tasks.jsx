@@ -83,7 +83,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
 
   const [tasks, setTasks] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
-  const [scope, setScope] = React.useState("mine");
+  const [scope, setScope] = React.useState(() => localStorage.getItem("crm_tasks_scope") || "mine");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [priorityFilter, setPriorityFilter] = React.useState("all");
   const [assigneeFilter, setAssigneeFilter] = React.useState("all");
@@ -353,7 +353,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
         {isAdmin && (
           <div style={{ display: "flex", borderRadius: 6, border: "1px solid #ddd", overflow: "hidden" }}>
             {[["mine", "Мои задачи"], ["all", "Все задачи"]].map(([val, label]) => (
-              <button key={val} onClick={() => { setScope(val); if (val === "mine") setAssigneeFilter("all"); }}
+              <button key={val} onClick={() => { setScope(val); localStorage.setItem("crm_tasks_scope", val); if (val === "mine") setAssigneeFilter("all"); }}
                 style={{ padding: "5px 12px", fontSize: 12, border: "none", background: scope === val ? "#4a90e2" : "white", color: scope === val ? "white" : "#333", cursor: "pointer", borderLeft: val === "all" ? "1px solid #ddd" : "none" }}>
                 {label}
               </button>
