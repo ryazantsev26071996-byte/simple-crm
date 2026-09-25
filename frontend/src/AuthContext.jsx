@@ -1,6 +1,27 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabase'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+// Читаем токен напрямую из localStorage, в обход supabase-js.
+// Клиент supabase-js использует navigator.locks для синхронизации сессии
+// между вкладками — если эта блокировка где-то зависла (см. AuthContext ниже),
+// любой вызов supabase.auth.getSession() или supabase.from(...) в этой вкладке
+// зависает вместе с ней. Прямое чтение из localStorage не зависит от этой
+// блокировки и работает всегда, пока токен в хранилище валиден.
+function getStoredAccessToken() {
+  try {
+    const key = `sb-${SUPABASE_URL.split('//')[1].split('.')[0]}-auth-token`
+    const raw = localStorage.getItem(key)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (parsed?.access_token) return parsed.access_token
+    }
+  } catch {}
+  return null
+}
+
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
@@ -74,31 +95,31 @@ export function AuthProvider({ children }) {
 
   async function fetchProfile(userId) {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
-
-      if (error) {
-        console.error('Profile fetch error:', error)
-        setProfile({ role: 'teacher', full_name: '' })
-      } else {
-        setProfile(data || { role: 'teacher', full_name: '' })
-      }
+      const token = getStoredAccessToken()
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=*`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
+        },
+      })
+      if (!res.ok) throw new Error(`profiles fetch failed: ${res.status}`)
+      const data = await res.json()
+      const row = Array.isArray(data) ? data[0] : data
+      setProfile(row || { role: 'teacher', full_name: '' })
     } catch (e) {
+      console.error('Profile fetch error:', e)
       setProfile({ role: 'teacher', full_name: '' })
     }
     setLoading(false)
   }
 
   async function authFetch(url, options = {}) {
-    const { data: { session } } = await supabase.auth.getSession()
+    const token = getStoredAccessToken()
     return fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token || ''}`,
+        'Authorization': `Bearer ${token || ''}`,
         ...options.headers
       }
     })
