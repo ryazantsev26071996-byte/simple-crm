@@ -397,7 +397,7 @@ export default function App() {
           )}
 
           {!loadingClients && view === 'kanban' && role !== 'teacher' && (
-            <KanbanBoard clients={clients} role={role} onClientSelect={handleClientSelect}
+            <KanbanBoard clients={clients} role={role} onClientSelect={handleClientSelect} userId={user?.id}
               taskBadges={taskBadges}
               stageEditMode={stageEditMode}
               onClientsReload={reloadClients}

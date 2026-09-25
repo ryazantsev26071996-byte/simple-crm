@@ -37,12 +37,33 @@ function ClientFormInline({ onSubmit, onOpenClient }) {
 
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
 
-export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated, taskBadges = {}, stageEditMode = false, onClientsReload }) {
+export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAddClient, onClientCreated, taskBadges = {}, stageEditMode = false, onClientsReload, userId }) {
   const [search, setSearch] = useState('')
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [filterMonth, setFilterMonth] = useState('all')
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768)
   const { stages, loading: stagesLoading, reload: reloadStages } = useClientStages()
+
+  const stageFilterKey = `crm_kanban_stage_filter_${userId || 'anon'}`
+  const [stageFilter, setStageFilter] = useState(() => {
+    try {
+      const raw = localStorage.getItem(stageFilterKey)
+      const parsed = raw ? JSON.parse(raw) : []
+      return Array.isArray(parsed) ? parsed : []
+    } catch { return [] }
+  })
+  const [showStageFilter, setShowStageFilter] = useState(false)
+
+  React.useEffect(() => {
+    try { localStorage.setItem(stageFilterKey, JSON.stringify(stageFilter)) } catch {}
+  }, [stageFilter, stageFilterKey])
+
+  function toggleStageFilter(name) {
+    setStageFilter(prev => {
+      const base = prev.length > 0 ? prev : visibleStages
+      return base.includes(name) ? base.filter(n => n !== name) : [...base, name]
+    })
+  }
 
   React.useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768)
@@ -55,6 +76,10 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
     ? TEACHER_STAGES.map(name => ({ id: name, name }))
     : stages
   const visibleStages = visibleStageObjs.map(s => s.name)
+  const activeStageFilter = stageFilter.filter(name => visibleStages.includes(name))
+  const displayedStageObjs = (activeStageFilter.length > 0 && !editMode)
+    ? visibleStageObjs.filter(s => activeStageFilter.includes(s.name))
+    : visibleStageObjs
   const currentYear = new Date().getFullYear()
 
   async function moveStage(stageId, direction) {
@@ -142,6 +167,34 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
             +<span className="btnLabel"> Добавить клиента</span>
           </button>
         )}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowStageFilter(v => !v)}
+            style={{ padding: '7px 12px', borderRadius: 8, border: activeStageFilter.length > 0 ? '1px solid #4a90e2' : '1px solid #ddd', background: activeStageFilter.length > 0 ? '#eaf3ff' : 'white', color: activeStageFilter.length > 0 ? '#4a90e2' : '#333', fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}
+          >
+            🧭 Стадии{activeStageFilter.length > 0 ? ` (${activeStageFilter.length})` : ''}
+          </button>
+          {showStageFilter && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: 'white', border: '1px solid #eee', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 500, width: 240, maxHeight: 360, overflowY: 'auto', padding: 10 }}>
+              <div style={{ fontSize: 11, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Показывать стадии</span>
+                {activeStageFilter.length > 0 && (
+                  <button onClick={() => setStageFilter([])} style={{ fontSize: 11, background: 'none', border: 'none', color: '#4a90e2', cursor: 'pointer', padding: 0 }}>Сбросить</button>
+                )}
+              </div>
+              {visibleStageObjs.map(s => (
+                <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px', fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox"
+                    checked={activeStageFilter.length === 0 || activeStageFilter.includes(s.name)}
+                    onChange={() => toggleStageFilter(s.name)}
+                    style={{ cursor: 'pointer', accentColor: '#4a90e2' }} />
+                  {s.name}
+                </label>
+              ))}
+              <div style={{ fontSize: 11, color: '#aaa', marginTop: 8 }}>Фильтр личный, виден только вам</div>
+            </div>
+          )}
+        </div>
         {search && <div style={{ fontSize: 12, color: '#888', whiteSpace: 'nowrap' }}>Найдено: {filteredClients.length}</div>}
       </div>
 
@@ -152,7 +205,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
       )}
       <div className="kanbanScroll" style={{ display: 'flex', overflowX: 'auto', height: editMode ? 'calc(100vh - 152px)' : 'calc(100vh - 120px)', alignItems: 'flex-start', gap: 10, padding: '12px 16px' }}>
         {stagesLoading && role !== 'teacher' && <div style={{ color: '#888', fontSize: 13, padding: 16 }}>Загрузка стадий...</div>}
-        {visibleStageObjs.map((stageObj, i) => {
+        {displayedStageObjs.map((stageObj, i) => {
           const stage = stageObj.name
           return (
             <Column
@@ -166,7 +219,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
               taskBadges={taskBadges}
               editMode={editMode}
               canMoveLeft={editMode && i > 0}
-              canMoveRight={editMode && i < visibleStageObjs.length - 1}
+              canMoveRight={editMode && i < displayedStageObjs.length - 1}
               onMoveLeft={() => moveStage(stageObj.id, 'left')}
               onMoveRight={() => moveStage(stageObj.id, 'right')}
               onRename={() => renameStage(stageObj.id, stage)}
