@@ -323,6 +323,19 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         } catch (err) { console.error('audit_log insert failed:', err); }
       }
 
+      // Не пришёл на пробное — автоматически переводим из "записан на пробное" в "не пришел"
+      if (clientId && form.attended === false && modal.entry?.attended !== false) {
+        const oldStageNa = allClients.find(c => c.id === Number(clientId))?.stage || null;
+        if (oldStageNa === 'записан на пробное') {
+          const newStageNa = 'не пришел';
+          await apiFetch(`clients?id=eq.${clientId}`, { method: "PATCH", body: JSON.stringify({ stage: newStageNa }) });
+          if (onClientsChange) onClientsChange({ id: Number(clientId), stage: newStageNa });
+          try {
+            await apiFetch('audit_log', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ action: 'stage_changed', entity: 'client', entity_id: Number(clientId), old_value: oldStageNa, new_value: newStageNa, performed_by: userId || null, performed_by_name: authorName || null }) });
+          } catch (err) { console.error('audit_log insert failed:', err); }
+        }
+      }
+
       if (clientId) {
         const entry = modal.entry;
         const displayDate = modal.date.split('-').reverse().join('.');
