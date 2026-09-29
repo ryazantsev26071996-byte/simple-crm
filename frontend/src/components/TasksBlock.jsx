@@ -96,7 +96,13 @@ export default function TasksBlock({ client, currentUserId, authorName }) {
 
   async function toggleComplete(task, e) {
     e.stopPropagation();
-    const nextStatus = (task.status === "done" || task.completed) ? "new" : "done";
+    const isDone = task.status === "done" || task.completed;
+    if (!isDone && task.report_required && !task.completion_report) {
+      setEditingTask(task);
+      setShowModal(true);
+      return;
+    }
+    const nextStatus = isDone ? "new" : "done";
     const nextCompleted = nextStatus === "done";
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: nextStatus, completed: nextCompleted } : t));
     try {
@@ -106,6 +112,22 @@ export default function TasksBlock({ client, currentUserId, authorName }) {
       console.error(err);
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status, completed: task.completed } : t));
     }
+  }
+
+  async function handleOpenTask(task) {
+    if (task.status === "new" && task.assigned_to === authorName && authorName) {
+      const updated = { ...task, status: "in_progress" };
+      setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+      setEditingTask(updated);
+      setShowModal(true);
+      try {
+        await apiFetch(`tasks?id=eq.${task.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "in_progress" }) });
+        writeAuditLog({ action: "task_status_changed", entity: "task", entity_id: String(task.id), old_value: "new", new_value: "in_progress" }, currentUserId, authorName);
+      } catch (e) { console.error(e); }
+      return;
+    }
+    setEditingTask(task);
+    setShowModal(true);
   }
 
   function taskStyle(task) {
@@ -152,7 +174,7 @@ export default function TasksBlock({ client, currentUserId, authorName }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {ordered.map(task => (
           <div key={task.id}
-            onClick={() => { setEditingTask(task); setShowModal(true); }}
+            onClick={() => handleOpenTask(task)}
             style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 2px', borderRadius: 6, cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.background = '#f8f9ff'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>

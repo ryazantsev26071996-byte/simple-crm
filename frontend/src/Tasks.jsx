@@ -279,6 +279,22 @@ export default function Tasks({ user, profile, onClientSelect }) {
     setShowModal(false);
   }
 
+  async function handleOpenTask(task) {
+    if (task.status === "new" && task.assigned_to === myName && myName) {
+      const updated = { ...task, status: "in_progress" };
+      setTasks(prev => prev.map(t => t.id === task.id ? updated : t));
+      setEditingTask(updated);
+      setShowModal(true);
+      try {
+        await apiFetch(`tasks?id=eq.${task.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "in_progress" }) });
+        writeAuditLog({ action: "task_status_changed", entity: "task", entity_id: String(task.id), old_value: "new", new_value: "in_progress" });
+      } catch (e) { console.error(e); }
+      return;
+    }
+    setEditingTask(task);
+    setShowModal(true);
+  }
+
   const assigneeOptions = React.useMemo(() =>
     [...new Set(tasks.map(t => t.assigned_to).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru")),
     [tasks]
@@ -455,7 +471,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
                   </div>
                   {(!isDoneGroup || doneOpen) && group.tasks.map(t => (
                     <TaskCard key={t.id} task={t}
-                      onEdit={() => { setEditingTask(t); setShowModal(true); }}
+                      onEdit={() => handleOpenTask(t)}
                       onStatusChange={handleStatusChange}
                       onClientSelect={onClientSelect}
                     />
@@ -506,7 +522,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
                     </tr>
                     {(!isDoneGroup || doneOpen) && rows.map(t => (
                       <TaskRow key={t.id} task={t}
-                        onEdit={() => { setEditingTask(t); setShowModal(true); }}
+                        onEdit={() => handleOpenTask(t)}
                         onStatusChange={handleStatusChange}
                         onClientSelect={onClientSelect}
                       />

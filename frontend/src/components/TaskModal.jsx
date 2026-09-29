@@ -197,6 +197,7 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
     observers:         Array.isArray(task?.observers) ? task.observers : [],
     is_important:      task?.is_important || false,
     report_required:   task?.report_required || false,
+    completion_report: task?.completion_report || "",
   });
   const [changingCreator, setChangingCreator] = React.useState(false);
   const [clientSearch, setClientSearch] = React.useState(task?.client?.name || defaultClient?.name || "");
@@ -220,6 +221,10 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
 
   async function submit() {
     if (!form.text.trim()) return;
+    if (form.status === "done" && form.report_required && !form.completion_report.trim()) {
+      alert("Пожалуйста, заполните отчёт о выполнении.");
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
@@ -241,6 +246,7 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
         observers:         form.observers,
         is_important:      form.is_important,
         report_required:   form.report_required,
+        completion_report: form.completion_report || null,
       });
     } catch (e) { alert(e.message); setSaving(false); }
   }
@@ -416,12 +422,11 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
         {form.status === "done" && form.report_required && (
           <div style={{ marginBottom: 12 }}>
             <label style={lStyle}>Отчёт о выполнении</label>
-            <textarea value={task?.completion_report || ""}
-              readOnly={!!task?.completion_report}
-              onChange={() => {}}
-              placeholder={task?.completion_report ? "" : "Отчёт будет запрошен при завершении через чекбокс"}
+            <textarea value={form.completion_report}
+              onChange={e => setForm(f => ({ ...f, completion_report: e.target.value }))}
+              placeholder="Опишите, что было сделано..."
               rows={2}
-              style={{ ...iStyle, resize: "vertical", color: task?.completion_report ? "#334155" : "#94a3b8", background: task?.completion_report ? "#f8fafc" : "white" }} />
+              style={{ ...iStyle, resize: "vertical" }} />
           </div>
         )}
 
