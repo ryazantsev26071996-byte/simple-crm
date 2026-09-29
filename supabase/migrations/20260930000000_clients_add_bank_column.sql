@@ -1,0 +1,2 @@
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS bank TEXT;
+ALTER TABLE public.contract_history ADD COLUMN IF NOT EXISTS bank TEXT;

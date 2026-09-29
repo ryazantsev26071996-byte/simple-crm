@@ -46,11 +46,16 @@ async function getNextContractNumber() {
 }
 
 const PAYMENT_METHODS = ['Наличные', 'Карта', 'Рассрочка школы', 'Рассрочка банка', 'Перевод']
-const BROKERS = ['Совкомбанк', 'Тинькофф', 'Сбер', 'ПСБ', 'Альфа', 'Хоум', 'Другой']
+const BROKERS = ['Директ Кредит', 'Тинькофф', 'Сбербанк', 'Совкомбанк']
+const BANKS_BY_BROKER = {
+  'Тинькофф': ['АО Тбанк', 'АО ОТП банк', 'ПАО «Совкомбанк»', 'Банк Ренессанс Кредит', 'МТС банк', 'Кредит Европа Банк', 'ООО МФК «Лайм-Займ»', 'ООО МКК «Вэббанкир»', 'ООО МКК «Денум Финанс»', 'ООО МКК «А Деньги»', 'ООО МФК «А Мигкредит»'],
+  'Сбербанк': ['ПАО Сбербанк'],
+  'Директ Кредит': ['Халва Карта рассрочки', 'Кредит Европа Банк', 'Банк Русский Стандарт', 'МТС Банк', 'Тинькофф Банк', 'Почта Банк', 'Ренессанс Кредит Банк', 'ОТП Банк', 'Альфа-Банк'],
+}
 
 const CONTRACT_FIELDS = [
   'contract_number', 'contract_date', 'payment_date', 'manager_name', 'registered_by',
-  'payment_method', 'broker', 'contract_amount', 'amount_paid', 'installment_term',
+  'payment_method', 'broker', 'bank', 'contract_amount', 'amount_paid', 'installment_term',
   'bank_application_number', 'bank_contract_number', 'requisites',
 ]
 
@@ -60,6 +65,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
     contract_number: client?.contract_number || "",
     email: client?.email || "",
     broker: client?.broker || "",
+    bank: client?.bank || "",
     payment_method: client?.payment_method || "",
     contract_date: client?.contract_date || "",
     payment_date: client?.payment_date || "",
@@ -71,6 +77,13 @@ export default function ContractBlock({ client, onUpdate, role }) {
     bank_application_number: client?.bank_application_number || "",
     bank_contract_number: client?.bank_contract_number || "",
     requisites: client?.requisites || "",
+  })
+  const [brokerCustom, setBrokerCustom] = React.useState(() =>
+    !!(client?.broker && !BROKERS.includes(client?.broker))
+  )
+  const [bankCustom, setBankCustom] = React.useState(() => {
+    const banks = BANKS_BY_BROKER[client?.broker]
+    return !!(client?.bank && banks && !banks.includes(client?.bank))
   })
   const [saving, setSaving] = React.useState(false)
   const [nextNumLoading, setNextNumLoading] = React.useState(false)
@@ -87,6 +100,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
       contract_number: client?.contract_number || "",
       email: client?.email || "",
       broker: client?.broker || "",
+      bank: client?.bank || "",
       payment_method: client?.payment_method || "",
       contract_date: client?.contract_date || "",
       payment_date: client?.payment_date || "",
@@ -99,6 +113,9 @@ export default function ContractBlock({ client, onUpdate, role }) {
       bank_contract_number: client?.bank_contract_number || "",
       requisites: client?.requisites || "",
     })
+    setBrokerCustom(!!(client?.broker && !BROKERS.includes(client?.broker)))
+    const banks = BANKS_BY_BROKER[client?.broker]
+    setBankCustom(!!(client?.bank && banks && !banks.includes(client?.bank)))
     if (client?.id) loadHistory(client.id)
     if (client?.id) loadSchedule(client.id)
   }, [client?.id])
@@ -203,6 +220,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
           contract_number: form.contract_number || null,
           email: form.email || null,
           broker: form.broker || null,
+          bank: form.bank || null,
           payment_method: form.payment_method || null,
           contract_date: form.contract_date || null,
           payment_date: form.payment_date || null,
@@ -243,6 +261,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
           registered_by: client.registered_by || null,
           payment_method: client.payment_method || null,
           broker: client.broker || null,
+          bank: client.bank || null,
           contract_amount: client.contract_amount || null,
           amount_paid: client.amount_paid || null,
           installment_term: client.installment_term || null,
@@ -397,15 +416,71 @@ export default function ContractBlock({ client, onUpdate, role }) {
               <div>
                 <div style={labelStyle}>Брокер</div>
                 {editing ? (
-                  <select style={inputStyle} value={form.broker}
-                    onChange={e => setForm(f => ({ ...f, broker: e.target.value }))}>
-                    <option value="">— выбрать —</option>
-                    {BROKERS.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
+                  <>
+                    <select style={inputStyle}
+                      value={brokerCustom ? "__custom__" : (form.broker || "")}
+                      onChange={e => {
+                        if (e.target.value === "__custom__") {
+                          setBrokerCustom(true)
+                          setBankCustom(false)
+                          setForm(f => ({ ...f, broker: "", bank: "" }))
+                        } else {
+                          setBrokerCustom(false)
+                          setBankCustom(false)
+                          setForm(f => ({ ...f, broker: e.target.value, bank: "" }))
+                        }
+                      }}>
+                      <option value="">— выбрать —</option>
+                      {BROKERS.map(b => <option key={b} value={b}>{b}</option>)}
+                      <option value="__custom__">Свой вариант</option>
+                    </select>
+                    {brokerCustom && (
+                      <input style={{ ...inputStyle, marginTop: 4 }} value={form.broker}
+                        onChange={e => setForm(f => ({ ...f, broker: e.target.value }))}
+                        placeholder="Введите брокера..." />
+                    )}
+                  </>
                 ) : (
                   <input style={inputStyle} value={form.broker} readOnly placeholder="Не заполнено" />
                 )}
               </div>
+              {form.broker !== 'Совкомбанк' && (
+                <div>
+                  <div style={labelStyle}>Банк</div>
+                  {editing ? (
+                    BANKS_BY_BROKER[form.broker] ? (
+                      <>
+                        <select style={inputStyle}
+                          value={bankCustom ? "__custom__" : (form.bank || "")}
+                          onChange={e => {
+                            if (e.target.value === "__custom__") {
+                              setBankCustom(true)
+                              setForm(f => ({ ...f, bank: "" }))
+                            } else {
+                              setBankCustom(false)
+                              setForm(f => ({ ...f, bank: e.target.value }))
+                            }
+                          }}>
+                          <option value="">— выбрать —</option>
+                          {BANKS_BY_BROKER[form.broker].map(b => <option key={b} value={b}>{b}</option>)}
+                          <option value="__custom__">Свой вариант</option>
+                        </select>
+                        {bankCustom && (
+                          <input style={{ ...inputStyle, marginTop: 4 }} value={form.bank}
+                            onChange={e => setForm(f => ({ ...f, bank: e.target.value }))}
+                            placeholder="Введите банк..." />
+                        )}
+                      </>
+                    ) : (
+                      <input style={inputStyle} value={form.bank}
+                        onChange={e => setForm(f => ({ ...f, bank: e.target.value }))}
+                        placeholder="Банк..." />
+                    )
+                  ) : (
+                    <input style={inputStyle} value={form.bank} readOnly placeholder="Не заполнено" />
+                  )}
+                </div>
+              )}
               <div>
                 <div style={labelStyle}>Срок рассрочки (мес)</div>
                 <input style={inputStyle} type={editing ? "number" : "text"} value={form.installment_term} readOnly={!editing}
@@ -561,6 +636,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
                           ['Сумма по договору', h.contract_amount != null ? Number(h.contract_amount).toLocaleString('ru-RU') + ' ₽' : null],
                           ['Сколько пришло', h.amount_paid != null ? Number(h.amount_paid).toLocaleString('ru-RU') + ' ₽' : null],
                           ['Брокер', h.broker],
+                          ['Банк', h.bank],
                           ['Срок рассрочки', h.installment_term ? h.installment_term + ' мес' : null],
                           ['Заявка в банке', h.bank_application_number],
                           ['Договор в банке', h.bank_contract_number],
