@@ -190,6 +190,7 @@ export default function Analytics() {
   const [workSchedule, setWorkSchedule] = React.useState([]);
   const [paymentSchedule, setPaymentSchedule] = React.useState([]);
   const [allSalesClients, setAllSalesClients] = React.useState([]);
+  const [historicalSales, setHistoricalSales] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [clientModal, setClientModal] = React.useState(null);
   const [openAttended, setOpenAttended] = React.useState({});
@@ -250,7 +251,7 @@ export default function Analytics() {
       const start = dateFmt(year, month, 1);
       const end   = dateFmt(year, month, daysInMonth);
       const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
-      const [leadsData, salesData, tr, le, pl, ws, psData] = await Promise.all([
+      const [leadsData, salesData, tr, le, pl, ws, psData, historyData] = await Promise.all([
         apiFetch(`clients?lead_date=gte.${start}&lead_date=lte.${end}&select=*&order=lead_date.asc`),
         apiFetch(`clients?stage=in.(продажа,ученик)&select=*&order=created_at.desc&limit=500`),
         apiFetch(`trial_schedule?date=gte.${start}&date=lte.${end}&select=*`),
@@ -258,6 +259,7 @@ export default function Analytics() {
         apiFetch(`manager_plans?year=eq.${year}&month=eq.${month}&select=*`),
         apiFetch(`work_schedule?date=gte.${dateFmt(new Date().getFullYear(), new Date().getMonth()+1, new Date().getDate())}&date=lte.${end}&hours=gt.0&select=employee_name,date,hours`).catch(() => []),
         apiFetch(`payment_schedule?planned_date=gte.${start}&planned_date=lte.${end}&select=*`).catch(() => []),
+        apiFetch(`contract_history?select=*,client:clients(name)&order=saved_at.desc&limit=500`).catch(() => []),
       ]);
       const leads = Array.isArray(leadsData) ? leadsData : [];
       const sales = (Array.isArray(salesData) ? salesData : []).filter(c => {
@@ -273,6 +275,26 @@ export default function Analytics() {
       setWorkSchedule(Array.isArray(ws) ? ws : []);
       setPaymentSchedule(Array.isArray(psData) ? psData : []);
       setAllSalesClients(Array.isArray(salesData) ? salesData : []);
+      const histSales = (Array.isArray(historyData) ? historyData : [])
+        .filter(h => {
+          if (h.payment_method === 'Рассрочка школы') return false;
+          const d = h.payment_date || h.contract_date;
+          return d && d.slice(0, 7) === yearMonth;
+        })
+        .map(h => ({
+          id: h.client_id,
+          name: h.client?.name || '—',
+          stage: 'ученик',
+          manager_name: h.manager_name,
+          registered_by: h.registered_by,
+          payment_date: h.payment_date,
+          contract_date: h.contract_date,
+          amount_paid: h.amount_paid,
+          contract_amount: h.contract_amount,
+          payment_method: h.payment_method,
+          _historyId: h.id,
+        }));
+      setHistoricalSales(histSales);
     } catch (e) { console.error(e); }
     setLoading(false);
   }
@@ -418,10 +440,11 @@ export default function Analytics() {
   const monthSum = sumRows(dailyRows);
 
   const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && c.manager_name);
+  const salesClientsWithHistory = [...clients, ...historicalSales].filter(c => ["продажа","ученик"].includes(c.stage) && c.manager_name);
 
   function mgStats(manager) {
     const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
-    const mSales   = clients.filter(c => {
+    const mSales   = [...clients, ...historicalSales].filter(c => {
       const d = c.payment_date || c.contract_date;
       return c.manager_name === manager &&
         ["продажа","ученик"].includes(c.stage) &&
@@ -467,8 +490,9 @@ export default function Analytics() {
   function amStats(name) {
     const amTrials        = trials.filter(t => t.account_manager === name && !t.rescheduled);
     const amAttended      = amTrials.filter(t => t.attended === true);
-    const amRenewals      = clients.filter(c => c.manager_name === name && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
-    const amRegistrations = clients.filter(c => ["ученик","продажа"].includes(c.stage) && c.registered_by === name);
+    const combined        = [...clients, ...historicalSales];
+    const amRenewals      = combined.filter(c => c.manager_name === name && ["ученик","продажа"].includes(c.stage) && (c.amount_paid || 0) > 0);
+    const amRegistrations = combined.filter(c => ["ученик","продажа"].includes(c.stage) && c.registered_by === name);
     const renewalRevenue  = amRenewals.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0)
                           + paymentSchedule.filter(p => p.manager_name === name).reduce((s, p) => s + (p.actual_amount || 0), 0);
     const regSum          = amRegistrations.reduce((s, c) => {
@@ -498,8 +522,8 @@ export default function Analytics() {
     };
   }
 
-  const totalSales   = salesClients.length;
-  const totalRevenue = salesClients.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0)
+  const totalSales   = salesClientsWithHistory.length;
+  const totalRevenue = salesClientsWithHistory.filter(c => c.payment_method !== 'Рассрочка школы').reduce((s, c) => s + (c.amount_paid || 0), 0)
                      + paymentSchedule.reduce((s, p) => s + (p.actual_amount || 0), 0);
   const totalPlan    = plans.reduce((s, p) => s + (p.plan || 0), 0);
   const schoolPlan   = Number(schoolPlanInput) || 0;
@@ -809,7 +833,7 @@ export default function Analytics() {
                           displayAmount = c.amount_paid || 0;
                         }
                         return (
-                          <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
+                          <tr key={c._historyId ? `h-${c._historyId}` : c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
                             onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
                             onMouseLeave={e => e.currentTarget.style.background = "white"}>
                             <td style={TD}>{c.name}</td>
@@ -892,7 +916,7 @@ export default function Analytics() {
                     </thead>
                     <tbody>
                       {s.renewals.map(c => (
-                        <tr key={c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
+                        <tr key={c._historyId ? `h-${c._historyId}` : c.id} onClick={() => setClientModal(c)} style={{ cursor: "pointer" }}
                           onMouseEnter={e => e.currentTarget.style.background = "#f0f7ff"}
                           onMouseLeave={e => e.currentTarget.style.background = "white"}>
                           <td style={TD}>{c.name}</td>
