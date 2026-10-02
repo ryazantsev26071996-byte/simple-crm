@@ -310,9 +310,20 @@ export default function Materials() {
     setMoveForm({ type: "приход", field: "qty_full", delta: "", comment: "" });
   }
 
+  async function deleteMaterial(mat) {
+    if (!window.confirm(`Удалить материал из справочника?\n«${mat.name}»`)) return;
+    try {
+      await apiFetch(`materials?id=eq.${mat.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      setMaterials(prev => prev.filter(m => m.id !== mat.id));
+      setAllMaterials(prev => prev.filter(m => m.id !== mat.id));
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
   // Check if category uses half/almost_empty fields at all
   const catHasHalf = materials.some(m => m.qty_half != null);
   const catHasAlmostEmpty = materials.some(m => m.qty_almost_empty != null);
+  const selectedCatName = categories.find(c => c.id === selectedCat)?.name || "";
+  const halfColLabel = selectedCatName === "Карандаши" ? "Огрызки" : "Половина";
 
   const lowCount = materials.filter(isLow).length;
 
@@ -415,8 +426,8 @@ export default function Materials() {
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>№ цвета</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ед.</th>
                           <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Целых</th>
-                          {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Половина</th>}
-                          {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Огрызки</th>}
+                          {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
+                          {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
                           <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Мин.</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Пересчёт</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>
@@ -447,8 +458,12 @@ export default function Materials() {
                                   📦
                                 </button>
                                 <button onClick={() => openEdit(mat)}
-                                  style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>
+                                  style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 4 }}>
                                   ✏️
+                                </button>
+                                <button onClick={() => deleteMaterial(mat)}
+                                  title="Удалить" style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>
+                                  🗑️
                                 </button>
                               </td>
                             </tr>
