@@ -184,11 +184,11 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
 
   async function handleSave() {
     const duplicate = isDuplicateSameDay();
-    if (form.attended === true && !form.lesson_comment.trim() && !duplicate) {
+    if (userEmail !== 'crm@artschool.ru' && form.attended === true && !form.lesson_comment.trim() && !duplicate) {
       alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
       return;
     }
-    if (form.attended === true && usedMaterials.length === 0) {
+    if (userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0) {
       alert('Добавьте хотя бы один материал, использованный на занятии — это обязательно при отметке "Пришёл"');
       return;
     }
@@ -437,7 +437,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
 
             {(form.attended===true||form.attended===false)&&(
               <div style={{marginBottom:10}}>
-                {(()=>{const dup=isDuplicateSameDay();const req=form.attended===true&&!dup;return(<>
+                {(()=>{const dup=isDuplicateSameDay();const isAdmin=userEmail==='crm@artschool.ru';const req=form.attended===true&&!dup&&!isAdmin;return(<>
                 <div style={{fontSize:12,marginBottom:4,color:req?"#e55":"#888",fontWeight:req?600:400}}>
                   Комментарий после занятия {req?"* (обязательно)":"(опционально)"}
                 </div>
@@ -449,9 +449,9 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
             )}
 
             {form.attended===true&&(
-              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:`1px solid ${usedMaterials.length===0?"#e55":"#eee"}`}}>
-                <div style={{fontSize:12,fontWeight:600,color:usedMaterials.length===0?"#e55":"#555",marginBottom:8}}>
-                  Материалы, использованные на занятии {usedMaterials.length===0?"* (обязательно)":""}
+              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:`1px solid ${usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"#e55":"#eee"}`}}>
+                <div style={{fontSize:12,fontWeight:600,color:usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"#e55":"#555",marginBottom:8}}>
+                  Материалы, использованные на занятии {usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"* (обязательно)":""}
                 </div>
                 {usedMaterials.map((um, idx) => (
                   <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"5px 8px",background:"white",borderRadius:6,border:"1px solid #e8e8e8"}}>
