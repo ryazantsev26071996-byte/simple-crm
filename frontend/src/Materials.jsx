@@ -44,7 +44,7 @@ function fmtDate(d) {
   return dt.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-const TABS = ["Справочник", "Заявки на закупку", "Журнал расхода"];
+const TABS = ["Справочник", "Заявки на закупку", "Журнал расхода", "Аналитика"];
 const STATUS_LABELS = { "новая": "Новая", "заказано": "Заказано", "куплено": "Куплено" };
 const STATUS_COLORS = { "новая": "#fff3cd", "заказано": "#cce5ff", "куплено": "#d4edda" };
 const STATUS_TEXT = { "новая": "#856404", "заказано": "#004085", "куплено": "#155724" };
@@ -92,6 +92,12 @@ export default function Materials() {
   const [usageDateFrom, setUsageDateFrom] = React.useState("");
   const [usageDateTo, setUsageDateTo] = React.useState("");
 
+  // analytics
+  const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
+  const [analyticsTxns, setAnalyticsTxns] = React.useState([]);
+  const [analyticsUsage, setAnalyticsUsage] = React.useState([]);
+  const [analyticsMats, setAnalyticsMats] = React.useState([]);
+
   const authorName = profile?.full_name || user?.email || "";
 
   React.useEffect(() => {
@@ -102,7 +108,23 @@ export default function Materials() {
   React.useEffect(() => {
     if (tab === "Заявки на закупку") loadRequests();
     if (tab === "Журнал расхода") loadUsageLog();
+    if (tab === "Аналитика") loadAnalytics();
   }, [tab]);
+
+  async function loadAnalytics() {
+    setAnalyticsLoading(true);
+    try {
+      const [txns, usage, mats] = await Promise.all([
+        apiFetch("material_transactions?select=*,material:materials(name,unit,category_id,qty_full)&order=created_at.desc&limit=1000"),
+        apiFetch("material_usage_log?select=*,material:materials(name,unit,tracking_mode),client:clients(name)&order=created_at.desc&limit=1000"),
+        apiFetch("materials?select=id,name,unit,category_id,qty_full,qty_reserve,min_threshold,tracking_mode,category:material_categories(name)"),
+      ]);
+      setAnalyticsTxns(Array.isArray(txns) ? txns : []);
+      setAnalyticsUsage(Array.isArray(usage) ? usage : []);
+      setAnalyticsMats(Array.isArray(mats) ? mats : []);
+    } catch (e) { console.error(e); }
+    setAnalyticsLoading(false);
+  }
 
   async function loadUsageLog() {
     setUsageLoading(true);
@@ -667,6 +689,190 @@ export default function Materials() {
               );
             })()}
           </div>
+        </div>
+      )}
+
+      {tab === "Аналитика" && (
+        <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+          {analyticsLoading ? (
+            <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Загрузка...</div>
+          ) : (() => {
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+            // Block 1: discrepancies — корректировки с delta < 0
+            const discrepancies = analyticsTxns.filter(t => t.type === 'корректировка' && Number(t.delta) < 0);
+
+            // Block 2: consumption speed (only точный)
+            const recentExpenses = analyticsTxns.filter(t => t.type === 'расход' && t.created_at >= thirtyDaysAgo);
+            const expenseMap = {};
+            recentExpenses.forEach(t => {
+              if (!expenseMap[t.material_id]) expenseMap[t.material_id] = { material_id: t.material_id, matObj: t.material, total: 0 };
+              expenseMap[t.material_id].total += Math.abs(Number(t.delta) || 0);
+            });
+            const speedRows = Object.values(expenseMap).map(e => {
+              const mat = analyticsMats.find(m => m.id === e.material_id);
+              const qty = mat ? Number(mat.qty_full) || 0 : 0;
+              const daysLeft = e.total > 0 ? Math.round(qty / (e.total / 30)) : Infinity;
+              return { name: e.matObj?.name || `#${e.material_id}`, unit: e.matObj?.unit || "", qty, expense30: e.total, daysLeft };
+            }).sort((a, b) => a.daysLeft - b.daysLeft);
+
+            // Block 3: paint usage
+            const recentPaintUsage = analyticsUsage.filter(r => r.material?.tracking_mode === 'оценочный' && r.created_at >= thirtyDaysAgo);
+            const paintMap = {};
+            recentPaintUsage.forEach(r => {
+              const id = r.material_id;
+              if (!paintMap[id]) paintMap[id] = { name: r.material?.name || `#${id}`, count: 0, totalWeight: 0 };
+              paintMap[id].count++;
+              paintMap[id].totalWeight += Number(r.qualitative_weight) || 0;
+            });
+            const paintRows = Object.values(paintMap).sort((a, b) => b.totalWeight - a.totalWeight);
+
+            // Block 4: by client
+            const clientMap = {};
+            analyticsUsage.filter(r => r.client_id).forEach(r => {
+              const id = r.client_id;
+              if (!clientMap[id]) clientMap[id] = { name: r.client?.name || `#${id}`, count: 0, recentMats: [] };
+              clientMap[id].count++;
+              const mn = r.material?.name;
+              if (mn && clientMap[id].recentMats.length < 5 && !clientMap[id].recentMats.includes(mn)) {
+                clientMap[id].recentMats.push(mn);
+              }
+            });
+            const clientRows = Object.values(clientMap).sort((a, b) => b.count - a.count).slice(0, 30);
+
+            const thS = { padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap", background: "#fafafa" };
+            const tdS = { padding: "7px 12px", borderBottom: "1px solid #f5f5f5" };
+            const secStyle = { marginBottom: 32 };
+            const titleS = { fontSize: 14, fontWeight: 700, color: "#333", marginBottom: 10 };
+
+            return (
+              <>
+                <div style={secStyle}>
+                  <div style={titleS}>⚠️ Расхождения</div>
+                  {discrepancies.length === 0 ? (
+                    <div style={{ color: "#27ae60", fontSize: 13, padding: "8px 0" }}>Расхождений не обнаружено ✓</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <th style={thS}>Материал</th>
+                          <th style={thS}>Дата</th>
+                          <th style={{ ...thS, textAlign: "right" }}>На сколько меньше</th>
+                          <th style={thS}>Комментарий</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {discrepancies.map(t => (
+                          <tr key={t.id} style={{ background: "#fff8f8" }}>
+                            <td style={{ ...tdS, fontWeight: 500 }}>{t.material?.name || `#${t.material_id}`}</td>
+                            <td style={{ ...tdS, whiteSpace: "nowrap", color: "#666" }}>
+                              {t.created_at ? new Date(t.created_at).toLocaleDateString("ru-RU") : "—"}
+                            </td>
+                            <td style={{ ...tdS, textAlign: "right", color: "#c0392b", fontWeight: 600 }}>
+                              −{Math.abs(Number(t.delta))} {t.material?.unit || ""}
+                            </td>
+                            <td style={{ ...tdS, color: "#666", fontSize: 12 }}>{t.comment || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div style={secStyle}>
+                  <div style={titleS}>📉 Скорость расхода / скоро закончится</div>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>Только материалы с точным учётом, где был расход за последние 30 дней</div>
+                  {speedRows.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Нет данных о расходе за последние 30 дней</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <th style={thS}>Материал</th>
+                          <th style={{ ...thS, textAlign: "right" }}>Остаток</th>
+                          <th style={{ ...thS, textAlign: "right" }}>Расход за 30 дней</th>
+                          <th style={{ ...thS, textAlign: "right" }}>Хватит примерно на</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {speedRows.map((r, i) => {
+                          const urgent = r.daysLeft < 7;
+                          const warn = !urgent && r.daysLeft < 14;
+                          return (
+                            <tr key={i} style={{ background: urgent ? "#fff0f0" : warn ? "#fffbe6" : "white", borderBottom: "1px solid #f5f5f5" }}>
+                              <td style={{ ...tdS, fontWeight: 500, borderBottom: "none" }}>{r.name}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#555", borderBottom: "none" }}>{r.qty} {r.unit}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#888", borderBottom: "none" }}>{r.expense30} {r.unit}</td>
+                              <td style={{ ...tdS, textAlign: "right", fontWeight: 600, borderBottom: "none", color: urgent ? "#c0392b" : warn ? "#e67e22" : "#27ae60" }}>
+                                {r.daysLeft === Infinity ? "∞" : `${r.daysLeft} дн.`}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div style={secStyle}>
+                  <div style={titleS}>🎨 Расход красок за период (последние 30 дней)</div>
+                  {paintRows.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Нет данных об использовании красок за последние 30 дней</div>
+                  ) : (
+                    <>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid #eee" }}>
+                            <th style={thS}>Материал</th>
+                            <th style={{ ...thS, textAlign: "right" }}>Сколько раз использовали</th>
+                            <th style={{ ...thS, textAlign: "right" }}>Условный расход</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {paintRows.map((r, i) => (
+                            <tr key={i} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                              <td style={{ ...tdS, fontWeight: 500 }}>{r.name}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#555" }}>{r.count}</td>
+                              <td style={{ ...tdS, textAlign: "right", fontWeight: 600, color: "#7c3aed" }}>{r.totalWeight}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <div style={{ fontSize: 11, color: "#aaa", marginTop: 8, lineHeight: 1.6 }}>
+                        Это условные единицы (капля=1, горошина=3, полтюбика=50, тюбик=100), не литры и не тюбики — используйте для сравнения материалов между собой и с предыдущими периодами, не как точный остаток.
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div style={secStyle}>
+                  <div style={titleS}>🧑‍🎓 Расход по ученикам</div>
+                  {clientRows.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Нет данных</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid #eee" }}>
+                          <th style={thS}>Ученик</th>
+                          <th style={{ ...thS, textAlign: "right" }}>Записей</th>
+                          <th style={thS}>Последние материалы</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientRows.map((r, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                            <td style={{ ...tdS, fontWeight: 500 }}>{r.name}</td>
+                            <td style={{ ...tdS, textAlign: "right", fontWeight: 600 }}>{r.count}</td>
+                            <td style={{ ...tdS, color: "#666", fontSize: 12 }}>{r.recentMats.join(", ") || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
