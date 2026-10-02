@@ -188,6 +188,10 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
       return;
     }
+    if (form.attended === true && usedMaterials.length === 0) {
+      alert('Добавьте хотя бы один материал, использованный на занятии — это обязательно при отметке "Пришёл"');
+      return;
+    }
     const payload = {
       date: modal.date, time: modal.time,
       client_id: form.client_id || null, client_name: form.client_name || null,
@@ -445,8 +449,10 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
             )}
 
             {form.attended===true&&(
-              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:"1px solid #eee"}}>
-                <div style={{fontSize:12,fontWeight:600,color:"#555",marginBottom:8}}>Материалы, использованные на занятии</div>
+              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:`1px solid ${usedMaterials.length===0?"#e55":"#eee"}`}}>
+                <div style={{fontSize:12,fontWeight:600,color:usedMaterials.length===0?"#e55":"#555",marginBottom:8}}>
+                  Материалы, использованные на занятии {usedMaterials.length===0?"* (обязательно)":""}
+                </div>
                 {usedMaterials.map((um, idx) => (
                   <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"5px 8px",background:"white",borderRadius:6,border:"1px solid #e8e8e8"}}>
                     <div style={{flex:1,fontSize:12,fontWeight:500,color:"#333",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{um.name}</div>
