@@ -155,11 +155,12 @@ export default function Materials({ isOwner = true }) {
     if (!editLogEntry) return;
     try {
       let patch = {};
-      if (editLogEntry.mode === 'точный') {
-        patch = { qty_exact: Number(editLogForm.qty_exact) || null };
+      const actualMode = editLogEntry.material?.tracking_mode;
+      if (actualMode === 'точный') {
+        patch = { mode: 'точный', qty_exact: Number(editLogForm.qty_exact) || null, qualitative_unit: null, qualitative_weight: null };
       } else {
         const unit = QUALITATIVE_UNITS.find(u => u.label === editLogForm.qualitative_unit);
-        patch = { qualitative_unit: editLogForm.qualitative_unit, qualitative_weight: unit?.weight ?? null };
+        patch = { mode: 'оценочный', qualitative_unit: editLogForm.qualitative_unit, qualitative_weight: unit?.weight ?? null, qty_exact: null };
       }
       await apiFetch(`material_usage_log?id=eq.${editLogEntry.id}`, { method: "PATCH", body: JSON.stringify(patch), headers: { Prefer: "return=minimal" } });
       setUsageLog(prev => prev.map(r => r.id === editLogEntry.id ? { ...r, ...patch } : r));
@@ -837,7 +838,7 @@ export default function Materials({ isOwner = true }) {
                           {isOwner && (
                             <td style={{ padding: "4px 8px" }}>
                               <button
-                                onClick={() => { setEditLogEntry(r); setEditLogForm(r.mode === 'точный' ? { qty_exact: r.qty_exact ?? "" } : { qualitative_unit: r.qualitative_unit || QUALITATIVE_UNITS[0].label }); }}
+                                onClick={() => { setEditLogEntry(r); setEditLogForm(r.material?.tracking_mode === 'точный' ? { qty_exact: r.qty_exact ?? "" } : { qualitative_unit: r.qualitative_unit || QUALITATIVE_UNITS[0].label }); }}
                                 style={{ fontSize: 14, background: "none", border: "none", cursor: "pointer", color: "#aaa", padding: "2px 4px", lineHeight: 1 }}
                                 title="Редактировать запись">✏️</button>
                             </td>
@@ -1373,7 +1374,7 @@ export default function Materials({ isOwner = true }) {
               <span style={{ fontWeight: 500 }}>{editLogEntry.material?.name}</span>
               {editLogEntry.lesson_date ? ` — ${fmtDate(editLogEntry.lesson_date)}` : ""}
             </div>
-            {editLogEntry.mode === 'точный' ? (
+            {editLogEntry.material?.tracking_mode === 'точный' ? (
               <div style={{ marginBottom: 12 }}>
                 <label style={{ display: "block", fontSize: 12, color: "#666", marginBottom: 4 }}>Количество ({editLogEntry.material?.unit})</label>
                 <input type="number" min="0" step="1" value={editLogForm.qty_exact}
