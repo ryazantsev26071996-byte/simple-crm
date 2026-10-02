@@ -8,6 +8,12 @@ const MAX_PER_SLOT = 12;
 const TEACHERS = ["Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья"];
 const RECORDERS = ["Софья", "Юлия", "Екатерина", "Александра", "Анастасия", "Дарья", "Администратор-VIP"];
 const LESSON_TYPES = ["занятие с педагогом", "свободное посещение", "нулевой урок", "ПРОБНОЕ", "МК", "ЛП", "СМОТР", "АРТ сквиз", "мероприятие", "тест-драйв 1", "тест-драйв 2", "тест-драйв 3"];
+const QUALITATIVE_UNITS = [
+  { label: "Капля", weight: 1 },
+  { label: "Горошина", weight: 3 },
+  { label: "Полтюбика", weight: 50 },
+  { label: "Тюбик", weight: 100 },
+];
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -65,6 +71,11 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     const raw = localStorage.getItem('crm_schedule_client_modal_id');
     return raw ? Number(raw) : null;
   });
+
+  const [usedMaterials, setUsedMaterials] = React.useState([]);
+  const [matSearch, setMatSearch] = React.useState("");
+  const [matSuggestions, setMatSuggestions] = React.useState([]);
+  const [showMatSuggestions, setShowMatSuggestions] = React.useState(false);
 
   React.useEffect(() => {
     if (modal) {
@@ -126,10 +137,22 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     if (cl) setClientModal(cl);
   }
 
+  async function searchMaterials(q) {
+    if (!q.trim()) { setMatSuggestions([]); return; }
+    try {
+      const data = await apiFetch(`materials?name=ilike.*${encodeURIComponent(q)}*&select=id,name,unit,tracking_mode&limit=8`);
+      setMatSuggestions(Array.isArray(data) ? data : []);
+    } catch (e) { setMatSuggestions([]); }
+  }
+
   async function openModal(date, time, entry = null) {
     setModal({ date, time, entry });
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
+    setUsedMaterials([]);
+    setMatSearch("");
+    setMatSuggestions([]);
+    setShowMatSuggestions(false);
     if (entry) {
       setForm({
         client_id: entry.client_id || "", client_name: entry.client_name || "",
@@ -174,10 +197,13 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       subscription_type: form.client_id ? (activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || null) : null,
     };
     try {
+      let scheduleId;
       if (modal.entry) {
-        await apiFetch(`schedule?id=eq.${modal.entry.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        const result = await apiFetch(`schedule?id=eq.${modal.entry.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        scheduleId = (Array.isArray(result) ? result[0] : result)?.id || modal.entry.id;
       } else {
-        await apiFetch("schedule", { method: "POST", body: JSON.stringify(payload) });
+        const result = await apiFetch("schedule", { method: "POST", body: JSON.stringify(payload) });
+        scheduleId = (Array.isArray(result) ? result[0] : result)?.id || null;
       }
       if (form.attended === true && form.client_id) {
         const cl = activeClients.find(c => c.id === Number(form.client_id));
@@ -192,6 +218,61 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
           await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText }) });
         }
       }
+      if (form.attended === true && usedMaterials.length > 0) {
+        for (const um of usedMaterials) {
+          try {
+            await apiFetch("material_usage_log", {
+              method: "POST",
+              headers: { Prefer: "return=minimal" },
+              body: JSON.stringify({
+                lesson_date: modal.date,
+                schedule_id: scheduleId || null,
+                client_id: Number(form.client_id) || null,
+                material_id: um.material_id,
+                mode: um.tracking_mode,
+                qty_exact: um.tracking_mode === 'точный' ? (Number(um.qty_exact) || null) : null,
+                qualitative_unit: um.tracking_mode === 'оценочный' ? (um.qualitative_unit || null) : null,
+                qualitative_weight: um.tracking_mode === 'оценочный' ? (um.qualitative_weight || null) : null,
+                teacher_name: form.teacher || null,
+                created_by: userId || null,
+                comment: null,
+              }),
+            });
+          } catch (e) { console.error("material_usage_log insert failed:", e); }
+          if (um.tracking_mode === 'точный' && um.qty_exact && Number(um.qty_exact) > 0) {
+            try {
+              const matData = await apiFetch(`materials?id=eq.${um.material_id}&select=id,name,qty_full`);
+              const mat = Array.isArray(matData) ? matData[0] : matData;
+              const currentQty = Number(mat?.qty_full) || 0;
+              const deduct = Number(um.qty_exact);
+              if (currentQty - deduct < 0) {
+                alert(`Недостаточно материала «${um.name}» для списания: в наличии ${currentQty}, требуется ${deduct}. Списание пропущено.`);
+              } else {
+                await apiFetch(`materials?id=eq.${um.material_id}`, {
+                  method: "PATCH",
+                  headers: { Prefer: "return=minimal" },
+                  body: JSON.stringify({ qty_full: currentQty - deduct }),
+                });
+                await apiFetch("material_transactions", {
+                  method: "POST",
+                  headers: { Prefer: "return=minimal" },
+                  body: JSON.stringify({
+                    material_id: um.material_id,
+                    type: 'расход',
+                    field: 'qty_full',
+                    delta: -deduct,
+                    comment: `Списано с занятия ${modal.date}`,
+                    client_id: Number(form.client_id) || null,
+                    created_by: userId || null,
+                    created_by_name: form.teacher || null,
+                  }),
+                });
+              }
+            } catch (e) { console.error("material stock update failed:", e); }
+          }
+        }
+      }
+      setUsedMaterials([]);
       setModal(null);
       loadSlots();
     } catch(e) { alert(e.message); }
@@ -360,6 +441,65 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                   value={form.lesson_comment} onChange={e=>setForm(f=>({...f,lesson_comment:e.target.value}))} placeholder="Что делали, прогресс, пожелания..." />
                 {form.attended===true&&form.client_id&&<div style={{fontSize:11,color:"#888"}}>{dup?"Спишется 1 занятие (повторное в этот день)":"Спишется 1 занятие и комментарий добавится в карточку ученика"}</div>}
                 </>);})()}
+              </div>
+            )}
+
+            {form.attended===true&&(
+              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:"1px solid #eee"}}>
+                <div style={{fontSize:12,fontWeight:600,color:"#555",marginBottom:8}}>Материалы, использованные на занятии</div>
+                {usedMaterials.map((um, idx) => (
+                  <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"5px 8px",background:"white",borderRadius:6,border:"1px solid #e8e8e8"}}>
+                    <div style={{flex:1,fontSize:12,fontWeight:500,color:"#333",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{um.name}</div>
+                    {um.tracking_mode === 'точный' ? (
+                      <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+                        <input type="number" min="0" step="1" value={um.qty_exact}
+                          onChange={e => setUsedMaterials(prev => prev.map((m, i) => i===idx ? {...m, qty_exact: e.target.value} : m))}
+                          style={{width:56,padding:"3px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:12,textAlign:"right",fontFamily:"inherit"}} />
+                        <span style={{fontSize:11,color:"#888"}}>{um.unit}</span>
+                      </div>
+                    ) : (
+                      <select value={um.qualitative_unit}
+                        onChange={e => {
+                          const unit = QUALITATIVE_UNITS.find(u => u.label === e.target.value);
+                          setUsedMaterials(prev => prev.map((m, i) => i===idx ? {...m, qualitative_unit: e.target.value, qualitative_weight: unit?.weight || null} : m));
+                        }}
+                        style={{fontSize:12,padding:"3px 6px",borderRadius:4,border:"1px solid #ddd",background:"white",flexShrink:0,fontFamily:"inherit"}}>
+                        {QUALITATIVE_UNITS.map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
+                      </select>
+                    )}
+                    <button onClick={() => setUsedMaterials(prev => prev.filter((_, i) => i!==idx))}
+                      style={{fontSize:16,background:"none",border:"none",cursor:"pointer",color:"#bbb",padding:"0 2px",flexShrink:0,lineHeight:1}}>×</button>
+                  </div>
+                ))}
+                <div style={{position:"relative"}}>
+                  <input value={matSearch}
+                    onChange={e => { setMatSearch(e.target.value); setShowMatSuggestions(true); searchMaterials(e.target.value); }}
+                    onFocus={() => { if (matSearch) setShowMatSuggestions(true); }}
+                    onBlur={() => setTimeout(() => setShowMatSuggestions(false), 150)}
+                    placeholder="+ Добавить материал..."
+                    style={{width:"100%",padding:"5px 8px",borderRadius:4,border:"1px dashed #bbb",fontSize:12,fontFamily:"inherit",boxSizing:"border-box",background:"white"}} />
+                  {showMatSuggestions && matSuggestions.length > 0 && (
+                    <div style={{position:"absolute",top:"100%",left:0,right:0,background:"white",border:"1px solid #ddd",borderRadius:"0 0 6px 6px",zIndex:200,maxHeight:160,overflowY:"auto",boxShadow:"0 4px 12px rgba(0,0,0,0.1)"}}>
+                      {matSuggestions.map(m => (
+                        <div key={m.id}
+                          onMouseDown={() => {
+                            setUsedMaterials(prev => [...prev, {
+                              material_id: m.id, name: m.name, unit: m.unit, tracking_mode: m.tracking_mode,
+                              qty_exact: "",
+                              qualitative_unit: QUALITATIVE_UNITS[0].label,
+                              qualitative_weight: QUALITATIVE_UNITS[0].weight,
+                            }]);
+                            setMatSearch(""); setMatSuggestions([]); setShowMatSuggestions(false);
+                          }}
+                          style={{padding:"7px 12px",cursor:"pointer",fontSize:12,borderBottom:"1px solid #f0f0f0"}}
+                          onMouseEnter={e => e.currentTarget.style.background="#f0f7ff"}
+                          onMouseLeave={e => e.currentTarget.style.background="white"}>
+                          {m.name} <span style={{color:"#aaa",fontSize:11}}>({m.tracking_mode === 'оценочный' ? 'краска' : m.unit})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
