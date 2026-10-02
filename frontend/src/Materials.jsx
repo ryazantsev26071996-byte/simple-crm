@@ -49,9 +49,9 @@ const STATUS_LABELS = { "новая": "Новая", "заказано": "Зак�
 const STATUS_COLORS = { "новая": "#fff3cd", "заказано": "#cce5ff", "куплено": "#d4edda" };
 const STATUS_TEXT = { "новая": "#856404", "заказано": "#004085", "куплено": "#155724" };
 
-export default function Materials() {
+export default function Materials({ isOwner = true }) {
   const { user, profile } = useAuth();
-  const [tab, setTab] = React.useState("Справочник");
+  const [tab, setTab] = React.useState(isOwner ? "Справочник" : "Заявки на закупку");
 
   // categories
   const [categories, setCategories] = React.useState([]);
@@ -97,6 +97,14 @@ export default function Materials() {
   const [analyticsTxns, setAnalyticsTxns] = React.useState([]);
   const [analyticsUsage, setAnalyticsUsage] = React.useState([]);
   const [analyticsMats, setAnalyticsMats] = React.useState([]);
+
+  // inline min_threshold editing
+  const [inlineMinId, setInlineMinId] = React.useState(null);
+  const [inlineMinVal, setInlineMinVal] = React.useState("");
+
+  // inventory mode
+  const [showInventory, setShowInventory] = React.useState(false);
+  const [inventoryFact, setInventoryFact] = React.useState({});
 
   const authorName = profile?.full_name || user?.email || "";
 
@@ -402,6 +410,50 @@ export default function Materials() {
     return [...withBrand, ...noBrand].map(k => groupMap[k]);
   }, [filteredMats, catHasBrand]);
 
+  async function saveInlineMin(mat) {
+    const val = inlineMinVal.trim() === "" ? null : Number(inlineMinVal);
+    setInlineMinId(null);
+    if (val === mat.min_threshold || (val === null && mat.min_threshold == null)) return;
+    try {
+      await apiFetch(`materials?id=eq.${mat.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ min_threshold: val }) });
+      setMaterials(prev => prev.map(m => m.id === mat.id ? { ...m, min_threshold: val } : m));
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
+  async function saveInventory() {
+    const today = new Date().toISOString().split("T")[0];
+    const relevantFields = ["qty_full", ...(catHasHalf ? ["qty_half"] : []), ...(catHasAlmostEmpty ? ["qty_almost_empty"] : [])];
+    let updatedCount = 0;
+    for (const mat of materials) {
+      const facts = inventoryFact[mat.id] || {};
+      const hasAnyFact = relevantFields.some(f => facts[f] != null && facts[f] !== "");
+      if (!hasAnyFact) continue;
+      const patch = { last_counted_at: today };
+      for (const f of relevantFields) {
+        const factStr = facts[f];
+        if (factStr == null || factStr === "") continue;
+        const newVal = Number(factStr);
+        const oldVal = mat[f] != null ? Number(mat[f]) : 0;
+        if (newVal === oldVal) continue;
+        patch[f] = newVal;
+        try {
+          await apiFetch("material_transactions", {
+            method: "POST", headers: { Prefer: "return=minimal" },
+            body: JSON.stringify({ material_id: mat.id, type: "корректировка", field: f, delta: newVal - oldVal, comment: `Инвентаризация ${today}`, created_by: user?.id || null, created_by_name: authorName }),
+          });
+        } catch (e) { console.error(e); }
+      }
+      try {
+        await apiFetch(`materials?id=eq.${mat.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+        updatedCount++;
+      } catch (e) { console.error(e); }
+    }
+    setShowInventory(false);
+    setInventoryFact({});
+    if (selectedCat) loadMaterials(selectedCat);
+    alert(`Инвентаризация завершена. Обновлено позиций: ${updatedCount}`);
+  }
+
   async function addAllBelowThreshold() {
     const cycleLabel = window.prompt("Введите название цикла заявки (например «Октябрь 2026 (до 10 числа)»):");
     if (!cycleLabel || !cycleLabel.trim()) return;
@@ -473,7 +525,7 @@ export default function Materials() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Top tab bar */}
       <div style={{ display: "flex", gap: 4, padding: "10px 16px 0", borderBottom: "1px solid #eee", flexShrink: 0 }}>
-        {TABS.map(t => (
+        {(isOwner ? TABS : ["Заявки на закупку"]).map(t => (
           <button key={t} onClick={() => setTab(t)}
             style={{ fontSize: 13, padding: "6px 16px", borderRadius: "6px 6px 0 0", border: "1px solid #ddd", borderBottom: tab === t ? "2px solid #7c3aed" : "1px solid #ddd", background: tab === t ? "#f5f3ff" : "white", color: tab === t ? "#7c3aed" : "#555", fontWeight: tab === t ? 600 : 400, cursor: "pointer" }}>
             {t}
@@ -525,8 +577,12 @@ export default function Materials() {
                       Мало осталось: {lowCount}
                     </span>
                   )}
+                  <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
+                    style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
+                    📝 Инвентаризация
+                  </button>
                   <button onClick={() => setShowAddMat(true)}
-                    style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
+                    style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
                     + Материал
                   </button>
                 </div>
@@ -573,7 +629,20 @@ export default function Materials() {
                                 {catHasAlmostEmpty && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_almost_empty != null ? mat.qty_almost_empty : "—"}</td>}
                                 {catHasReserve && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_reserve != null ? mat.qty_reserve : "—"}</td>}
                                 <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_warehouse != null ? mat.qty_warehouse : "—"}</td>
-                                <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>{mat.min_threshold != null ? mat.min_threshold : "—"}</td>
+                                <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>
+                                  {inlineMinId === mat.id ? (
+                                    <input type="number" min="0" autoFocus value={inlineMinVal}
+                                      onChange={e => setInlineMinVal(e.target.value)}
+                                      onBlur={() => saveInlineMin(mat)}
+                                      onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setInlineMinId(null); }}
+                                      style={{ width: 60, padding: "2px 4px", borderRadius: 4, border: "1px solid #7c3aed", fontSize: 12, textAlign: "right", fontFamily: "inherit" }} />
+                                  ) : (
+                                    <span onClick={() => { setInlineMinId(mat.id); setInlineMinVal(mat.min_threshold != null ? String(mat.min_threshold) : ""); }}
+                                      style={{ cursor: "pointer", borderBottom: "1px dashed #ccc", paddingBottom: 1 }} title="Нажмите для редактирования">
+                                      {mat.min_threshold != null ? mat.min_threshold : "—"}
+                                    </span>
+                                  )}
+                                </td>
                                 <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>
                                   {fmtDate(mat.last_counted_at)}
                                   {(()=>{ const stale = !mat.last_counted_at || (Date.now() - new Date(mat.last_counted_at+"T00:00:00").getTime()) > 30*24*60*60*1000; return stale ? <span title="Давно не пересчитывалось" style={{marginLeft:4,color:"#f39c12",cursor:"default"}}>⏰</span> : null; })()}
@@ -932,6 +1001,60 @@ export default function Materials() {
               </>
             );
           })()}
+        </div>
+      )}
+
+      {/* Inventory modal */}
+      {showInventory && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 12, width: 680, maxWidth: "97vw", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+              <strong style={{ fontSize: 14 }}>📝 Инвентаризация: {selectedCatName}</strong>
+              <button onClick={() => setShowInventory(false)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "#aaa" }}>×</button>
+            </div>
+            <div style={{ padding: "10px 18px", background: "#fffbe6", borderBottom: "1px solid #f0e8a0", fontSize: 12, color: "#7a6000", flexShrink: 0 }}>
+              Введите фактическое количество для материалов, которые пересчитали. Поля пустые — впишите то, что видите на полке. Пустые строки пропускаются.
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
+                    <th style={{ padding: "8px 14px", textAlign: "left", fontWeight: 500 }}>Материал</th>
+                    <th style={{ padding: "8px 10px", textAlign: "right", fontWeight: 500, color: "#aaa" }}>Сейчас</th>
+                    <th style={{ padding: "8px 10px", textAlign: "center", fontWeight: 500 }}>Факт: Целых</th>
+                    {catHasHalf && <th style={{ padding: "8px 10px", textAlign: "center", fontWeight: 500 }}>Факт: {halfColLabel}</th>}
+                    {catHasAlmostEmpty && <th style={{ padding: "8px 10px", textAlign: "center", fontWeight: 500 }}>Факт: Скоро закончится</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {materials.map(mat => {
+                    const facts = inventoryFact[mat.id] || {};
+                    const setFact = (field, val) => setInventoryFact(prev => ({ ...prev, [mat.id]: { ...(prev[mat.id] || {}), [field]: val } }));
+                    const numInp = { width: 64, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12, textAlign: "right", fontFamily: "inherit" };
+                    return (
+                      <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                        <td style={{ padding: "7px 14px", fontWeight: 500 }}>{mat.name}{mat.color_number ? <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 6 }}>#{mat.color_number}</span> : null}</td>
+                        <td style={{ padding: "7px 10px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{mat.qty_full ?? 0} {mat.unit}</td>
+                        <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                          <input type="number" min="0" step="0.5" value={facts.qty_full ?? ""} onChange={e => setFact("qty_full", e.target.value)} style={numInp} placeholder="—" />
+                        </td>
+                        {catHasHalf && <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                          <input type="number" min="0" step="0.5" value={facts.qty_half ?? ""} onChange={e => setFact("qty_half", e.target.value)} style={numInp} placeholder="—" />
+                        </td>}
+                        {catHasAlmostEmpty && <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                          <input type="number" min="0" step="0.5" value={facts.qty_almost_empty ?? ""} onChange={e => setFact("qty_almost_empty", e.target.value)} style={numInp} placeholder="—" />
+                        </td>}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ padding: "12px 18px", borderTop: "1px solid #eee", display: "flex", gap: 8, justifyContent: "flex-end", flexShrink: 0 }}>
+              <button onClick={() => setShowInventory(false)} style={{ fontSize: 13, padding: "7px 16px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>Отмена</button>
+              <button onClick={saveInventory} style={{ fontSize: 13, padding: "7px 20px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer", fontWeight: 600 }}>Завершить инвентаризацию</button>
+            </div>
+          </div>
         </div>
       )}
 
