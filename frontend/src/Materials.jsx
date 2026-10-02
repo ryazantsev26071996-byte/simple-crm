@@ -583,36 +583,36 @@ export default function Materials() {
                 <label style={labelStyle}>Название *</label>
                 <input value={addMatForm.name} onChange={e => setAddMatForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} placeholder="Название материала" />
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div>
                   <label style={labelStyle}>Производитель</label>
-                  <input value={addMatForm.brand} onChange={e => setAddMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг, Ладога..." />
+                  <input value={addMatForm.brand} onChange={e => setAddMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг..." />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div>
                   <label style={labelStyle}>Номер цвета</label>
                   <input value={addMatForm.color_number} onChange={e => setAddMatForm(f => ({ ...f, color_number: e.target.value }))} style={inputStyle} placeholder="Напр. 303" />
                 </div>
+                <div>
+                  <label style={labelStyle}>Единица</label>
+                  <input value={addMatForm.unit} onChange={e => setAddMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} placeholder="шт, тюбик..." />
+                </div>
               </div>
-              <div>
-                <label style={labelStyle}>Единица измерения</label>
-                <input value={addMatForm.unit} onChange={e => setAddMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} placeholder="шт, тюбик, кювета..." />
-              </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 100px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div>
                   <label style={labelStyle}>Целых (нач. остаток)</label>
                   <input type="number" min="0" value={addMatForm.qty_full} onChange={e => setAddMatForm(f => ({ ...f, qty_full: e.target.value }))} style={inputStyle} placeholder="0" />
                 </div>
-                <div style={{ flex: "1 1 100px" }}>
+                <div>
                   <label style={labelStyle}>Запас (чемоданчик)</label>
-                  <input type="number" min="0" value={addMatForm.qty_reserve} onChange={e => setAddMatForm(f => ({ ...f, qty_reserve: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                  <input type="number" min="0" value={addMatForm.qty_reserve} onChange={e => setAddMatForm(f => ({ ...f, qty_reserve: e.target.value }))} style={inputStyle} />
                 </div>
-                <div style={{ flex: "1 1 100px" }}>
+                <div>
                   <label style={labelStyle}>На складе</label>
-                  <input type="number" min="0" value={addMatForm.qty_warehouse} onChange={e => setAddMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                  <input type="number" min="0" value={addMatForm.qty_warehouse} onChange={e => setAddMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} />
                 </div>
-                <div style={{ flex: "1 1 100px" }}>
+                <div>
                   <label style={labelStyle}>Мин. порог</label>
-                  <input type="number" min="0" value={addMatForm.min_threshold} onChange={e => setAddMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} placeholder="Не указан" />
+                  <input type="number" min="0" value={addMatForm.min_threshold} onChange={e => setAddMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
               <div>
@@ -656,38 +656,38 @@ export default function Materials() {
                   <input value={editMatForm.unit} onChange={e => setEditMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <div style={{ flex: "1 1 100px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div>
                   <label style={labelStyle}>Целых</label>
                   <input type="number" min="0" step="0.5" value={editMatForm.qty_full} onChange={e => setEditMatForm(f => ({ ...f, qty_full: e.target.value }))} style={inputStyle} />
                 </div>
                 {catHasHalf && (
-                  <div style={{ flex: "1 1 100px" }}>
+                  <div>
                     <label style={labelStyle}>{halfColLabel}</label>
-                    <input type="number" min="0" step="0.5" value={editMatForm.qty_half} onChange={e => setEditMatForm(f => ({ ...f, qty_half: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                    <input type="number" min="0" step="0.5" value={editMatForm.qty_half} onChange={e => setEditMatForm(f => ({ ...f, qty_half: e.target.value }))} style={inputStyle} />
                   </div>
                 )}
                 {catHasAlmostEmpty && (
-                  <div style={{ flex: "1 1 100px" }}>
+                  <div>
                     <label style={labelStyle}>Скоро закончится</label>
-                    <input type="number" min="0" step="0.5" value={editMatForm.qty_almost_empty} onChange={e => setEditMatForm(f => ({ ...f, qty_almost_empty: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                    <input type="number" min="0" step="0.5" value={editMatForm.qty_almost_empty} onChange={e => setEditMatForm(f => ({ ...f, qty_almost_empty: e.target.value }))} style={inputStyle} />
                   </div>
                 )}
-                <div style={{ flex: "1 1 100px" }}>
+                <div>
                   <label style={labelStyle}>Запас (чемоданчик)</label>
-                  <input type="number" min="0" step="0.5" value={editMatForm.qty_reserve} onChange={e => setEditMatForm(f => ({ ...f, qty_reserve: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                  <input type="number" min="0" step="0.5" value={editMatForm.qty_reserve} onChange={e => setEditMatForm(f => ({ ...f, qty_reserve: e.target.value }))} style={inputStyle} />
                 </div>
-                <div style={{ flex: "1 1 100px" }}>
+                <div>
                   <label style={labelStyle}>На складе</label>
-                  <input type="number" min="0" step="0.5" value={editMatForm.qty_warehouse} onChange={e => setEditMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                  <input type="number" min="0" step="0.5" value={editMatForm.qty_warehouse} onChange={e => setEditMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div>
                   <label style={labelStyle}>Мин. порог</label>
-                  <input type="number" min="0" step="0.5" value={editMatForm.min_threshold} onChange={e => setEditMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} placeholder="Не задан" />
+                  <input type="number" min="0" step="0.5" value={editMatForm.min_threshold} onChange={e => setEditMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div>
                   <label style={labelStyle}>Дата пересчёта</label>
                   <input type="date" value={editMatForm.last_counted_at} onChange={e => setEditMatForm(f => ({ ...f, last_counted_at: e.target.value }))} style={inputStyle} />
                 </div>
