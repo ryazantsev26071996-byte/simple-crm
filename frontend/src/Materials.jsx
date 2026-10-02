@@ -149,7 +149,7 @@ export default function Materials() {
 
   async function loadAllMaterials() {
     try {
-      const data = await apiFetch("materials?order=name.asc&select=id,name,category_id");
+      const data = await apiFetch("materials?order=name.asc&select=id,name,category_id,unit");
       setAllMaterials(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
   }
@@ -402,6 +402,55 @@ export default function Materials() {
     return [...withBrand, ...noBrand].map(k => groupMap[k]);
   }, [filteredMats, catHasBrand]);
 
+  async function addAllBelowThreshold() {
+    const cycleLabel = window.prompt("Введите название цикла заявки (например «Октябрь 2026 (до 10 числа)»):");
+    if (!cycleLabel || !cycleLabel.trim()) return;
+    const cycle = cycleLabel.trim();
+    try {
+      const mats = await apiFetch("materials?select=id,name,unit,qty_full,qty_half,min_threshold&min_threshold=not.is.null");
+      const belowThreshold = (Array.isArray(mats) ? mats : []).filter(m => {
+        const qty = (Number(m.qty_full) || 0) + (Number(m.qty_half) || 0) * 0.5;
+        return qty <= Number(m.min_threshold);
+      });
+      if (belowThreshold.length === 0) { alert("Все остатки выше порога, добавлять нечего"); return; }
+      const existingIds = new Set(
+        requests
+          .filter(r => r.cycle_label === cycle && (r.status === "новая" || r.status === "заказано") && r.material_id)
+          .map(r => r.material_id)
+      );
+      const toAdd = belowThreshold.filter(m => !existingIds.has(m.id));
+      if (toAdd.length === 0) { alert("Все материалы ниже порога уже есть в заявках этого цикла"); return; }
+      const created = [];
+      for (const m of toAdd) {
+        const qty = (Number(m.qty_full) || 0) + (Number(m.qty_half) || 0) * 0.5;
+        const needed = Math.max(1, Math.ceil(Number(m.min_threshold) - qty));
+        const data = await apiFetch("purchase_requests", {
+          method: "POST",
+          body: JSON.stringify({ cycle_label: cycle, material_id: m.id, needed_qty: needed, available_qty: qty, status: "новая", requested_by: user?.id || null, requested_by_name: authorName }),
+        });
+        const r = Array.isArray(data) ? data[0] : data;
+        if (r) created.push(r);
+      }
+      setRequests(prev => [...prev, ...created]);
+      alert(`Добавлено ${created.length} позиций`);
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
+  async function copyRequestText(cycle) {
+    const items = reqByCycle[cycle] || [];
+    const lines = items.map((r, i) => {
+      const name = reqMatName(r);
+      const mat = allMaterials.find(m => m.id === r.material_id);
+      const unit = mat?.unit || "";
+      return `${i + 1}. ${name} — ${r.needed_qty}${unit ? " " + unit : ""}`;
+    });
+    const text = `Заявка на закупку — ${cycle}\n\n${lines.join("\n")}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      alert("Скопировано");
+    } catch (e) { alert("Не удалось скопировать: " + e.message); }
+  }
+
   // Group requests by cycle_label
   const reqByCycle = {};
   requests.forEach(r => {
@@ -525,7 +574,10 @@ export default function Materials() {
                                 {catHasReserve && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_reserve != null ? mat.qty_reserve : "—"}</td>}
                                 <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_warehouse != null ? mat.qty_warehouse : "—"}</td>
                                 <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>{mat.min_threshold != null ? mat.min_threshold : "—"}</td>
-                                <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12 }}>{fmtDate(mat.last_counted_at)}</td>
+                                <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>
+                                  {fmtDate(mat.last_counted_at)}
+                                  {(()=>{ const stale = !mat.last_counted_at || (Date.now() - new Date(mat.last_counted_at+"T00:00:00").getTime()) > 30*24*60*60*1000; return stale ? <span title="Давно не пересчитывалось" style={{marginLeft:4,color:"#f39c12",cursor:"default"}}>⏰</span> : null; })()}
+                                </td>
                                 <td style={{ padding: "7px 12px", color: "#888", fontSize: 12, maxWidth: 160, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={mat.notes || ""}>{mat.notes || "—"}</td>
                                 <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                                   <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 4 }}>📦</button>
@@ -563,7 +615,11 @@ export default function Materials() {
 
       {tab === "Заявки на закупку" && (
         <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginBottom: 14 }}>
+            <button onClick={addAllBelowThreshold}
+              style={{ fontSize: 13, padding: "7px 16px", borderRadius: 7, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
+              ⬇️ Добавить ниже порога
+            </button>
             <button onClick={() => setShowAddReq(true)}
               style={{ fontSize: 13, padding: "7px 16px", borderRadius: 7, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
               + Заявка
@@ -575,7 +631,10 @@ export default function Materials() {
             <div style={{ color: "#aaa", textAlign: "center", padding: 32 }}>Нет заявок</div>
           ) : cycles.map(cycle => (
             <div key={cycle} style={{ marginBottom: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: 14, color: "#333", marginBottom: 8, padding: "6px 0", borderBottom: "2px solid #7c3aed" }}>{cycle}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, padding: "6px 0", borderBottom: "2px solid #7c3aed" }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "#333" }}>{cycle}</span>
+                <button onClick={() => copyRequestText(cycle)} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#555" }}>📋 Скопировать текстом</button>
+              </div>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
