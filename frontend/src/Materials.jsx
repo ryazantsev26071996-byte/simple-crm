@@ -44,7 +44,7 @@ function fmtDate(d) {
   return dt.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-const TABS = ["Справочник", "Заявки на закупку"];
+const TABS = ["Справочник", "Заявки на закупку", "Журнал расхода"];
 const STATUS_LABELS = { "новая": "Новая", "заказано": "Заказано", "куплено": "Куплено" };
 const STATUS_COLORS = { "новая": "#fff3cd", "заказано": "#cce5ff", "куплено": "#d4edda" };
 const STATUS_TEXT = { "новая": "#856404", "заказано": "#004085", "куплено": "#155724" };
@@ -85,6 +85,13 @@ export default function Materials() {
   const [matDropdown, setMatDropdown] = React.useState([]);
   const [allMaterials, setAllMaterials] = React.useState([]);
 
+  // usage log
+  const [usageLog, setUsageLog] = React.useState([]);
+  const [usageLoading, setUsageLoading] = React.useState(false);
+  const [usageMatFilter, setUsageMatFilter] = React.useState("");
+  const [usageDateFrom, setUsageDateFrom] = React.useState("");
+  const [usageDateTo, setUsageDateTo] = React.useState("");
+
   const authorName = profile?.full_name || user?.email || "";
 
   React.useEffect(() => {
@@ -94,7 +101,17 @@ export default function Materials() {
 
   React.useEffect(() => {
     if (tab === "Заявки на закупку") loadRequests();
+    if (tab === "Журнал расхода") loadUsageLog();
   }, [tab]);
+
+  async function loadUsageLog() {
+    setUsageLoading(true);
+    try {
+      const data = await apiFetch("material_usage_log?select=*,material:materials(name,unit,tracking_mode,category_id),client:clients(name)&order=created_at.desc&limit=300");
+      setUsageLog(Array.isArray(data) ? data : []);
+    } catch (e) { console.error(e); }
+    setUsageLoading(false);
+  }
 
   React.useEffect(() => {
     if (selectedCat) loadMaterials(selectedCat);
@@ -566,6 +583,90 @@ export default function Materials() {
               </table>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === "Журнал расхода" && (
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+            <input
+              value={usageMatFilter}
+              onChange={e => setUsageMatFilter(e.target.value)}
+              placeholder="Поиск по материалу..."
+              style={{ padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, width: 200 }}
+            />
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#555" }}>
+              <span>с</span>
+              <input type="date" value={usageDateFrom} onChange={e => setUsageDateFrom(e.target.value)}
+                style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }} />
+              <span>по</span>
+              <input type="date" value={usageDateTo} onChange={e => setUsageDateTo(e.target.value)}
+                style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }} />
+            </div>
+            {(usageMatFilter || usageDateFrom || usageDateTo) && (
+              <button onClick={() => { setUsageMatFilter(""); setUsageDateFrom(""); setUsageDateTo(""); }}
+                style={{ fontSize: 12, padding: "5px 10px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#888" }}>
+                Сбросить
+              </button>
+            )}
+          </div>
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            {usageLoading ? (
+              <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Загрузка...</div>
+            ) : (() => {
+              const filtered = usageLog.filter(r => {
+                if (usageMatFilter && !(r.material?.name || "").toLowerCase().includes(usageMatFilter.toLowerCase())) return false;
+                if (usageDateFrom || usageDateTo) {
+                  if (!r.lesson_date) return false;
+                  if (usageDateFrom && r.lesson_date < usageDateFrom) return false;
+                  if (usageDateTo && r.lesson_date > usageDateTo) return false;
+                }
+                return true;
+              });
+              if (filtered.length === 0) return <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Записей не найдено</div>;
+              return (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee", position: "sticky", top: 0 }}>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Дата занятия</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Материал</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ученик</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Педагог</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Сколько</th>
+                      <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Когда записано</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(r => {
+                      const matName = r.material?.name || `#${r.material_id}`;
+                      const clientName = r.client?.name || "—";
+                      const qty = r.mode === 'точный'
+                        ? `${r.qty_exact != null ? r.qty_exact : "—"} ${r.material?.unit || ""}`.trim()
+                        : (r.qualitative_unit || "—");
+                      const createdAt = r.created_at
+                        ? new Date(r.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                        : "—";
+                      return (
+                        <tr key={r.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                          <td style={{ padding: "7px 12px", whiteSpace: "nowrap" }}>{r.lesson_date ? fmtDate(r.lesson_date) : "—"}</td>
+                          <td style={{ padding: "7px 12px", fontWeight: 500 }}>{matName}</td>
+                          <td style={{ padding: "7px 12px", color: "#666" }}>{clientName}</td>
+                          <td style={{ padding: "7px 12px", color: "#666" }}>{r.teacher_name || "—"}</td>
+                          <td style={{ padding: "7px 12px" }}>
+                            {r.mode === 'точный'
+                              ? <span style={{ fontWeight: 500 }}>{qty}</span>
+                              : <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: 10, background: "#f0ecfa", color: "#7c3aed", fontSize: 12, fontWeight: 500 }}>{qty}</span>
+                            }
+                          </td>
+                          <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>{createdAt}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
         </div>
       )}
 
