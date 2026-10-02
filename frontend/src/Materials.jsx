@@ -66,7 +66,7 @@ export default function Materials() {
 
   // add material modal
   const [showAddMat, setShowAddMat] = React.useState(false);
-  const [addMatForm, setAddMatForm] = React.useState({ name: "", color_number: "", brand: "", unit: "шт", qty_full: "", min_threshold: "", notes: "" });
+  const [addMatForm, setAddMatForm] = React.useState({ name: "", color_number: "", brand: "", unit: "шт", qty_full: "", qty_reserve: "", qty_warehouse: "", min_threshold: "", notes: "" });
 
   // edit material modal
   const [editMat, setEditMat] = React.useState(null);
@@ -161,6 +161,8 @@ export default function Materials() {
       };
       if (addMatForm.color_number.trim()) body.color_number = addMatForm.color_number.trim();
       if (addMatForm.brand.trim()) body.brand = addMatForm.brand.trim();
+      if (addMatForm.qty_reserve !== "") body.qty_reserve = Number(addMatForm.qty_reserve);
+      if (addMatForm.qty_warehouse !== "") body.qty_warehouse = Number(addMatForm.qty_warehouse);
       if (addMatForm.min_threshold !== "") body.min_threshold = Number(addMatForm.min_threshold);
       if (addMatForm.notes.trim()) body.notes = addMatForm.notes.trim();
       const data = await apiFetch("materials", { method: "POST", body: JSON.stringify(body) });
@@ -168,7 +170,7 @@ export default function Materials() {
       setMaterials(prev => [...prev, created]);
       setAllMaterials(prev => [...prev, { id: created.id, name: created.name, category_id: created.category_id }]);
       setShowAddMat(false);
-      setAddMatForm({ name: "", color_number: "", brand: "", unit: "шт", qty_full: "", min_threshold: "", notes: "" });
+      setAddMatForm({ name: "", color_number: "", brand: "", unit: "шт", qty_full: "", qty_reserve: "", qty_warehouse: "", min_threshold: "", notes: "" });
     } catch (e) { alert("Ошибка: " + e.message); }
   }
 
@@ -183,6 +185,8 @@ export default function Materials() {
         qty_full: Number(editMatForm.qty_full) || 0,
         qty_half: editMatForm.qty_half !== "" && editMatForm.qty_half != null ? Number(editMatForm.qty_half) : null,
         qty_almost_empty: editMatForm.qty_almost_empty !== "" && editMatForm.qty_almost_empty != null ? Number(editMatForm.qty_almost_empty) : null,
+        qty_reserve: editMatForm.qty_reserve !== "" && editMatForm.qty_reserve != null ? Number(editMatForm.qty_reserve) : null,
+        qty_warehouse: editMatForm.qty_warehouse !== "" && editMatForm.qty_warehouse != null ? Number(editMatForm.qty_warehouse) : null,
         min_threshold: editMatForm.min_threshold !== "" && editMatForm.min_threshold != null ? Number(editMatForm.min_threshold) : null,
         last_counted_at: editMatForm.last_counted_at || null,
         notes: editMatForm.notes || null,
@@ -190,7 +194,7 @@ export default function Materials() {
       };
 
       // Write correction transactions for changed qty fields
-      const qtyFields = ["qty_full", "qty_half", "qty_almost_empty"];
+      const qtyFields = ["qty_full", "qty_half", "qty_almost_empty", "qty_reserve", "qty_warehouse"];
       for (const f of qtyFields) {
         const oldVal = editMat[f] != null ? Number(editMat[f]) : 0;
         const newVal = body[f] != null ? Number(body[f]) : 0;
@@ -302,6 +306,8 @@ export default function Materials() {
       qty_full: mat.qty_full != null ? String(mat.qty_full) : "0",
       qty_half: mat.qty_half != null ? String(mat.qty_half) : "",
       qty_almost_empty: mat.qty_almost_empty != null ? String(mat.qty_almost_empty) : "",
+      qty_reserve: mat.qty_reserve != null ? String(mat.qty_reserve) : "",
+      qty_warehouse: mat.qty_warehouse != null ? String(mat.qty_warehouse) : "",
       min_threshold: mat.min_threshold != null ? String(mat.min_threshold) : "",
       last_counted_at: mat.last_counted_at || "",
       notes: mat.notes || "",
@@ -322,13 +328,15 @@ export default function Materials() {
     } catch (e) { alert("Ошибка: " + e.message); }
   }
 
-  // Check if category uses half/almost_empty/brand fields at all
+  // Check which optional columns to show
   const catHasHalf = materials.some(m => m.qty_half != null);
   const catHasAlmostEmpty = materials.some(m => m.qty_almost_empty != null);
   const catHasBrand = materials.some(m => m.brand != null && m.brand !== "");
+  const catHasReserve = materials.some(m => m.qty_reserve != null);
   const selectedCatName = categories.find(c => c.id === selectedCat)?.name || "";
   const halfColLabel = selectedCatName === "Карандаши" ? "Огрызки" : "Половина";
-  const colCount = 8 + (catHasBrand ? 1 : 0) + (catHasHalf ? 1 : 0) + (catHasAlmostEmpty ? 1 : 0);
+  // 9 always-visible columns: Название, № цвета, Ед., Целых, На складе, Мин., Пересчёт, Заметки, Действия
+  const colCount = 9 + (catHasBrand ? 1 : 0) + (catHasHalf ? 1 : 0) + (catHasAlmostEmpty ? 1 : 0) + (catHasReserve ? 1 : 0);
 
   const lowCount = materials.filter(isLow).length;
 
@@ -451,6 +459,8 @@ export default function Materials() {
                           {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
                           {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
                           {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
+                          {catHasReserve && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Запас</th>}
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>На складе</th>
                           <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Мин.</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Пересчёт</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>
@@ -473,6 +483,8 @@ export default function Materials() {
                                 {catHasBrand && <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.brand || "—"}</td>}
                                 {catHasHalf && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_half != null ? mat.qty_half : "—"}</td>}
                                 {catHasAlmostEmpty && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_almost_empty != null ? mat.qty_almost_empty : "—"}</td>}
+                                {catHasReserve && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_reserve != null ? mat.qty_reserve : "—"}</td>}
+                                <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_warehouse != null ? mat.qty_warehouse : "—"}</td>
                                 <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>{mat.min_threshold != null ? mat.min_threshold : "—"}</td>
                                 <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12 }}>{fmtDate(mat.last_counted_at)}</td>
                                 <td style={{ padding: "7px 12px", color: "#888", fontSize: 12, maxWidth: 160, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={mat.notes || ""}>{mat.notes || "—"}</td>
@@ -585,12 +597,20 @@ export default function Materials() {
                 <label style={labelStyle}>Единица измерения</label>
                 <input value={addMatForm.unit} onChange={e => setAddMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} placeholder="шт, тюбик, кювета..." />
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Начальный остаток (целых)</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 100px" }}>
+                  <label style={labelStyle}>Целых (нач. остаток)</label>
                   <input type="number" min="0" value={addMatForm.qty_full} onChange={e => setAddMatForm(f => ({ ...f, qty_full: e.target.value }))} style={inputStyle} placeholder="0" />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: "1 1 100px" }}>
+                  <label style={labelStyle}>Запас (чемоданчик)</label>
+                  <input type="number" min="0" value={addMatForm.qty_reserve} onChange={e => setAddMatForm(f => ({ ...f, qty_reserve: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                </div>
+                <div style={{ flex: "1 1 100px" }}>
+                  <label style={labelStyle}>На складе</label>
+                  <input type="number" min="0" value={addMatForm.qty_warehouse} onChange={e => setAddMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                </div>
+                <div style={{ flex: "1 1 100px" }}>
                   <label style={labelStyle}>Мин. порог</label>
                   <input type="number" min="0" value={addMatForm.min_threshold} onChange={e => setAddMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} placeholder="Не указан" />
                 </div>
@@ -636,18 +656,30 @@ export default function Materials() {
                   <input value={editMatForm.unit} onChange={e => setEditMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Остаток (целых)</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ flex: "1 1 100px" }}>
+                  <label style={labelStyle}>Целых</label>
                   <input type="number" min="0" step="0.5" value={editMatForm.qty_full} onChange={e => setEditMatForm(f => ({ ...f, qty_full: e.target.value }))} style={inputStyle} />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Остаток (половина)</label>
-                  <input type="number" min="0" step="0.5" value={editMatForm.qty_half} onChange={e => setEditMatForm(f => ({ ...f, qty_half: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                {catHasHalf && (
+                  <div style={{ flex: "1 1 100px" }}>
+                    <label style={labelStyle}>{halfColLabel}</label>
+                    <input type="number" min="0" step="0.5" value={editMatForm.qty_half} onChange={e => setEditMatForm(f => ({ ...f, qty_half: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                  </div>
+                )}
+                {catHasAlmostEmpty && (
+                  <div style={{ flex: "1 1 100px" }}>
+                    <label style={labelStyle}>Скоро закончится</label>
+                    <input type="number" min="0" step="0.5" value={editMatForm.qty_almost_empty} onChange={e => setEditMatForm(f => ({ ...f, qty_almost_empty: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                  </div>
+                )}
+                <div style={{ flex: "1 1 100px" }}>
+                  <label style={labelStyle}>Запас (чемоданчик)</label>
+                  <input type="number" min="0" step="0.5" value={editMatForm.qty_reserve} onChange={e => setEditMatForm(f => ({ ...f, qty_reserve: e.target.value }))} style={inputStyle} placeholder="Не задано" />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Остаток (огрызки)</label>
-                  <input type="number" min="0" step="0.5" value={editMatForm.qty_almost_empty} onChange={e => setEditMatForm(f => ({ ...f, qty_almost_empty: e.target.value }))} style={inputStyle} placeholder="Не задано" />
+                <div style={{ flex: "1 1 100px" }}>
+                  <label style={labelStyle}>На складе</label>
+                  <input type="number" min="0" step="0.5" value={editMatForm.qty_warehouse} onChange={e => setEditMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} placeholder="Не задано" />
                 </div>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
