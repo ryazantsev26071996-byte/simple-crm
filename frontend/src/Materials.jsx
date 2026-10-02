@@ -66,7 +66,7 @@ export default function Materials() {
 
   // add material modal
   const [showAddMat, setShowAddMat] = React.useState(false);
-  const [addMatForm, setAddMatForm] = React.useState({ name: "", color_number: "", unit: "шт", qty_full: "", min_threshold: "", notes: "" });
+  const [addMatForm, setAddMatForm] = React.useState({ name: "", color_number: "", brand: "", unit: "шт", qty_full: "", min_threshold: "", notes: "" });
 
   // edit material modal
   const [editMat, setEditMat] = React.useState(null);
@@ -118,7 +118,7 @@ export default function Materials() {
   async function loadMaterials(catId) {
     setMatLoading(true);
     try {
-      const data = await apiFetch(`materials?category_id=eq.${catId}&order=name.asc`);
+      const data = await apiFetch(`materials?category_id=eq.${catId}&order=id.asc`);
       setMaterials(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
     setMatLoading(false);
@@ -160,6 +160,7 @@ export default function Materials() {
         qty_full: Number(addMatForm.qty_full) || 0,
       };
       if (addMatForm.color_number.trim()) body.color_number = addMatForm.color_number.trim();
+      if (addMatForm.brand.trim()) body.brand = addMatForm.brand.trim();
       if (addMatForm.min_threshold !== "") body.min_threshold = Number(addMatForm.min_threshold);
       if (addMatForm.notes.trim()) body.notes = addMatForm.notes.trim();
       const data = await apiFetch("materials", { method: "POST", body: JSON.stringify(body) });
@@ -167,7 +168,7 @@ export default function Materials() {
       setMaterials(prev => [...prev, created]);
       setAllMaterials(prev => [...prev, { id: created.id, name: created.name, category_id: created.category_id }]);
       setShowAddMat(false);
-      setAddMatForm({ name: "", color_number: "", unit: "шт", qty_full: "", min_threshold: "", notes: "" });
+      setAddMatForm({ name: "", color_number: "", brand: "", unit: "шт", qty_full: "", min_threshold: "", notes: "" });
     } catch (e) { alert("Ошибка: " + e.message); }
   }
 
@@ -177,6 +178,7 @@ export default function Materials() {
       const body = {
         name: editMatForm.name,
         color_number: editMatForm.color_number || null,
+        brand: editMatForm.brand || null,
         unit: editMatForm.unit || "шт",
         qty_full: Number(editMatForm.qty_full) || 0,
         qty_half: editMatForm.qty_half !== "" && editMatForm.qty_half != null ? Number(editMatForm.qty_half) : null,
@@ -295,6 +297,7 @@ export default function Materials() {
     setEditMatForm({
       name: mat.name || "",
       color_number: mat.color_number || "",
+      brand: mat.brand || "",
       unit: mat.unit || "шт",
       qty_full: mat.qty_full != null ? String(mat.qty_full) : "0",
       qty_half: mat.qty_half != null ? String(mat.qty_half) : "",
@@ -319,19 +322,38 @@ export default function Materials() {
     } catch (e) { alert("Ошибка: " + e.message); }
   }
 
-  // Check if category uses half/almost_empty fields at all
+  // Check if category uses half/almost_empty/brand fields at all
   const catHasHalf = materials.some(m => m.qty_half != null);
   const catHasAlmostEmpty = materials.some(m => m.qty_almost_empty != null);
+  const catHasBrand = materials.some(m => m.brand != null && m.brand !== "");
   const selectedCatName = categories.find(c => c.id === selectedCat)?.name || "";
   const halfColLabel = selectedCatName === "Карандаши" ? "Огрызки" : "Половина";
+  const colCount = 8 + (catHasBrand ? 1 : 0) + (catHasHalf ? 1 : 0) + (catHasAlmostEmpty ? 1 : 0);
 
   const lowCount = materials.filter(isLow).length;
 
   const filteredMats = materials.filter(m => {
     if (!matSearch) return true;
     return m.name.toLowerCase().includes(matSearch.toLowerCase()) ||
-      (m.color_number || "").toLowerCase().includes(matSearch.toLowerCase());
+      (m.color_number || "").toLowerCase().includes(matSearch.toLowerCase()) ||
+      (m.brand || "").toLowerCase().includes(matSearch.toLowerCase());
   });
+
+  // Group filteredMats by brand when category has brands
+  const brandGroups = React.useMemo(() => {
+    if (!catHasBrand) return null;
+    const groupMap = {};
+    const groupOrder = [];
+    filteredMats.forEach(m => {
+      const key = m.brand || "__no_brand__";
+      if (!groupMap[key]) { groupMap[key] = { brand: m.brand || null, mats: [] }; groupOrder.push(key); }
+      groupMap[key].mats.push(m);
+    });
+    // Put "no brand" group last
+    const noBrand = groupOrder.includes("__no_brand__") ? ["__no_brand__"] : [];
+    const withBrand = groupOrder.filter(k => k !== "__no_brand__");
+    return [...withBrand, ...noBrand].map(k => groupMap[k]);
+  }, [filteredMats, catHasBrand]);
 
   // Group requests by cycle_label
   const reqByCycle = {};
@@ -426,6 +448,7 @@ export default function Materials() {
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>№ цвета</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ед.</th>
                           <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Целых</th>
+                          {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
                           {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
                           {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
                           <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Мин.</th>
@@ -435,40 +458,46 @@ export default function Materials() {
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredMats.map(mat => {
-                          const low = isLow(mat);
-                          return (
-                            <tr key={mat.id}
-                              style={{ borderBottom: "1px solid #f5f5f5", background: low ? "#fff0f0" : "white" }}>
-                              <td style={{ padding: "7px 12px", fontWeight: low ? 600 : 400, color: low ? "#c0392b" : "#222" }}>
-                                {mat.name}
-                                {low && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>мало</span>}
-                              </td>
-                              <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
-                              <td style={{ padding: "7px 12px", color: "#888" }}>{mat.unit}</td>
-                              <td style={{ padding: "7px 12px", textAlign: "right", fontWeight: 500 }}>{mat.qty_full ?? 0}</td>
-                              {catHasHalf && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_half != null ? mat.qty_half : "—"}</td>}
-                              {catHasAlmostEmpty && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_almost_empty != null ? mat.qty_almost_empty : "—"}</td>}
-                              <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>{mat.min_threshold != null ? mat.min_threshold : "—"}</td>
-                              <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12 }}>{fmtDate(mat.last_counted_at)}</td>
-                              <td style={{ padding: "7px 12px", color: "#888", fontSize: 12, maxWidth: 160, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={mat.notes || ""}>{mat.notes || "—"}</td>
-                              <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                <button onClick={() => openMove(mat)}
-                                  title="Движение" style={{ fontSize: 13, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 4 }}>
-                                  📦
-                                </button>
-                                <button onClick={() => openEdit(mat)}
-                                  style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 4 }}>
-                                  ✏️
-                                </button>
-                                <button onClick={() => deleteMaterial(mat)}
-                                  title="Удалить" style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>
-                                  🗑️
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {(() => {
+                          const renderRow = (mat) => {
+                            const low = isLow(mat);
+                            return (
+                              <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: low ? "#fff0f0" : "white" }}>
+                                <td style={{ padding: "7px 12px", fontWeight: low ? 600 : 400, color: low ? "#c0392b" : "#222" }}>
+                                  {mat.name}
+                                  {low && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>мало</span>}
+                                </td>
+                                <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
+                                <td style={{ padding: "7px 12px", color: "#888" }}>{mat.unit}</td>
+                                <td style={{ padding: "7px 12px", textAlign: "right", fontWeight: 500 }}>{mat.qty_full ?? 0}</td>
+                                {catHasBrand && <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.brand || "—"}</td>}
+                                {catHasHalf && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_half != null ? mat.qty_half : "—"}</td>}
+                                {catHasAlmostEmpty && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_almost_empty != null ? mat.qty_almost_empty : "—"}</td>}
+                                <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>{mat.min_threshold != null ? mat.min_threshold : "—"}</td>
+                                <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12 }}>{fmtDate(mat.last_counted_at)}</td>
+                                <td style={{ padding: "7px 12px", color: "#888", fontSize: 12, maxWidth: 160, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={mat.notes || ""}>{mat.notes || "—"}</td>
+                                <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                  <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 4 }}>📦</button>
+                                  <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 4 }}>✏️</button>
+                                  <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
+                                </td>
+                              </tr>
+                            );
+                          };
+                          if (catHasBrand && brandGroups) {
+                            return brandGroups.map(({ brand, mats }) => (
+                              <React.Fragment key={brand ?? "__no_brand__"}>
+                                <tr>
+                                  <td colSpan={colCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed", letterSpacing: 0.2 }}>
+                                    {brand || "Без производителя"}
+                                  </td>
+                                </tr>
+                                {mats.map(renderRow)}
+                              </React.Fragment>
+                            ));
+                          }
+                          return filteredMats.map(renderRow);
+                        })()}
                       </tbody>
                     </table>
                   )}
@@ -544,13 +573,17 @@ export default function Materials() {
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Производитель</label>
+                  <input value={addMatForm.brand} onChange={e => setAddMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг, Ладога..." />
+                </div>
+                <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Номер цвета</label>
                   <input value={addMatForm.color_number} onChange={e => setAddMatForm(f => ({ ...f, color_number: e.target.value }))} style={inputStyle} placeholder="Напр. 303" />
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={labelStyle}>Единица измерения</label>
-                  <input value={addMatForm.unit} onChange={e => setAddMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} placeholder="шт, тюбик, кювета..." />
-                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Единица измерения</label>
+                <input value={addMatForm.unit} onChange={e => setAddMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} placeholder="шт, тюбик, кювета..." />
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <div style={{ flex: 1 }}>
@@ -590,6 +623,10 @@ export default function Materials() {
                 <input value={editMatForm.name} onChange={e => setEditMatForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
               </div>
               <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Производитель</label>
+                  <input value={editMatForm.brand} onChange={e => setEditMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг" />
+                </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Номер цвета</label>
                   <input value={editMatForm.color_number} onChange={e => setEditMatForm(f => ({ ...f, color_number: e.target.value }))} style={inputStyle} />
@@ -664,8 +701,8 @@ export default function Materials() {
                   <select value={moveForm.field} onChange={e => setMoveForm(f => ({ ...f, field: e.target.value }))}
                     style={{ ...inputStyle }}>
                     <option value="qty_full">Целых</option>
-                    {catHasHalf && <option value="qty_half">Половина</option>}
-                    {catHasAlmostEmpty && <option value="qty_almost_empty">Огрызки</option>}
+                    {catHasHalf && <option value="qty_half">{halfColLabel}</option>}
+                    {catHasAlmostEmpty && <option value="qty_almost_empty">Скоро закончится</option>}
                   </select>
                 </div>
               )}
