@@ -73,6 +73,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   });
 
   const [usedMaterials, setUsedMaterials] = React.useState([]);
+  const [matValidationErrors, setMatValidationErrors] = React.useState(new Set());
   const [matSearch, setMatSearch] = React.useState("");
   const [matSuggestions, setMatSuggestions] = React.useState([]);
   const [showMatSuggestions, setShowMatSuggestions] = React.useState(false);
@@ -150,6 +151,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
     setUsedMaterials([]);
+    setMatValidationErrors(new Set());
     setMatSearch("");
     setMatSuggestions([]);
     setShowMatSuggestions(false);
@@ -192,6 +194,20 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       alert('Добавьте хотя бы один материал, использованный на занятии — это обязательно при отметке "Пришёл"');
       return;
     }
+    if (form.attended === true && usedMaterials.length > 0) {
+      const errSet = new Set();
+      for (let i = 0; i < usedMaterials.length; i++) {
+        const um = usedMaterials[i];
+        if (um.tracking_mode === 'точный' && (!um.qty_exact || Number(um.qty_exact) <= 0)) errSet.add(i);
+        else if (um.tracking_mode === 'оценочный' && !um.qualitative_unit) errSet.add(i);
+      }
+      if (errSet.size > 0) {
+        setMatValidationErrors(errSet);
+        alert(`Укажите количество для «${usedMaterials[[...errSet][0]]?.name}»`);
+        return;
+      }
+    }
+    setMatValidationErrors(new Set());
     const payload = {
       date: modal.date, time: modal.time,
       client_id: form.client_id || null, client_name: form.client_name || null,
@@ -277,6 +293,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         }
       }
       setUsedMaterials([]);
+      setMatValidationErrors(new Set());
       setModal(null);
       loadSlots();
     } catch(e) { alert(e.message); }
@@ -453,14 +470,18 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                 <div style={{fontSize:12,fontWeight:600,color:usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"#e55":"#555",marginBottom:8}}>
                   Материалы, использованные на занятии {usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"* (обязательно)":""}
                 </div>
+                <div style={{fontSize:11,color:"#aaa",marginBottom:8,lineHeight:1.4}}>Указывайте только то, что реально израсходовано сегодня: новый лист бумаги или холст, который взяли, или сколько краски выдавили из тюбика. Не нужно отмечать материалы, которые просто лежат на столе, но не тратились.</div>
                 {usedMaterials.map((um, idx) => (
-                  <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"5px 8px",background:"white",borderRadius:6,border:"1px solid #e8e8e8"}}>
+                  <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"5px 8px",background:"white",borderRadius:6,border:`1px solid ${matValidationErrors.has(idx)?"#e55":"#e8e8e8"}`}}>
                     <div style={{flex:1,fontSize:12,fontWeight:500,color:"#333",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{um.name}</div>
                     {um.tracking_mode === 'точный' ? (
                       <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
                         <input type="number" min="0" step="1" value={um.qty_exact}
-                          onChange={e => setUsedMaterials(prev => prev.map((m, i) => i===idx ? {...m, qty_exact: e.target.value} : m))}
-                          style={{width:56,padding:"3px 6px",borderRadius:4,border:"1px solid #ddd",fontSize:12,textAlign:"right",fontFamily:"inherit"}} />
+                          onChange={e => {
+                            setUsedMaterials(prev => prev.map((m, i) => i===idx ? {...m, qty_exact: e.target.value} : m));
+                            setMatValidationErrors(prev => { const next = new Set(prev); next.delete(idx); return next; });
+                          }}
+                          style={{width:56,padding:"3px 6px",borderRadius:4,border:`1px solid ${matValidationErrors.has(idx)&&(!um.qty_exact||Number(um.qty_exact)<=0)?"#e55":"#ddd"}`,fontSize:12,textAlign:"right",fontFamily:"inherit"}} />
                         <span style={{fontSize:11,color:"#888"}}>{um.unit}</span>
                       </div>
                     ) : (

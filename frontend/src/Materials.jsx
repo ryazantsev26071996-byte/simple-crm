@@ -46,6 +46,12 @@ function fmtDate(d) {
 
 const TABS = ["Справочник", "Заявки на закупку", "Журнал расхода", "Аналитика"];
 const STATUS_LABELS = { "новая": "Новая", "заказано": "Заказано", "куплено": "Куплено" };
+const QUALITATIVE_UNITS = [
+  { label: "Капля", weight: 1 },
+  { label: "Горошина", weight: 3 },
+  { label: "Полтюбика", weight: 50 },
+  { label: "Тюбик", weight: 100 },
+];
 const STATUS_COLORS = { "новая": "#fff3cd", "заказано": "#cce5ff", "куплено": "#d4edda" };
 const STATUS_TEXT = { "новая": "#856404", "заказано": "#004085", "куплено": "#155724" };
 
@@ -91,6 +97,8 @@ export default function Materials({ isOwner = true }) {
   const [usageMatFilter, setUsageMatFilter] = React.useState("");
   const [usageDateFrom, setUsageDateFrom] = React.useState("");
   const [usageDateTo, setUsageDateTo] = React.useState("");
+  const [editLogEntry, setEditLogEntry] = React.useState(null);
+  const [editLogForm, setEditLogForm] = React.useState({});
 
   // analytics
   const [analyticsLoading, setAnalyticsLoading] = React.useState(false);
@@ -141,6 +149,22 @@ export default function Materials({ isOwner = true }) {
       setUsageLog(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
     setUsageLoading(false);
+  }
+
+  async function saveEditLogEntry() {
+    if (!editLogEntry) return;
+    try {
+      let patch = {};
+      if (editLogEntry.mode === 'точный') {
+        patch = { qty_exact: Number(editLogForm.qty_exact) || null };
+      } else {
+        const unit = QUALITATIVE_UNITS.find(u => u.label === editLogForm.qualitative_unit);
+        patch = { qualitative_unit: editLogForm.qualitative_unit, qualitative_weight: unit?.weight ?? null };
+      }
+      await apiFetch(`material_usage_log?id=eq.${editLogEntry.id}`, { method: "PATCH", body: JSON.stringify(patch), headers: { Prefer: "return=minimal" } });
+      setUsageLog(prev => prev.map(r => r.id === editLogEntry.id ? { ...r, ...patch } : r));
+      setEditLogEntry(null);
+    } catch (e) { alert(e.message); }
   }
 
   React.useEffect(() => {
@@ -784,6 +808,7 @@ export default function Materials({ isOwner = true }) {
                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Педагог</th>
                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Сколько</th>
                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Когда записано</th>
+                      {isOwner && <th style={{ padding: "8px 12px", width: 32 }}></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -809,6 +834,14 @@ export default function Materials({ isOwner = true }) {
                             }
                           </td>
                           <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>{createdAt}</td>
+                          {isOwner && (
+                            <td style={{ padding: "4px 8px" }}>
+                              <button
+                                onClick={() => { setEditLogEntry(r); setEditLogForm(r.mode === 'точный' ? { qty_exact: r.qty_exact ?? "" } : { qualitative_unit: r.qualitative_unit || QUALITATIVE_UNITS[0].label }); }}
+                                style={{ fontSize: 14, background: "none", border: "none", cursor: "pointer", color: "#aaa", padding: "2px 4px", lineHeight: 1 }}
+                                title="Редактировать запись">✏️</button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1325,6 +1358,42 @@ export default function Materials({ isOwner = true }) {
                 <button onClick={() => setShowAddReq(false)} style={{ fontSize: 13, padding: "7px 16px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>Отмена</button>
                 <button onClick={addRequest} style={{ fontSize: 13, padding: "7px 16px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>Добавить</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {editLogEntry && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "white", borderRadius: 10, padding: "24px 24px 20px", width: 320, boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>Редактировать запись журнала</div>
+              <button onClick={() => setEditLogEntry(null)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "#aaa" }}>×</button>
+            </div>
+            <div style={{ fontSize: 13, color: "#555", marginBottom: 12 }}>
+              <span style={{ fontWeight: 500 }}>{editLogEntry.material?.name}</span>
+              {editLogEntry.lesson_date ? ` — ${fmtDate(editLogEntry.lesson_date)}` : ""}
+            </div>
+            {editLogEntry.mode === 'точный' ? (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, color: "#666", marginBottom: 4 }}>Количество ({editLogEntry.material?.unit})</label>
+                <input type="number" min="0" step="1" value={editLogForm.qty_exact}
+                  onChange={e => setEditLogForm(f => ({ ...f, qty_exact: e.target.value }))}
+                  style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, boxSizing: "border-box" }} />
+              </div>
+            ) : (
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, color: "#666", marginBottom: 4 }}>Количество краски</label>
+                <select value={editLogForm.qualitative_unit}
+                  onChange={e => setEditLogForm(f => ({ ...f, qualitative_unit: e.target.value }))}
+                  style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, background: "white" }}>
+                  {QUALITATIVE_UNITS.map(u => <option key={u.label} value={u.label}>{u.label}</option>)}
+                </select>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: "#aaa", marginBottom: 16 }}>Исправление записи в журнале не меняет текущий остаток материала.</div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button onClick={() => setEditLogEntry(null)} style={{ fontSize: 13, padding: "7px 16px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>Отмена</button>
+              <button onClick={saveEditLogEntry} style={{ fontSize: 13, padding: "7px 16px", borderRadius: 6, border: "none", background: "#4a90e2", color: "white", cursor: "pointer" }}>Сохранить</button>
             </div>
           </div>
         </div>
