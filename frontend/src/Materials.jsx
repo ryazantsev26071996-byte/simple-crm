@@ -114,6 +114,13 @@ export default function Materials({ isOwner = true }) {
   const [showInventory, setShowInventory] = React.useState(false);
   const [inventoryFact, setInventoryFact] = React.useState({});
 
+  // purchase request cycles (archiving)
+  const [reqCycles, setReqCycles] = React.useState([]);
+  const [expandedArchivedCycles, setExpandedArchivedCycles] = React.useState(new Set());
+
+  // inline edit mode for справочник
+  const [showEditMode, setShowEditMode] = React.useState(false);
+
   const authorName = profile?.full_name || user?.email || "";
 
   React.useEffect(() => {
@@ -199,8 +206,12 @@ export default function Materials({ isOwner = true }) {
   async function loadRequests() {
     setReqLoading(true);
     try {
-      const data = await apiFetch("purchase_requests?order=cycle_label.asc,id.asc");
+      const [data, cyclesData] = await Promise.all([
+        apiFetch("purchase_requests?order=cycle_label.asc,id.asc"),
+        apiFetch("purchase_request_cycles?select=*"),
+      ]);
       setRequests(Array.isArray(data) ? data : []);
+      setReqCycles(Array.isArray(cyclesData) ? cyclesData : []);
     } catch (e) { console.error(e); }
     setReqLoading(false);
   }
@@ -267,10 +278,12 @@ export default function Materials({ isOwner = true }) {
 
       // Write correction transactions for changed qty fields
       const qtyFields = ["qty_full", "qty_half", "qty_almost_empty", "qty_reserve", "qty_warehouse"];
+      let anyQtyChanged = false;
       for (const f of qtyFields) {
         const oldVal = editMat[f] != null ? Number(editMat[f]) : 0;
         const newVal = body[f] != null ? Number(body[f]) : 0;
         if (oldVal !== newVal) {
+          anyQtyChanged = true;
           await apiFetch("material_transactions", {
             method: "POST",
             body: JSON.stringify({
@@ -285,6 +298,7 @@ export default function Materials({ isOwner = true }) {
           });
         }
       }
+      if (anyQtyChanged) body.last_counted_at = new Date().toISOString().split("T")[0];
 
       await apiFetch(`materials?id=eq.${editMat.id}`, {
         method: "PATCH",
@@ -365,6 +379,70 @@ export default function Materials({ isOwner = true }) {
         body: JSON.stringify({ status }),
       });
       setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
+  async function archiveCycle(cycle) {
+    const now = new Date().toISOString();
+    try {
+      await apiFetch("purchase_request_cycles", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ cycle_label: cycle, archived: true, archived_at: now }),
+      });
+      setReqCycles(prev => {
+        const ex = prev.find(c => c.cycle_label === cycle);
+        if (ex) return prev.map(c => c.cycle_label === cycle ? { ...c, archived: true, archived_at: now } : c);
+        return [...prev, { cycle_label: cycle, archived: true, archived_at: now }];
+      });
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
+  async function unarchiveCycle(cycle) {
+    try {
+      await apiFetch("purchase_request_cycles", {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ cycle_label: cycle, archived: false, archived_at: null }),
+      });
+      setReqCycles(prev => {
+        const ex = prev.find(c => c.cycle_label === cycle);
+        if (ex) return prev.map(c => c.cycle_label === cycle ? { ...c, archived: false, archived_at: null } : c);
+        return [...prev, { cycle_label: cycle, archived: false }];
+      });
+      setExpandedArchivedCycles(prev => { const next = new Set(prev); next.delete(cycle); return next; });
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
+  const QTY_INLINE_FIELDS = ["qty_full", "qty_half", "qty_almost_empty", "qty_reserve", "qty_warehouse"];
+  const NUM_INLINE_FIELDS = [...QTY_INLINE_FIELDS, "min_threshold"];
+
+  async function saveInlineField(mat, field, rawValue) {
+    const today = new Date().toISOString().split("T")[0];
+    let parsedValue;
+    if (NUM_INLINE_FIELDS.includes(field)) {
+      parsedValue = rawValue === "" || rawValue == null ? null : Number(rawValue);
+      if (parsedValue !== null && Number.isNaN(parsedValue)) return;
+    } else if (field === "unit") {
+      parsedValue = (rawValue || "").trim() || "шт";
+    } else {
+      parsedValue = (rawValue || "").trim() || null;
+    }
+    const oldVal = mat[field];
+    const isQty = QTY_INLINE_FIELDS.includes(field);
+    const changed = NUM_INLINE_FIELDS.includes(field)
+      ? (parsedValue ?? 0) !== (oldVal != null ? Number(oldVal) : 0)
+      : parsedValue !== (oldVal || null);
+    if (!changed) return;
+    try {
+      const patch = { [field]: parsedValue, updated_at: new Date().toISOString() };
+      if (isQty) patch.last_counted_at = today;
+      await apiFetch(`materials?id=eq.${mat.id}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(patch),
+      });
+      setMaterials(prev => prev.map(m => m.id === mat.id ? { ...m, ...patch } : m));
     } catch (e) { alert("Ошибка: " + e.message); }
   }
 
@@ -602,8 +680,12 @@ export default function Materials({ isOwner = true }) {
                       Мало осталось: {lowCount}
                     </span>
                   )}
+                  <button onClick={() => setShowEditMode(v => !v)}
+                    style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
+                    ✏️ {showEditMode ? "Режим вкл." : "Режим редактирования"}
+                  </button>
                   <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
-                    style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
+                    style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
                     📝 Инвентаризация
                   </button>
                   <button onClick={() => setShowAddMat(true)}
@@ -623,9 +705,9 @@ export default function Materials({ isOwner = true }) {
                         <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Название</th>
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>№ цвета</th>
+                          {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
                           <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ед.</th>
                           <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Целых</th>
-                          {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
                           {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
                           {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
                           {catHasReserve && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Запас</th>}
@@ -647,15 +729,53 @@ export default function Materials({ isOwner = true }) {
                                   {low && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>мало</span>}
                                 </td>
                                 <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
-                                <td style={{ padding: "7px 12px", color: "#888" }}>{mat.unit}</td>
-                                <td style={{ padding: "7px 12px", textAlign: "right", fontWeight: 500 }}>{mat.qty_full ?? 0}</td>
-                                {catHasBrand && <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.brand || "—"}</td>}
-                                {catHasHalf && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_half != null ? mat.qty_half : "—"}</td>}
-                                {catHasAlmostEmpty && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_almost_empty != null ? mat.qty_almost_empty : "—"}</td>}
-                                {catHasReserve && <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_reserve != null ? mat.qty_reserve : "—"}</td>}
-                                <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{mat.qty_warehouse != null ? mat.qty_warehouse : "—"}</td>
-                                <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa" }}>
-                                  {inlineMinId === mat.id ? (
+                                {catHasBrand && (
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12 }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_brand_${mat.updated_at||''}`} type="text" defaultValue={mat.brand || ""} onBlur={e => saveInlineField(mat, "brand", e.target.value)} style={{ width: "100%", minWidth: 80, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : (mat.brand || "—")}
+                                  </td>
+                                )}
+                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888" }}>
+                                  {showEditMode
+                                    ? <input key={`${mat.id}_unit_${mat.updated_at||''}`} type="text" defaultValue={mat.unit || ""} onBlur={e => saveInlineField(mat, "unit", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
+                                    : mat.unit}
+                                </td>
+                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
+                                  {showEditMode
+                                    ? <input key={`${mat.id}_qty_full_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_full != null ? String(mat.qty_full) : "0"} onBlur={e => saveInlineField(mat, "qty_full", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                    : (mat.qty_full ?? 0)}
+                                </td>
+                                {catHasHalf && (
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_qty_half_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_half != null ? String(mat.qty_half) : ""} onBlur={e => saveInlineField(mat, "qty_half", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : (mat.qty_half != null ? mat.qty_half : "—")}
+                                  </td>
+                                )}
+                                {catHasAlmostEmpty && (
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_qty_ae_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_almost_empty != null ? String(mat.qty_almost_empty) : ""} onBlur={e => saveInlineField(mat, "qty_almost_empty", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : (mat.qty_almost_empty != null ? mat.qty_almost_empty : "—")}
+                                  </td>
+                                )}
+                                {catHasReserve && (
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_qty_res_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_reserve != null ? String(mat.qty_reserve) : ""} onBlur={e => saveInlineField(mat, "qty_reserve", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : (mat.qty_reserve != null ? mat.qty_reserve : "—")}
+                                  </td>
+                                )}
+                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                  {showEditMode
+                                    ? <input key={`${mat.id}_qty_wh_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_warehouse != null ? String(mat.qty_warehouse) : ""} onBlur={e => saveInlineField(mat, "qty_warehouse", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                    : (mat.qty_warehouse != null ? mat.qty_warehouse : "—")}
+                                </td>
+                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#aaa" }}>
+                                  {showEditMode ? (
+                                    <input key={`${mat.id}_min_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.min_threshold != null ? String(mat.min_threshold) : ""} onBlur={e => saveInlineField(mat, "min_threshold", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                  ) : inlineMinId === mat.id ? (
                                     <input type="number" min="0" autoFocus value={inlineMinVal}
                                       onChange={e => setInlineMinVal(e.target.value)}
                                       onBlur={() => saveInlineMin(mat)}
@@ -672,7 +792,11 @@ export default function Materials({ isOwner = true }) {
                                   {fmtDate(mat.last_counted_at)}
                                   {(()=>{ const stale = !mat.last_counted_at || (Date.now() - new Date(mat.last_counted_at+"T00:00:00").getTime()) > 30*24*60*60*1000; return stale ? <span title="Давно не пересчитывалось" style={{marginLeft:4,color:"#f39c12",cursor:"default"}}>⏰</span> : null; })()}
                                 </td>
-                                <td style={{ padding: "7px 12px", color: "#888", fontSize: 12, maxWidth: 160, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={mat.notes || ""}>{mat.notes || "—"}</td>
+                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12, maxWidth: showEditMode ? "none" : 160, whiteSpace: showEditMode ? "normal" : "nowrap", overflow: showEditMode ? "visible" : "hidden", textOverflow: showEditMode ? "clip" : "ellipsis" }} title={mat.notes || ""}>
+                                  {showEditMode
+                                    ? <input key={`${mat.id}_notes_${mat.updated_at||''}`} type="text" defaultValue={mat.notes || ""} onBlur={e => saveInlineField(mat, "notes", e.target.value)} style={{ width: "100%", minWidth: 120, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
+                                    : (mat.notes || "—")}
+                                </td>
                                 <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                                   <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 4 }}>📦</button>
                                   <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 4 }}>✏️</button>
@@ -723,41 +847,71 @@ export default function Materials({ isOwner = true }) {
             <div style={{ color: "#aaa", textAlign: "center", padding: 32 }}>Загрузка...</div>
           ) : cycles.length === 0 ? (
             <div style={{ color: "#aaa", textAlign: "center", padding: 32 }}>Нет заявок</div>
-          ) : cycles.map(cycle => (
-            <div key={cycle} style={{ marginBottom: 24 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, padding: "6px 0", borderBottom: "2px solid #7c3aed" }}>
-                <span style={{ fontWeight: 700, fontSize: 14, color: "#333" }}>{cycle}</span>
-                <button onClick={() => copyRequestText(cycle)} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#555" }}>📋 Скопировать текстом</button>
-              </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                <thead>
-                  <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
-                    <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Материал</th>
-                    <th style={{ padding: "6px 12px", textAlign: "right", fontWeight: 500 }}>Нужно</th>
-                    <th style={{ padding: "6px 12px", textAlign: "right", fontWeight: 500 }}>В наличии</th>
-                    <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Статус</th>
-                    <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Заметка</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reqByCycle[cycle].map(r => (
-                    <tr key={r.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                      <td style={{ padding: "7px 12px" }}>{reqMatName(r)}</td>
-                      <td style={{ padding: "7px 12px", textAlign: "right" }}>{r.needed_qty}</td>
-                      <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{r.available_qty != null ? r.available_qty : "—"}</td>
-                      <td style={{ padding: "7px 12px" }}>
-                        <select value={r.status} onChange={e => updateRequestStatus(r.id, e.target.value)}
-                          style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: STATUS_COLORS[r.status] || "white", color: STATUS_TEXT[r.status] || "#333", cursor: "pointer" }}>
-                          {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                        </select>
-                      </td>
-                      <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{r.note || "—"}</td>
+          ) : cycles.map(cycle => {
+            const cycleRecord = reqCycles.find(c => c.cycle_label === cycle);
+            const isArchived = cycleRecord?.archived === true;
+            const isExpanded = expandedArchivedCycles.has(cycle);
+
+            if (isArchived && !isExpanded) {
+              const archivedAt = cycleRecord.archived_at
+                ? new Date(cycleRecord.archived_at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" })
+                : "—";
+              return (
+                <div key={cycle} onClick={() => setExpandedArchivedCycles(prev => { const next = new Set(prev); next.add(cycle); return next; })}
+                  style={{ marginBottom: 8, padding: "10px 16px", background: "#f5f5f5", borderRadius: 8, border: "1px solid #e0e0e0", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
+                  <span style={{ fontSize: 13, color: "#888" }}>📦 Заказ «{cycle}» — от {archivedAt}</span>
+                  <span style={{ fontSize: 12, color: "#7c3aed", fontWeight: 500 }}>Развернуть ▸</span>
+                </div>
+              );
+            }
+
+            return (
+              <div key={cycle} style={{ marginBottom: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, padding: "6px 0", borderBottom: `2px solid ${isArchived ? "#bbb" : "#7c3aed"}` }}>
+                  <span style={{ fontWeight: 700, fontSize: 14, color: isArchived ? "#999" : "#333" }}>{cycle}</span>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {!isArchived && (
+                      <button onClick={() => archiveCycle(cycle)} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid #bbb", background: "#f5f5f5", cursor: "pointer", color: "#555" }}>✅ Заказ выполнен</button>
+                    )}
+                    {isArchived && isExpanded && (
+                      <button onClick={() => unarchiveCycle(cycle)} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid #4caf50", background: "#e8f5e9", cursor: "pointer", color: "#27ae60" }}>↩️ Вернуть в работу</button>
+                    )}
+                    <button onClick={() => copyRequestText(cycle)} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#555" }}>📋 Скопировать текстом</button>
+                    {isArchived && isExpanded && (
+                      <button onClick={() => setExpandedArchivedCycles(prev => { const next = new Set(prev); next.delete(cycle); return next; })} style={{ fontSize: 12, padding: "3px 10px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#888" }}>Свернуть</button>
+                    )}
+                  </div>
+                </div>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
+                      <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Материал</th>
+                      <th style={{ padding: "6px 12px", textAlign: "right", fontWeight: 500 }}>Нужно</th>
+                      <th style={{ padding: "6px 12px", textAlign: "right", fontWeight: 500 }}>В наличии</th>
+                      <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Статус</th>
+                      <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Заметка</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ))}
+                  </thead>
+                  <tbody>
+                    {reqByCycle[cycle].map(r => (
+                      <tr key={r.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
+                        <td style={{ padding: "7px 12px" }}>{reqMatName(r)}</td>
+                        <td style={{ padding: "7px 12px", textAlign: "right" }}>{r.needed_qty}</td>
+                        <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{r.available_qty != null ? r.available_qty : "—"}</td>
+                        <td style={{ padding: "7px 12px" }}>
+                          <select value={r.status} onChange={e => updateRequestStatus(r.id, e.target.value)}
+                            style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: STATUS_COLORS[r.status] || "white", color: STATUS_TEXT[r.status] || "#333", cursor: "pointer" }}>
+                            {Object.entries(STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{r.note || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       )}
 
