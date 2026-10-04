@@ -1,3 +1,5 @@
+import { effectiveEndDate } from "./subscriptionMonths.js";
+
 export function exportToExcel(clients) {
   const headers = [
     'Имя', 'Контакт', 'Источник', 'Стадия', 'Абонемент',
@@ -9,7 +11,7 @@ export function exportToExcel(clients) {
   const rows = clients.map(c => {
     const lessonsLeft = c.is_unlimited ? 'Безлимит' : Math.max(0, (c.lessons_total||0) - (c.lessons_used||0))
     const freezeLeft = (c.freeze_days_total||0) - (c.freeze_days_used||0)
-    const endDate = c.subscription_end_with_freeze || c.subscription_end
+    const endDate = effectiveEndDate(c)
     return [
       c.name || '',
       c.phone || '',

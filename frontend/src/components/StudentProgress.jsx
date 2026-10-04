@@ -84,7 +84,9 @@ export default function StudentProgress({ client, authorName }) {
   const monthCountFromType = client.subscription_type ? (SUB_MONTHS[client.subscription_type] ?? null) : null;
   let monthCount = monthCountFromType;
   let monthCountFromDates = false;
-  if (monthCount === null && client.subscription_start && client.subscription_end) {
+  if (monthCount === null && client.subscription_months && client.subscription_months > 0) {
+    monthCount = client.subscription_months;
+  } else if (monthCount === null && client.subscription_start && client.subscription_end) {
     const start = new Date(client.subscription_start);
     const end = new Date(client.subscription_end);
     const diffDays = (end - start) / (1000 * 60 * 60 * 24);

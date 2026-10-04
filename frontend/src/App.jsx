@@ -45,6 +45,7 @@ import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
 import ContractBlock from "./components/ContractBlock.jsx";
 import LearningStrategy from "./components/LearningStrategy.jsx";
 import StudentProgress from "./components/StudentProgress.jsx";
+import { effectiveEndDate } from "./subscriptionMonths.js";
 import Schedule from "./Schedule.jsx";
 import TrialSchedule from "./TrialSchedule.jsx";
 import TeamOnline from "./TeamOnline.jsx";
@@ -519,7 +520,7 @@ export default function App() {
                   }).map(c => {
                     const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
                     const freezeLeft = (c.freeze_days_total||0)-(c.freeze_days_used||0);
-                    const endDate = c.subscription_end_with_freeze || c.subscription_end;
+                    const endDate = effectiveEndDate(c);
                     return (
                       <tr key={c.id} onClick={() => handleClientSelect(c.id)}
                         style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer', background: c.id === selectedId ? '#f0f7ff' : 'white' }}>

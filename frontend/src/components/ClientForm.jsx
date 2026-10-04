@@ -109,6 +109,9 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     freeze_days_total: initialValue?.freeze_days_total || 0,
     freeze_days_used: initialValue?.freeze_days_used || 0,
     subscription_start: initialValue?.subscription_start || "",
+    subscription_end: initialValue?.subscription_end || "",
+    subscription_end_with_freeze: initialValue?.subscription_end_with_freeze || "",
+    subscription_months: initialValue?.subscription_months || "",
     is_unlimited: initialValue?.is_unlimited || false,
   })
   const [phoneError, setPhoneError] = React.useState("")
@@ -153,12 +156,15 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       freeze_days_total: initialValue?.freeze_days_total || 0,
       freeze_days_used: initialValue?.freeze_days_used || 0,
       subscription_start: initialValue?.subscription_start || "",
+      subscription_end: initialValue?.subscription_end || "",
+      subscription_end_with_freeze: initialValue?.subscription_end_with_freeze || "",
+      subscription_months: initialValue?.subscription_months || "",
       is_unlimited: initialValue?.is_unlimited || false,
     })
     setPhoneError("")
     setShowCustomSub(false)
     if (initialValue?.subscription_type === 'Индивидуальные условия') {
-      setCustomSub({ months: '', lessons: initialValue.lessons_total || '', freeze: initialValue.freeze_days_total || '' })
+      setCustomSub({ months: initialValue?.subscription_months || '', lessons: initialValue?.lessons_total || '', freeze: initialValue?.freeze_days_total || '' })
     }
   }, [initialValue?.id, JSON.stringify(initialValue)])
 
@@ -180,6 +186,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       lessons_total: sub.lessons,
       freeze_days_total: sub.freeze,
       is_unlimited: sub.unlimited,
+      subscription_months: sub.months || null,
     }))
   }
 
@@ -188,13 +195,15 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     const lessons = Number(customSub.lessons) || 0
     const freeze = Number(customSub.freeze) || 0
     const end = months && form.subscription_start ? addMonths(form.subscription_start, months) : ''
+    const endWithFreeze = end && Number(form.freeze_days_used) > 0 ? addDays(end, Number(form.freeze_days_used)) : end
     setForm(f => ({
       ...f,
       lessons_total: lessons,
       freeze_days_total: freeze,
       is_unlimited: false,
       subscription_end: end,
-      subscription_end_with_freeze: end,
+      subscription_end_with_freeze: endWithFreeze,
+      subscription_months: months || f.subscription_months,
     }))
     setShowCustomSub(false)
   }
@@ -203,15 +212,23 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
     const start = e.target.value
     const sub = SUBSCRIPTIONS.find(s => s.name === form.subscription_type)
     let end = ''
+    let newMonths = undefined
     if (start) {
       if (sub) {
-        if (sub.months) end = addMonths(start, sub.months)
+        if (sub.months) { end = addMonths(start, sub.months); newMonths = sub.months }
         else if (sub.days) end = addDays(start, sub.days)
-      } else if (form.subscription_type === 'Индивидуальные условия' && Number(customSub.months) > 0) {
-        end = addMonths(start, Number(customSub.months))
+      } else if (form.subscription_type === 'Индивидуальные условия' && Number(form.subscription_months) > 0) {
+        end = addMonths(start, Number(form.subscription_months))
       }
     }
-    setForm(f => ({ ...f, subscription_start: start, subscription_end: end, subscription_end_with_freeze: end }))
+    const endWithFreeze = end && Number(form.freeze_days_used) > 0 ? addDays(end, Number(form.freeze_days_used)) : end
+    setForm(f => ({
+      ...f,
+      subscription_start: start,
+      subscription_end: end,
+      subscription_end_with_freeze: endWithFreeze,
+      ...(newMonths !== undefined ? { subscription_months: newMonths } : {}),
+    }))
   }
 
   function isLink(value) {
@@ -274,6 +291,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       subscription_start: form.subscription_start || null,
       subscription_end: form.subscription_end || null,
       subscription_end_with_freeze: form.subscription_end_with_freeze || null,
+      subscription_months: form.subscription_months ? Number(form.subscription_months) : null,
       is_unlimited: form.is_unlimited,
     })
   }
@@ -398,6 +416,25 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
             <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>
               {form.is_unlimited ? 'Безлимит' : `${form.lessons_total} занятий`}
               {form.freeze_days_total > 0 && ` · заморозка ${form.freeze_days_total} дн`}
+            </div>
+          )}
+          {form.subscription_type === 'Индивидуальные условия' && !showCustomSub && !disabled && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Срок (месяцев)</div>
+              <input type="number" min="1" value={form.subscription_months}
+                onChange={e => {
+                  const months = e.target.value
+                  let end = ''
+                  if (months && form.subscription_start) end = addMonths(form.subscription_start, Number(months))
+                  const endWithFreeze = end && Number(form.freeze_days_used) > 0 ? addDays(end, Number(form.freeze_days_used)) : end
+                  setForm(f => ({ ...f, subscription_months: months, subscription_end: end, subscription_end_with_freeze: endWithFreeze }))
+                }}
+                style={{ width: 80, padding: '4px 8px', borderRadius: 5, border: '1px solid #ddd', fontSize: 13 }} />
+              {!form.subscription_months && (
+                <div style={{ fontSize: 11, color: '#e67e22', marginTop: 3 }}>
+                  Укажите срок в месяцах — без него не считается дата окончания абонемента
+                </div>
+              )}
             </div>
           )}
         </div>

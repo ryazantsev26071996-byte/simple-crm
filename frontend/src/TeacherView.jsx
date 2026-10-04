@@ -1,40 +1,7 @@
 import React from "react";
-import { SUB_MONTHS } from "./subscriptionMonths.js";
+import { effectiveEndDate } from "./subscriptionMonths.js";
 
 const TEACHER_STAGES = ['ученик', 'пробный месяц', 'тест-драйв']
-const SUB_DAYS = {
-  'Тест-драйв': 7,
-  'Пробный месяц': 30,
-  '8 занятий': 30,
-}
-
-function calcEndDate(start, type) {
-  if (!start || !type) return null
-  const d = new Date(start)
-  if (SUB_MONTHS[type]) { d.setMonth(d.getMonth() + SUB_MONTHS[type]); return d.toISOString().slice(0,10) }
-  if (SUB_DAYS[type])   { d.setDate(d.getDate() + SUB_DAYS[type]);     return d.toISOString().slice(0,10) }
-  return null
-}
-
-function effectiveEnd(c) {
-  if (c.subscription_end_with_freeze) return c.subscription_end_with_freeze;
-  if (c.subscription_end) {
-    if (c.freeze_days_used > 0) {
-      const d = new Date(c.subscription_end);
-      d.setDate(d.getDate() + (c.freeze_days_used || 0));
-      return d.toISOString().slice(0, 10);
-    }
-    return c.subscription_end;
-  }
-  const base = calcEndDate(c.subscription_start, c.subscription_type);
-  if (!base) return null;
-  if (c.freeze_days_used > 0) {
-    const d = new Date(base);
-    d.setDate(d.getDate() + (c.freeze_days_used || 0));
-    return d.toISOString().slice(0, 10);
-  }
-  return base;
-}
 
 function daysLeft(endDate) {
   if (!endDate) return null
@@ -66,8 +33,8 @@ export function TeacherView({ clients, onClientSelect }) {
         aVal = a.is_unlimited ? 9999 : Math.max(0, (a.lessons_total||0)-(a.lessons_used||0))
         bVal = b.is_unlimited ? 9999 : Math.max(0, (b.lessons_total||0)-(b.lessons_used||0))
       } else if (sortField === 'days_left') {
-        aVal = daysLeft(effectiveEnd(a)) ?? 9999
-        bVal = daysLeft(effectiveEnd(b)) ?? 9999
+        aVal = daysLeft(effectiveEndDate(a)) ?? 9999
+        bVal = daysLeft(effectiveEndDate(b)) ?? 9999
       } else if (sortField === 'last_visit') {
         aVal = a.last_visit || ''
         bVal = b.last_visit || ''
@@ -189,7 +156,7 @@ export function TeacherView({ clients, onClientSelect }) {
             <tbody>
               {filtered.map(c => {
                 const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0))
-                const endDate = effectiveEnd(c)
+                const endDate = effectiveEndDate(c)
                 const days = daysLeft(endDate)
                 const isCalc = !c.subscription_end_with_freeze && !c.subscription_end && !!endDate
                 const daysColor = days !== null ? (days < 7 ? '#e55' : days < 30 ? '#f90' : '#2a9') : '#aaa'
