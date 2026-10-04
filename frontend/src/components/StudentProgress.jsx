@@ -81,7 +81,16 @@ export default function StudentProgress({ client, authorName }) {
 
   React.useEffect(() => { loadData(client.id); }, [client.id]);
 
-  const monthCount = client.subscription_type ? (SUB_MONTHS[client.subscription_type] ?? null) : null;
+  const monthCountFromType = client.subscription_type ? (SUB_MONTHS[client.subscription_type] ?? null) : null;
+  let monthCount = monthCountFromType;
+  let monthCountFromDates = false;
+  if (monthCount === null && client.subscription_start && client.subscription_end) {
+    const start = new Date(client.subscription_start);
+    const end = new Date(client.subscription_end);
+    const diffDays = (end - start) / (1000 * 60 * 60 * 24);
+    monthCount = Math.max(1, Math.round(diffDays / 30.44));
+    monthCountFromDates = true;
+  }
 
   async function handleArtsquizToggle(checked) {
     if (checked) {
@@ -236,10 +245,16 @@ export default function StudentProgress({ client, authorName }) {
           <div style={{ color: "#aaa", fontSize: 12 }}>Загрузка...</div>
         ) : monthCount === null ? (
           <div style={{ fontSize: 13, color: "#aaa" }}>
-            Абонемент не указан или неизвестен — месяцы не определены
+            Не указан абонемент или даты его начала/окончания — месяцы не определены
           </div>
         ) : (
-          Array.from({ length: monthCount }, (_, i) => i + 1).map(monthNo => {
+          <>
+          {monthCountFromDates && (
+            <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>
+              Месяцев определено по датам абонемента: {monthCount}
+            </div>
+          )}
+          {Array.from({ length: monthCount }, (_, i) => i + 1).map(monthNo => {
             const review = monthReviews.find(r => r.month_no === monthNo);
             const isDone = !!review;
             const isEditing = editingMonth === monthNo;
@@ -306,7 +321,8 @@ export default function StudentProgress({ client, authorName }) {
                 )}
               </div>
             );
-          })
+          })}
+          </>
         )}
       </div>
     </div>
