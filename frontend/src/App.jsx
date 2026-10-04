@@ -44,6 +44,7 @@ import { exportToExcel } from "./ExportExcel.jsx";
 import StudentInfoBlock from "./components/StudentInfoBlock.jsx";
 import ContractBlock from "./components/ContractBlock.jsx";
 import LearningStrategy from "./components/LearningStrategy.jsx";
+import StudentProgress from "./components/StudentProgress.jsx";
 import Schedule from "./Schedule.jsx";
 import TrialSchedule from "./TrialSchedule.jsx";
 import TeamOnline from "./TeamOnline.jsx";
@@ -624,6 +625,10 @@ export default function App() {
             )}
             {['ученик', 'пробный месяц', 'тест-драйв'].includes(selectedClient?.stage) && (
               <LearningStrategy client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
+            )}
+
+            {(String(selectedClient?.stage || '').trim().toLowerCase() === 'ученик' || selectedClient?.subscription_type) && (
+              <StudentProgress client={selectedClient} authorName={authorName} />
             )}
 
             <div style={{ marginTop: 16, height: 'calc(100vh - 300px)', display: 'flex', flexDirection: 'column' }}>
