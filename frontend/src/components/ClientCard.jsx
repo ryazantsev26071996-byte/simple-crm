@@ -23,6 +23,7 @@ import CommentsWall from "./CommentsWall.jsx";
 import StudentInfoBlock from "./StudentInfoBlock.jsx";
 import ContractBlock from "./ContractBlock.jsx";
 import LearningStrategy from "./LearningStrategy.jsx";
+import StudentProgress from "./StudentProgress.jsx";
 import { createComment, getComments, updateClient, getNextContractNumber } from "../api.js";
 import { supabase } from "../supabase";
 import MailingsPopup from "./MailingsPopup.jsx";
@@ -204,6 +205,10 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
 
         {['ученик', 'пробный месяц', 'тест-драйв'].includes(client.stage) && (
           <LearningStrategy client={client} role={role} onUpdate={onUpdate} />
+        )}
+
+        {(client.stage?.trim().toLowerCase() === 'ученик' || !!client.subscription_type) && (
+          <StudentProgress client={client} authorName={authorName} />
         )}
 
         <div style={{ marginTop: 16, minHeight: 300, display: 'flex', flexDirection: 'column' }}>
