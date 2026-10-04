@@ -161,9 +161,10 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         teacher: entry.teacher || "", recorded_by: entry.recorded_by || "",
         lesson_type: entry.lesson_type || "", comment: entry.comment || "",
         lesson_comment: "", attended: entry.attended, walk_in: entry.walk_in || false,
+        digital_drawing: entry.digital_drawing || false,
       });
     } else {
-      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false });
+      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false, digital_drawing: false });
       try {
         const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role`);
         if (Array.isArray(ws) && ws.length > 0) {
@@ -190,7 +191,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
       return;
     }
-    if (userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0) {
+    if (userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0 && !form.digital_drawing) {
       alert('Добавьте хотя бы один материал, использованный на занятии — это обязательно при отметке "Пришёл"');
       return;
     }
@@ -214,6 +215,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       teacher: form.teacher || null, recorded_by: form.recorded_by || null,
       lesson_type: form.lesson_type || null, comment: form.comment || null,
       attended: form.attended, walk_in: form.walk_in || false,
+      digital_drawing: form.digital_drawing || false,
       subscription_type: form.client_id ? (activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || null) : null,
     };
     try {
@@ -450,6 +452,9 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
               <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
                 <input type="checkbox" checked={form.walk_in} onChange={e=>setForm(f=>({...f,walk_in:e.target.checked}))} /> 🚶 Без записи
               </label>
+              <label style={{display:"flex",alignItems:"center",gap:6,fontSize:13,cursor:"pointer"}}>
+                <input type="checkbox" checked={form.digital_drawing||false} onChange={e=>setForm(f=>({...f,digital_drawing:e.target.checked}))} /> 🖥️ Цифровой рисунок
+              </label>
             </div>
 
             {(form.attended===true||form.attended===false)&&(
@@ -465,10 +470,10 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
               </div>
             )}
 
-            {form.attended===true&&(
-              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:`1px solid ${usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"#e55":"#eee"}`}}>
-                <div style={{fontSize:12,fontWeight:600,color:usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"#e55":"#555",marginBottom:8}}>
-                  Материалы, использованные на занятии {usedMaterials.length===0&&userEmail!=='crm@artschool.ru'?"* (обязательно)":""}
+            {form.attended===true&&(()=>{const matRequired=usedMaterials.length===0&&userEmail!=='crm@artschool.ru'&&!form.digital_drawing;return(
+              <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:`1px solid ${matRequired?"#e55":"#eee"}`}}>
+                <div style={{fontSize:12,fontWeight:600,color:matRequired?"#e55":"#555",marginBottom:8}}>
+                  Материалы, использованные на занятии {matRequired?"* (обязательно)":form.digital_drawing?"(необязательно — цифровое занятие)":""}
                 </div>
                 <div style={{fontSize:11,color:"#aaa",marginBottom:8,lineHeight:1.4}}>Указывайте только то, что реально израсходовано сегодня: новый лист бумаги или холст, который взяли, или сколько краски выдавили из тюбика. Не нужно отмечать материалы, которые просто лежат на столе, но не тратились.</div>
                 {usedMaterials.map((um, idx) => (
@@ -528,7 +533,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                   )}
                 </div>
               </div>
-            )}
+            );})()}
 
             <div style={{display:"flex",gap:8}}>
               <button onClick={handleSave} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
