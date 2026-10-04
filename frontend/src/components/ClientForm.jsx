@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase } from '../supabase'
 import { useClientStages } from '../hooks/useClientStages.js'
+import { getSubscriptionMonths } from '../subscriptionMonths.js'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -203,7 +204,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       is_unlimited: false,
       subscription_end: end,
       subscription_end_with_freeze: endWithFreeze,
-      subscription_months: months || f.subscription_months,
+      subscription_months: months || '',
     }))
     setShowCustomSub(false)
   }
@@ -413,27 +414,26 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
             </div>
           )}
           {form.subscription_type && !showCustomSub && (
-            <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>
-              {form.is_unlimited ? 'Безлимит' : `${form.lessons_total} занятий`}
-              {form.freeze_days_total > 0 && ` · заморозка ${form.freeze_days_total} дн`}
-            </div>
-          )}
-          {form.subscription_type === 'Индивидуальные условия' && !showCustomSub && !disabled && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 11, color: '#888', marginBottom: 3 }}>Срок (месяцев)</div>
-              <input type="number" min="1" value={form.subscription_months}
-                onChange={e => {
-                  const months = e.target.value
-                  let end = ''
-                  if (months && form.subscription_start) end = addMonths(form.subscription_start, Number(months))
-                  const endWithFreeze = end && Number(form.freeze_days_used) > 0 ? addDays(end, Number(form.freeze_days_used)) : end
-                  setForm(f => ({ ...f, subscription_months: months, subscription_end: end, subscription_end_with_freeze: endWithFreeze }))
-                }}
-                style={{ width: 80, padding: '4px 8px', borderRadius: 5, border: '1px solid #ddd', fontSize: 13 }} />
-              {!form.subscription_months && (
-                <div style={{ fontSize: 11, color: '#e67e22', marginTop: 3 }}>
-                  Укажите срок в месяцах — без него не считается дата окончания абонемента
-                </div>
+            <div style={{ fontSize: 11, color: '#888', marginTop: 3, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+              <span>
+                {form.is_unlimited ? 'Безлимит' : `${form.lessons_total} занятий`}
+                {form.freeze_days_total > 0 && ` · заморозка ${form.freeze_days_total} дн`}
+                {(form.subscription_months || getSubscriptionMonths(form.subscription_type))
+                  ? ` · ${form.subscription_months || getSubscriptionMonths(form.subscription_type)} мес.`
+                  : null}
+              </span>
+              {form.subscription_type === 'Индивидуальные условия' && !form.subscription_months && (
+                <span style={{ color: '#e67e22' }}>· срок не указан</span>
+              )}
+              {form.subscription_type === 'Индивидуальные условия' && !disabled && (
+                <button type="button"
+                  onClick={() => {
+                    setCustomSub({ months: form.subscription_months || '', lessons: form.lessons_total || '', freeze: form.freeze_days_total || '' })
+                    setShowCustomSub(true)
+                  }}
+                  style={{ fontSize: 11, padding: '1px 7px', borderRadius: 4, border: '1px solid #ccc', background: 'white', cursor: 'pointer', color: '#555' }}>
+                  ✏️ Изменить условия
+                </button>
               )}
             </div>
           )}
