@@ -1,4 +1,5 @@
-export const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+// Округление до сотых. Имя round1 оставлено, чтобы не править все места использования.
+export const round1 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 export const fmtQty = (n) => (n === null || n === undefined || n === '') ? '—' : String(round1(n));
 export const stockValue = (m) => round1((Number(m.qty_full) || 0) * 1 + (Number(m.qty_half) || 0) * 0.5 + (Number(m.qty_almost_empty) || 0) * 0.25);
 export const isLow = (m) => m.min_threshold !== null && m.min_threshold !== undefined && m.min_threshold !== '' && stockValue(m) <= Number(m.min_threshold);
