@@ -4,15 +4,20 @@ import { useAuth } from "./AuthContext";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const EMPLOYEES = {
+const ACTIVE_EMPLOYEES = {
   "Аккаунты":  [],
   "Менеджеры": ["Татьяна", "Салампи"],
-  "Педагоги":  ["Юлия", "Екатерина", "Александра", "Софья", "Анастасия", "Дарья"],
+  "Педагоги":  ["Юлия", "Екатерина", "Александра", "Александра Ф", "Дарья"],
+};
+const ALL_EMPLOYEES = {
+  ...ACTIVE_EMPLOYEES,
+  "Педагоги": [...ACTIVE_EMPLOYEES["Педагоги"], "Софья", "Анастасия"],
 };
 
 const EMPLOYEE_ROLE = {
   "Татьяна": "Менеджеры", "Салампи": "Менеджеры",
   "Юлия": "Педагоги", "Екатерина": "Педагоги", "Александра": "Педагоги",
+  "Александра Ф": "Педагоги",
   "Софья": "Педагоги", "Анастасия": "Педагоги", "Дарья": "Педагоги",
 };
 
@@ -100,6 +105,12 @@ export default function WorkSchedule() {
   const [managerPlans,  setManagerPlans]  = React.useState({});
   const [salaryLoading, setSalaryLoading] = React.useState(false);
 
+  const nowY = now.getFullYear();
+  const nowM = now.getMonth() + 1;
+  const isPast = year < nowY || (year === nowY && month < nowM);
+  // For display (calendar, totals, salary): show retired staff in past months
+  const EMPLOYEES = isPast ? ALL_EMPLOYEES : ACTIVE_EMPLOYEES;
+
   const prevMonth = month === 1 ? 12 : month - 1;
   const prevYear  = month === 1 ? year - 1 : year;
 
@@ -171,7 +182,7 @@ export default function WorkSchedule() {
     if (role !== 'admin' && role !== 'supervisor') return;
     const dateStr = dateFmt(year, month, day);
     const form = {};
-    for (const names of Object.values(EMPLOYEES)) {
+    for (const names of Object.values(ACTIVE_EMPLOYEES)) {
       for (const emp of names) {
         const ent = data[`${dateStr}_${emp}`];
         const defaultStart = EMPLOYEE_ROLE[emp] === "Аккаунты" ? "11:00" : "10:00";
@@ -188,7 +199,7 @@ export default function WorkSchedule() {
     const dateStr = modal.date;
     try {
       await Promise.all(
-        Object.values(EMPLOYEES).flat().map(emp => {
+        Object.values(ACTIVE_EMPLOYEES).flat().map(emp => {
           const f = modalForm[emp] || {};
           const hasExisting = !!data[`${dateStr}_${emp}`];
           if (f.checked) {
@@ -582,7 +593,7 @@ export default function WorkSchedule() {
               <button onClick={() => setModal(null)} style={{ fontSize: 22, background: "none", border: "none", cursor: "pointer", color: "#888", lineHeight: 1 }}>×</button>
             </div>
 
-            {Object.entries(EMPLOYEES).map(([role, names]) => (
+            {Object.entries(ACTIVE_EMPLOYEES).map(([role, names]) => (
               <div key={role} style={{ marginBottom: 18 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: ROLE_COLOR[role], textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 8 }}>
                   {role}
