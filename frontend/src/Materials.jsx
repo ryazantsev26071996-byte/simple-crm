@@ -1,6 +1,6 @@
 import React from "react";
 import { useAuth } from "./AuthContext";
-import { round1, fmtQty, stockValue, isLow, lowAction } from "./materialsUtils.js";
+import { round1, fmtQty, stockValue, isLow, lowAction, normName } from "./materialsUtils.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -65,6 +65,10 @@ export default function Materials({ isOwner = true }) {
   const [materials, setMaterials] = React.useState([]);
   const [matLoading, setMatLoading] = React.useState(false);
   const [matSearch, setMatSearch] = React.useState("");
+  const [groupBy, setGroupBy] = React.useState("brand");
+  const [filterLow, setFilterLow] = React.useState(false);
+  const [filterReserve, setFilterReserve] = React.useState(false);
+  const [filterWarehouse, setFilterWarehouse] = React.useState(false);
 
   // add material modal
   const [showAddMat, setShowAddMat] = React.useState(false);
@@ -185,7 +189,7 @@ export default function Materials({ isOwner = true }) {
 
   async function loadAllMaterials() {
     try {
-      const data = await apiFetch("materials?order=name.asc&select=id,name,category_id,unit");
+      const data = await apiFetch("materials?order=name.asc&select=id,name,category_id,unit,brand,color_number,qty_full,qty_half,qty_almost_empty,qty_reserve,qty_warehouse,min_threshold,category:material_categories(name)");
       setAllMaterials(Array.isArray(data) ? data : []);
     } catch (e) { console.error(e); }
   }
@@ -489,14 +493,30 @@ export default function Materials({ isOwner = true }) {
   const warehouseCount = lowMats.filter(m => lowAction(m) === 'warehouse').length;
   const reserveCount = lowMats.filter(m => lowAction(m) === 'reserve').length;
 
-  const filteredMats = materials.filter(m => {
-    if (!matSearch) return true;
-    return m.name.toLowerCase().includes(matSearch.toLowerCase()) ||
-      (m.color_number || "").toLowerCase().includes(matSearch.toLowerCase()) ||
-      (m.brand || "").toLowerCase().includes(matSearch.toLowerCase());
-  });
+  const filteredMats = React.useMemo(() => {
+    let list = materials;
+    if (filterLow) list = list.filter(isLow);
+    if (filterReserve) list = list.filter(m => Number(m.qty_reserve) > 0);
+    if (filterWarehouse) list = list.filter(m => Number(m.qty_warehouse) > 0);
+    return list;
+  }, [materials, filterLow, filterReserve, filterWarehouse]);
 
-  // Group filteredMats by brand when category has brands
+  const globalSearchActive = matSearch.trim().length > 0;
+
+  const globalSearchResults = React.useMemo(() => {
+    if (!matSearch.trim()) return [];
+    const q = normName(matSearch);
+    let list = allMaterials.filter(m =>
+      normName(m.name).includes(q) ||
+      normName(m.color_number || '').includes(q) ||
+      normName(m.brand || '').includes(q)
+    );
+    if (filterLow) list = list.filter(isLow);
+    if (filterReserve) list = list.filter(m => Number(m.qty_reserve) > 0);
+    if (filterWarehouse) list = list.filter(m => Number(m.qty_warehouse) > 0);
+    return list;
+  }, [allMaterials, matSearch, filterLow, filterReserve, filterWarehouse]);
+
   const brandGroups = React.useMemo(() => {
     if (!catHasBrand) return null;
     const groupMap = {};
@@ -506,11 +526,22 @@ export default function Materials({ isOwner = true }) {
       if (!groupMap[key]) { groupMap[key] = { brand: m.brand || null, mats: [] }; groupOrder.push(key); }
       groupMap[key].mats.push(m);
     });
-    // Put "no brand" group last
     const noBrand = groupOrder.includes("__no_brand__") ? ["__no_brand__"] : [];
     const withBrand = groupOrder.filter(k => k !== "__no_brand__");
     return [...withBrand, ...noBrand].map(k => groupMap[k]);
   }, [filteredMats, catHasBrand]);
+
+  const colorGroups = React.useMemo(() => {
+    const sourceList = globalSearchActive ? globalSearchResults : filteredMats;
+    const groupMap = {};
+    const groupOrder = [];
+    sourceList.forEach(m => {
+      const key = normName(m.name);
+      if (!groupMap[key]) { groupMap[key] = { colorName: m.name, key, mats: [] }; groupOrder.push(key); }
+      groupMap[key].mats.push(m);
+    });
+    return groupOrder.map(k => groupMap[k]);
+  }, [globalSearchActive, globalSearchResults, filteredMats]);
 
   async function saveInlineMin(mat) {
     const val = inlineMinVal.trim() === "" ? null : Number(inlineMinVal);
@@ -633,199 +664,330 @@ export default function Materials({ isOwner = true }) {
       </div>
 
       {tab === "Справочник" && (
-        <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-          {/* Left: categories */}
-          <div style={{ width: 220, borderRight: "1px solid #eee", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
-            <div style={{ padding: "10px 12px", borderBottom: "1px solid #f0f0f0", fontWeight: 600, fontSize: 13, color: "#555" }}>Категории</div>
-            <div style={{ flex: 1, overflowY: "auto" }}>
-              {categories.map(cat => (
-                <div key={cat.id} onClick={() => setSelectedCat(cat.id)}
-                  style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, background: selectedCat === cat.id ? "#f5f3ff" : "white", color: selectedCat === cat.id ? "#7c3aed" : "#333", fontWeight: selectedCat === cat.id ? 600 : 400, borderLeft: selectedCat === cat.id ? "3px solid #7c3aed" : "3px solid transparent" }}>
-                  {cat.name}
-                </div>
-              ))}
-            </div>
-            <div style={{ padding: 10, borderTop: "1px solid #f0f0f0" }}>
-              {addingCat ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") setAddingCat(false); }}
-                    placeholder="Название категории" autoFocus
-                    style={{ ...inputStyle }} />
-                  <div style={{ display: "flex", gap: 4 }}>
-                    <button onClick={addCategory} style={{ flex: 1, fontSize: 12, padding: "5px 0", borderRadius: 5, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>Добавить</button>
-                    <button onClick={() => { setAddingCat(false); setNewCatName(""); }} style={{ flex: 1, fontSize: 12, padding: "5px 0", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>Отмена</button>
-                  </div>
-                </div>
-              ) : (
-                <button onClick={() => setAddingCat(true)} style={{ width: "100%", fontSize: 12, padding: "6px 0", borderRadius: 6, border: "1px dashed #bbb", background: "white", cursor: "pointer", color: "#888" }}>+ Категория</button>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+          {/* Глобальный поиск + группировка + фильтры */}
+          <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 8, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+            <div style={{ position: "relative", flex: "1 1 260px", maxWidth: 440 }}>
+              <input value={matSearch} onChange={e => setMatSearch(e.target.value)}
+                placeholder="Найти материал по названию, номеру цвета или производителю…"
+                style={{ ...inputStyle, paddingRight: matSearch ? 30 : 10 }} />
+              {matSearch && (
+                <button onClick={() => setMatSearch("")}
+                  style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", lineHeight: 1, padding: 0 }}>×</button>
               )}
             </div>
+            <div style={{ display: "flex" }}>
+              <button onClick={() => setGroupBy("brand")}
+                style={{ fontSize: 12, padding: "5px 10px", borderRadius: "5px 0 0 5px", border: `1px solid ${groupBy === "brand" ? "#7c3aed" : "#ddd"}`, background: groupBy === "brand" ? "#f5f3ff" : "white", color: groupBy === "brand" ? "#7c3aed" : "#666", cursor: "pointer" }}>
+                По производителю
+              </button>
+              <button onClick={() => setGroupBy("color")}
+                style={{ fontSize: 12, padding: "5px 10px", borderRadius: "0 5px 5px 0", border: `1px solid ${groupBy === "color" ? "#7c3aed" : "#ddd"}`, borderLeft: "none", background: groupBy === "color" ? "#f5f3ff" : "white", color: groupBy === "color" ? "#7c3aed" : "#666", cursor: "pointer" }}>
+                По цвету
+              </button>
+            </div>
+            {[
+              { key: "low", label: "Только мало", active: filterLow, set: setFilterLow },
+              { key: "reserve", label: "Есть в запасе", active: filterReserve, set: setFilterReserve },
+              { key: "warehouse", label: "Есть на складе", active: filterWarehouse, set: setFilterWarehouse },
+            ].map(f => (
+              <button key={f.key} onClick={() => f.set(v => !v)}
+                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 12, border: `1px solid ${f.active ? "#7c3aed" : "#ddd"}`, background: f.active ? "#f5f3ff" : "white", color: f.active ? "#7c3aed" : "#666", cursor: "pointer" }}>
+                {f.label}
+              </button>
+            ))}
+            {globalSearchActive && <span style={{ fontSize: 12, color: "#888" }}>Найдено: {globalSearchResults.length}</span>}
           </div>
 
-          {/* Right: materials table */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            {selectedCat ? (
-              <>
-                <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
-                  <input value={matSearch} onChange={e => setMatSearch(e.target.value)}
-                    placeholder="Поиск по названию или номеру цвета..."
-                    style={{ ...inputStyle, width: 280, flex: "0 0 auto" }} />
-                  {(buyCount > 0 || warehouseCount > 0 || reserveCount > 0) && (
-                    <span style={{ fontSize: 12, background: "#fff0f0", color: "#c0392b", border: "1px solid #fcc", borderRadius: 12, padding: "3px 10px", fontWeight: 600 }}>
-                      {[buyCount > 0 && `Купить: ${buyCount}`, warehouseCount > 0 && `Со склада: ${warehouseCount}`, reserveCount > 0 && `Из запаса: ${reserveCount}`].filter(Boolean).join(' · ')}
-                    </span>
-                  )}
-                  <button onClick={() => setShowEditMode(v => !v)}
-                    style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
-                    ✏️ {showEditMode ? "Режим вкл." : "Режим редактирования"}
-                  </button>
-                  <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
-                    style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
-                    📝 Инвентаризация
-                  </button>
-                  <button onClick={() => setShowAddMat(true)}
-                    style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
-                    + Материал
-                  </button>
-                </div>
+          <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+            {/* Left: categories */}
+            <div style={{ width: 220, borderRight: "1px solid #eee", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+              <div style={{ padding: "10px 12px", borderBottom: "1px solid #f0f0f0", fontWeight: 600, fontSize: 13, color: "#555" }}>Категории</div>
+              <div style={{ flex: 1, overflowY: "auto" }}>
+                {categories.map(cat => (
+                  <div key={cat.id} onClick={() => { setSelectedCat(cat.id); setMatSearch(""); }}
+                    style={{ padding: "9px 14px", cursor: "pointer", fontSize: 13, background: selectedCat === cat.id && !globalSearchActive ? "#f5f3ff" : "white", color: selectedCat === cat.id && !globalSearchActive ? "#7c3aed" : "#333", fontWeight: selectedCat === cat.id && !globalSearchActive ? 600 : 400, borderLeft: selectedCat === cat.id && !globalSearchActive ? "3px solid #7c3aed" : "3px solid transparent" }}>
+                    {cat.name}
+                  </div>
+                ))}
+              </div>
+              <div style={{ padding: 10, borderTop: "1px solid #f0f0f0" }}>
+                {addingCat ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") setAddingCat(false); }}
+                      placeholder="Название категории" autoFocus
+                      style={{ ...inputStyle }} />
+                    <div style={{ display: "flex", gap: 4 }}>
+                      <button onClick={addCategory} style={{ flex: 1, fontSize: 12, padding: "5px 0", borderRadius: 5, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>Добавить</button>
+                      <button onClick={() => { setAddingCat(false); setNewCatName(""); }} style={{ flex: 1, fontSize: 12, padding: "5px 0", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>Отмена</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setAddingCat(true)} style={{ width: "100%", fontSize: 12, padding: "6px 0", borderRadius: 6, border: "1px dashed #bbb", background: "white", cursor: "pointer", color: "#888" }}>+ Категория</button>
+                )}
+              </div>
+            </div>
 
+            {/* Right: materials table */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {globalSearchActive ? (
                 <div style={{ flex: 1, overflowY: "auto" }}>
-                  {matLoading ? (
-                    <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Загрузка...</div>
-                  ) : filteredMats.length === 0 ? (
-                    <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Нет материалов</div>
-                  ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                      <thead>
-                        <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
-                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Название</th>
-                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>№ цвета</th>
-                          {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
-                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ед.</th>
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Целых</th>
-                          {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
-                          {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
-                          {catHasReserve && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Запас</th>}
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>На складе</th>
-                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Мин.</th>
-                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Пересчёт</th>
-                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>
-                          <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500, whiteSpace: "nowrap" }}>Действия</th>
+                  {globalSearchResults.length === 0 ? (
+                    <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Ничего не найдено</div>
+                  ) : (() => {
+                    const renderGlobalRow = (mat) => {
+                      const action = lowAction(mat);
+                      const rowBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
+                      const catName = mat.category?.name || categories.find(c => c.id === mat.category_id)?.name || "—";
+                      return (
+                        <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: rowBg }}>
+                          <td style={{ padding: "7px 12px", fontWeight: action ? 600 : 400, color: action === 'buy' ? "#c0392b" : "#222" }}>
+                            {mat.name}
+                            {action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
+                            {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Из запаса ({fmtQty(mat.qty_reserve)})</span>}
+                            {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Со склада ({fmtQty(mat.qty_warehouse)})</span>}
+                          </td>
+                          <td style={{ padding: "7px 12px" }}>
+                            <button onClick={() => { setSelectedCat(mat.category_id); setMatSearch(""); }}
+                              style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>
+                              {catName}
+                            </button>
+                          </td>
+                          <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.color_number || "—"}</td>
+                          <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.brand || "—"}</td>
+                          <td style={{ padding: "7px 12px", textAlign: "right", fontWeight: 500 }}>{fmtQty(stockValue(mat))} {mat.unit}</td>
+                          <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{fmtQty(mat.min_threshold)}</td>
+                          <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
+                            <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
+                            <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
+                            <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍 Аналоги</button>
+                            <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const renderRow = (mat) => {
-                            const action = lowAction(mat);
-                            const rowBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
-                            return (
-                              <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: rowBg }}>
-                                <td style={{ padding: "7px 12px", fontWeight: action ? 600 : 400, color: action === 'buy' ? "#c0392b" : "#222" }}>
-                                  {mat.name}
-                                  {action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
-                                  {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
-                                  {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
-                                </td>
-                                <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
-                                {catHasBrand && (
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12 }}>
-                                    {showEditMode
-                                      ? <input key={`${mat.id}_brand_${mat.updated_at||''}`} type="text" defaultValue={mat.brand || ""} onBlur={e => saveInlineField(mat, "brand", e.target.value)} style={{ width: "100%", minWidth: 80, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : (mat.brand || "—")}
+                      );
+                    };
+                    const globalColCount = 7;
+                    if (groupBy === "color") {
+                      return (
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead><tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>Название</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>Категория</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>№ цвета</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>Производитель</th>
+                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500 }}>Остаток</th>
+                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500 }}>Мин.</th>
+                            <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500 }}>Действия</th>
+                          </tr></thead>
+                          <tbody>
+                            {colorGroups.map(grp => grp.mats.length === 1
+                              ? renderGlobalRow(grp.mats[0])
+                              : (
+                                <React.Fragment key={grp.key}>
+                                  <tr><td colSpan={globalColCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>
+                                    {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
+                                  </td></tr>
+                                  {grp.mats.map(renderGlobalRow)}
+                                </React.Fragment>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      );
+                    }
+                    return (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <thead><tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>Название</th>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>Категория</th>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>№ цвета</th>
+                          <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500 }}>Производитель</th>
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500 }}>Остаток</th>
+                          <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500 }}>Мин.</th>
+                          <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500 }}>Действия</th>
+                        </tr></thead>
+                        <tbody>{globalSearchResults.map(renderGlobalRow)}</tbody>
+                      </table>
+                    );
+                  })()}
+                </div>
+              ) : selectedCat ? (
+                <>
+                  <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+                    {(buyCount > 0 || warehouseCount > 0 || reserveCount > 0) && (
+                      <span style={{ fontSize: 12, background: "#fff0f0", color: "#c0392b", border: "1px solid #fcc", borderRadius: 12, padding: "3px 10px", fontWeight: 600 }}>
+                        {[buyCount > 0 && `Купить: ${buyCount}`, warehouseCount > 0 && `Со склада: ${warehouseCount}`, reserveCount > 0 && `Из запаса: ${reserveCount}`].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                    {filteredMats.length !== materials.length && (
+                      <span style={{ fontSize: 12, color: "#888" }}>Показано: {filteredMats.length} из {materials.length}</span>
+                    )}
+                    <button onClick={() => setShowEditMode(v => !v)}
+                      style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
+                      ✏️ {showEditMode ? "Режим вкл." : "Режим редактирования"}
+                    </button>
+                    <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
+                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
+                      📝 Инвентаризация
+                    </button>
+                    <button onClick={() => setShowAddMat(true)}
+                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
+                      + Материал
+                    </button>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: "auto" }}>
+                    {matLoading ? (
+                      <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Загрузка...</div>
+                    ) : filteredMats.length === 0 ? (
+                      <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Нет материалов</div>
+                    ) : (
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Название</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>№ цвета</th>
+                            {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ед.</th>
+                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Целых</th>
+                            {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
+                            {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
+                            {catHasReserve && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Запас</th>}
+                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>На складе</th>
+                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Мин.</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Пересчёт</th>
+                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>
+                            <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500, whiteSpace: "nowrap" }}>Действия</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(() => {
+                            const renderRow = (mat) => {
+                              const action = lowAction(mat);
+                              const rowBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
+                              return (
+                                <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: rowBg }}>
+                                  <td style={{ padding: "7px 12px", fontWeight: action ? 600 : 400, color: action === 'buy' ? "#c0392b" : "#222" }}>
+                                    {mat.name}
+                                    {action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
+                                    {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
+                                    {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
                                   </td>
-                                )}
-                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888" }}>
-                                  {showEditMode
-                                    ? <input key={`${mat.id}_unit_${mat.updated_at||''}`} type="text" defaultValue={mat.unit || ""} onBlur={e => saveInlineField(mat, "unit", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
-                                    : mat.unit}
-                                </td>
-                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
-                                  {showEditMode
-                                    ? <input key={`${mat.id}_qty_full_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_full != null ? String(mat.qty_full) : "0"} onBlur={e => saveInlineField(mat, "qty_full", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                    : fmtQty(mat.qty_full)}
-                                </td>
-                                {catHasHalf && (
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                    {showEditMode
-                                      ? <input key={`${mat.id}_qty_half_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_half != null ? String(mat.qty_half) : ""} onBlur={e => saveInlineField(mat, "qty_half", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : fmtQty(mat.qty_half)}
-                                  </td>
-                                )}
-                                {catHasAlmostEmpty && (
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                    {showEditMode
-                                      ? <input key={`${mat.id}_qty_ae_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_almost_empty != null ? String(mat.qty_almost_empty) : ""} onBlur={e => saveInlineField(mat, "qty_almost_empty", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : fmtQty(mat.qty_almost_empty)}
-                                  </td>
-                                )}
-                                {catHasReserve && (
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                    {showEditMode
-                                      ? <input key={`${mat.id}_qty_res_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_reserve != null ? String(mat.qty_reserve) : ""} onBlur={e => saveInlineField(mat, "qty_reserve", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : fmtQty(mat.qty_reserve)}
-                                  </td>
-                                )}
-                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                  {showEditMode
-                                    ? <input key={`${mat.id}_qty_wh_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_warehouse != null ? String(mat.qty_warehouse) : ""} onBlur={e => saveInlineField(mat, "qty_warehouse", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                    : fmtQty(mat.qty_warehouse)}
-                                </td>
-                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#aaa" }}>
-                                  {showEditMode ? (
-                                    <input key={`${mat.id}_min_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.min_threshold != null ? String(mat.min_threshold) : ""} onBlur={e => saveInlineField(mat, "min_threshold", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                  ) : inlineMinId === mat.id ? (
-                                    <input type="number" min="0" autoFocus value={inlineMinVal}
-                                      onChange={e => setInlineMinVal(e.target.value)}
-                                      onBlur={() => saveInlineMin(mat)}
-                                      onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setInlineMinId(null); }}
-                                      style={{ width: 60, padding: "2px 4px", borderRadius: 4, border: "1px solid #7c3aed", fontSize: 12, textAlign: "right", fontFamily: "inherit" }} />
-                                  ) : (
-                                    <span onClick={() => { setInlineMinId(mat.id); setInlineMinVal(mat.min_threshold != null ? String(mat.min_threshold) : ""); }}
-                                      style={{ cursor: "pointer", borderBottom: "1px dashed #ccc", paddingBottom: 1 }} title="Нажмите для редактирования">
-                                      {fmtQty(mat.min_threshold)}
-                                    </span>
+                                  <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
+                                  {catHasBrand && (
+                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12 }}>
+                                      {showEditMode
+                                        ? <input key={`${mat.id}_brand_${mat.updated_at||''}`} type="text" defaultValue={mat.brand || ""} onBlur={e => saveInlineField(mat, "brand", e.target.value)} style={{ width: "100%", minWidth: 80, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
+                                        : (mat.brand || "—")}
+                                    </td>
                                   )}
-                                </td>
-                                <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>
-                                  {fmtDate(mat.last_counted_at)}
-                                  {(()=>{ const stale = !mat.last_counted_at || (Date.now() - new Date(mat.last_counted_at+"T00:00:00").getTime()) > 30*24*60*60*1000; return stale ? <span title="Давно не пересчитывалось" style={{marginLeft:4,color:"#f39c12",cursor:"default"}}>⏰</span> : null; })()}
-                                </td>
-                                <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12, maxWidth: showEditMode ? "none" : 160, whiteSpace: showEditMode ? "normal" : "nowrap", overflow: showEditMode ? "visible" : "hidden", textOverflow: showEditMode ? "clip" : "ellipsis" }} title={mat.notes || ""}>
-                                  {showEditMode
-                                    ? <input key={`${mat.id}_notes_${mat.updated_at||''}`} type="text" defaultValue={mat.notes || ""} onBlur={e => saveInlineField(mat, "notes", e.target.value)} style={{ width: "100%", minWidth: 120, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
-                                    : (mat.notes || "—")}
-                                </td>
-                                <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                  <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 4 }}>📦</button>
-                                  <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 4 }}>✏️</button>
-                                  <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
-                                </td>
-                              </tr>
-                            );
-                          };
-                          if (catHasBrand && brandGroups) {
-                            return brandGroups.map(({ brand, mats }) => (
-                              <React.Fragment key={brand ?? "__no_brand__"}>
-                                <tr>
-                                  <td colSpan={colCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed", letterSpacing: 0.2 }}>
-                                    {brand || "Без производителя"}
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888" }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_unit_${mat.updated_at||''}`} type="text" defaultValue={mat.unit || ""} onBlur={e => saveInlineField(mat, "unit", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : mat.unit}
+                                  </td>
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_qty_full_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_full != null ? String(mat.qty_full) : "0"} onBlur={e => saveInlineField(mat, "qty_full", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : fmtQty(mat.qty_full)}
+                                  </td>
+                                  {catHasHalf && (
+                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                      {showEditMode
+                                        ? <input key={`${mat.id}_qty_half_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_half != null ? String(mat.qty_half) : ""} onBlur={e => saveInlineField(mat, "qty_half", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                        : fmtQty(mat.qty_half)}
+                                    </td>
+                                  )}
+                                  {catHasAlmostEmpty && (
+                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                      {showEditMode
+                                        ? <input key={`${mat.id}_qty_ae_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_almost_empty != null ? String(mat.qty_almost_empty) : ""} onBlur={e => saveInlineField(mat, "qty_almost_empty", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                        : fmtQty(mat.qty_almost_empty)}
+                                    </td>
+                                  )}
+                                  {catHasReserve && (
+                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                      {showEditMode
+                                        ? <input key={`${mat.id}_qty_res_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_reserve != null ? String(mat.qty_reserve) : ""} onBlur={e => saveInlineField(mat, "qty_reserve", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                        : fmtQty(mat.qty_reserve)}
+                                    </td>
+                                  )}
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_qty_wh_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_warehouse != null ? String(mat.qty_warehouse) : ""} onBlur={e => saveInlineField(mat, "qty_warehouse", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : fmtQty(mat.qty_warehouse)}
+                                  </td>
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#aaa" }}>
+                                    {showEditMode ? (
+                                      <input key={`${mat.id}_min_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.min_threshold != null ? String(mat.min_threshold) : ""} onBlur={e => saveInlineField(mat, "min_threshold", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
+                                    ) : inlineMinId === mat.id ? (
+                                      <input type="number" min="0" autoFocus value={inlineMinVal}
+                                        onChange={e => setInlineMinVal(e.target.value)}
+                                        onBlur={() => saveInlineMin(mat)}
+                                        onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setInlineMinId(null); }}
+                                        style={{ width: 60, padding: "2px 4px", borderRadius: 4, border: "1px solid #7c3aed", fontSize: 12, textAlign: "right", fontFamily: "inherit" }} />
+                                    ) : (
+                                      <span onClick={() => { setInlineMinId(mat.id); setInlineMinVal(mat.min_threshold != null ? String(mat.min_threshold) : ""); }}
+                                        style={{ cursor: "pointer", borderBottom: "1px dashed #ccc", paddingBottom: 1 }} title="Нажмите для редактирования">
+                                        {fmtQty(mat.min_threshold)}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>
+                                    {fmtDate(mat.last_counted_at)}
+                                    {(()=>{ const stale = !mat.last_counted_at || (Date.now() - new Date(mat.last_counted_at+"T00:00:00").getTime()) > 30*24*60*60*1000; return stale ? <span title="Давно не пересчитывалось" style={{marginLeft:4,color:"#f39c12",cursor:"default"}}>⏰</span> : null; })()}
+                                  </td>
+                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12, maxWidth: showEditMode ? "none" : 160, whiteSpace: showEditMode ? "normal" : "nowrap", overflow: showEditMode ? "visible" : "hidden", textOverflow: showEditMode ? "clip" : "ellipsis" }} title={mat.notes || ""}>
+                                    {showEditMode
+                                      ? <input key={`${mat.id}_notes_${mat.updated_at||''}`} type="text" defaultValue={mat.notes || ""} onBlur={e => saveInlineField(mat, "notes", e.target.value)} style={{ width: "100%", minWidth: 120, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
+                                      : (mat.notes || "—")}
+                                  </td>
+                                  <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
+                                    <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
+                                    <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
+                                    <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
+                                    <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
                                   </td>
                                 </tr>
-                                {mats.map(renderRow)}
-                              </React.Fragment>
-                            ));
-                          }
-                          return filteredMats.map(renderRow);
-                        })()}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Выберите категорию</div>
-            )}
+                              );
+                            };
+                            if (groupBy === "color") {
+                              return colorGroups.map(grp => grp.mats.length === 1
+                                ? renderRow(grp.mats[0])
+                                : (
+                                  <React.Fragment key={grp.key}>
+                                    <tr><td colSpan={colCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed", letterSpacing: 0.2 }}>
+                                      {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
+                                    </td></tr>
+                                    {grp.mats.map(renderRow)}
+                                  </React.Fragment>
+                                )
+                              );
+                            }
+                            if (catHasBrand && groupBy === "brand" && brandGroups) {
+                              return brandGroups.map(({ brand, mats }) => (
+                                <React.Fragment key={brand ?? "__no_brand__"}>
+                                  <tr>
+                                    <td colSpan={colCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed", letterSpacing: 0.2 }}>
+                                      {brand || "Без производителя"}
+                                    </td>
+                                  </tr>
+                                  {mats.map(renderRow)}
+                                </React.Fragment>
+                              ));
+                            }
+                            return filteredMats.map(renderRow);
+                          })()}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Выберите категорию</div>
+              )}
+            </div>
           </div>
         </div>
       )}
