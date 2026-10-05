@@ -40,6 +40,11 @@ function fmtDate(d) {
   return dt.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function fmtColorNumber(s) {
+  if (s === null || s === undefined || s === '') return "—";
+  return String(s).replace(/\.0$/, '');
+}
+
 const TABS = ["Справочник", "Что кончается", "Заявки на закупку", "Журнал расхода", "Аналитика"];
 const STATUS_LABELS = { "новая": "Новая", "заказано": "Заказано", "куплено": "Куплено" };
 const QUALITATIVE_UNITS = [
@@ -69,6 +74,7 @@ export default function Materials({ isOwner = true }) {
   const [filterLow, setFilterLow] = React.useState(false);
   const [filterReserve, setFilterReserve] = React.useState(false);
   const [filterWarehouse, setFilterWarehouse] = React.useState(false);
+  const [searchEverywhere, setSearchEverywhere] = React.useState(false);
 
   // add material modal
   const [showAddMat, setShowAddMat] = React.useState(false);
@@ -495,16 +501,24 @@ export default function Materials({ isOwner = true }) {
 
   const filteredMats = React.useMemo(() => {
     let list = materials;
+    if (matSearch.trim() && !searchEverywhere) {
+      const q = normName(matSearch);
+      list = list.filter(m =>
+        normName(m.name).includes(q) ||
+        normName(m.color_number || '').includes(q) ||
+        normName(m.brand || '').includes(q)
+      );
+    }
     if (filterLow) list = list.filter(isLow);
     if (filterReserve) list = list.filter(m => Number(m.qty_reserve) > 0);
     if (filterWarehouse) list = list.filter(m => Number(m.qty_warehouse) > 0);
     return list;
-  }, [materials, filterLow, filterReserve, filterWarehouse]);
+  }, [materials, matSearch, searchEverywhere, filterLow, filterReserve, filterWarehouse]);
 
-  const globalSearchActive = matSearch.trim().length > 0;
+  const globalSearchActive = matSearch.trim().length > 0 && searchEverywhere;
 
   const globalSearchResults = React.useMemo(() => {
-    if (!matSearch.trim()) return [];
+    if (!matSearch.trim() || !searchEverywhere) return [];
     const q = normName(matSearch);
     let list = allMaterials.filter(m =>
       normName(m.name).includes(q) ||
@@ -515,7 +529,7 @@ export default function Materials({ isOwner = true }) {
     if (filterReserve) list = list.filter(m => Number(m.qty_reserve) > 0);
     if (filterWarehouse) list = list.filter(m => Number(m.qty_warehouse) > 0);
     return list;
-  }, [allMaterials, matSearch, filterLow, filterReserve, filterWarehouse]);
+  }, [allMaterials, matSearch, searchEverywhere, filterLow, filterReserve, filterWarehouse]);
 
   const brandGroups = React.useMemo(() => {
     if (!catHasBrand) return null;
@@ -711,6 +725,10 @@ export default function Materials({ isOwner = true }) {
                   style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", lineHeight: 1, padding: 0 }}>×</button>
               )}
             </div>
+            <button onClick={() => setSearchEverywhere(v => !v)}
+              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 12, border: `1px solid ${searchEverywhere ? "#7c3aed" : "#ddd"}`, background: searchEverywhere ? "#f5f3ff" : "white", color: searchEverywhere ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap" }}>
+              Искать везде
+            </button>
             <div style={{ display: "flex" }}>
               <button onClick={() => setGroupBy("brand")}
                 style={{ fontSize: 12, padding: "5px 10px", borderRadius: "5px 0 0 5px", border: `1px solid ${groupBy === "brand" ? "#7c3aed" : "#ddd"}`, background: groupBy === "brand" ? "#f5f3ff" : "white", color: groupBy === "brand" ? "#7c3aed" : "#666", cursor: "pointer" }}>
@@ -731,7 +749,7 @@ export default function Materials({ isOwner = true }) {
                 {f.label}
               </button>
             ))}
-            {globalSearchActive && <span style={{ fontSize: 12, color: "#888" }}>Найдено: {globalSearchResults.length}</span>}
+            {matSearch.trim() && <span style={{ fontSize: 12, color: "#888" }}>Найдено: {globalSearchActive ? globalSearchResults.length : filteredMats.length}</span>}
           </div>
 
           <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
@@ -789,14 +807,14 @@ export default function Materials({ isOwner = true }) {
                               {catName}
                             </button>
                           </td>
-                          <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.color_number || "—"}</td>
+                          <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{fmtColorNumber(mat.color_number)}</td>
                           <td style={{ padding: "7px 12px", color: "#888", fontSize: 12 }}>{mat.brand || "—"}</td>
                           <td style={{ padding: "7px 12px", textAlign: "right", fontWeight: 500 }}>{fmtQty(stockValue(mat))} {mat.unit}</td>
                           <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{fmtQty(mat.min_threshold)}</td>
                           <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                             <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
                             <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
-                            <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍 Аналоги</button>
+                            <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍 Аналоги</button>
                             {isLow(mat) && (activeRequestMatIds.has(mat.id)
                               ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
                               : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
@@ -913,7 +931,7 @@ export default function Materials({ isOwner = true }) {
                                     {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
                                     {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
                                   </td>
-                                  <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
+                                  <td style={{ padding: "7px 12px", color: "#888" }}>{fmtColorNumber(mat.color_number)}</td>
                                   {catHasBrand && (
                                     <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12 }}>
                                       {showEditMode
@@ -985,7 +1003,7 @@ export default function Materials({ isOwner = true }) {
                                   <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                                     <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
                                     <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
-                                    <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
+                                    <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
                                     {isLow(mat) && (activeRequestMatIds.has(mat.id)
                                       ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
                                       : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
@@ -1071,7 +1089,7 @@ export default function Materials({ isOwner = true }) {
                           <tr key={mat.id} style={{ background: "#f6fff8", borderBottom: "1px solid #f0f0f0" }}>
                             <td style={{ ...tdS, fontWeight: 500 }}>{mat.name}</td>
                             <td style={{ ...tdS, color: "#888" }}>{mat.brand || "—"}</td>
-                            <td style={{ ...tdS, color: "#888" }}>{mat.color_number || "—"}</td>
+                            <td style={{ ...tdS, color: "#888" }}>{fmtColorNumber(mat.color_number)}</td>
                             <td style={{ ...tdS, textAlign: "right", color: "#27ae60", fontWeight: 600 }}>{fmtQty(mat.qty_reserve)}</td>
                             <td style={{ ...tdS, textAlign: "center" }}>{renderCartBtn(mat)}</td>
                           </tr>
@@ -1099,7 +1117,7 @@ export default function Materials({ isOwner = true }) {
                           <tr key={mat.id} style={{ background: "#edf7ff", borderBottom: "1px solid #f0f0f0" }}>
                             <td style={{ ...tdS, fontWeight: 500 }}>{mat.name}</td>
                             <td style={{ ...tdS, color: "#888" }}>{mat.brand || "—"}</td>
-                            <td style={{ ...tdS, color: "#888" }}>{mat.color_number || "—"}</td>
+                            <td style={{ ...tdS, color: "#888" }}>{fmtColorNumber(mat.color_number)}</td>
                             <td style={{ ...tdS, textAlign: "right", color: "#2980b9", fontWeight: 600 }}>{fmtQty(mat.qty_warehouse)}</td>
                             <td style={{ ...tdS, textAlign: "center" }}>{renderCartBtn(mat)}</td>
                           </tr>
@@ -1160,7 +1178,7 @@ export default function Materials({ isOwner = true }) {
                             <tr key={mat.id} style={{ background: "#fff0f0", borderBottom: "1px solid #f0f0f0" }}>
                               <td style={{ ...tdS, fontWeight: 500 }}>{mat.name}</td>
                               <td style={{ ...tdS, color: "#888" }}>{mat.brand || "—"}</td>
-                              <td style={{ ...tdS, color: "#888" }}>{mat.color_number || "—"}</td>
+                              <td style={{ ...tdS, color: "#888" }}>{fmtColorNumber(mat.color_number)}</td>
                               <td style={{ ...tdS, textAlign: "right", color: "#c0392b", fontWeight: 600 }}>{fmtQty(sv)}</td>
                               <td style={{ ...tdS, textAlign: "right", color: "#888" }}>{fmtQty(mat.min_threshold)}</td>
                               <td style={{ ...tdS, textAlign: "right", fontWeight: 600, color: "#7c3aed" }}>{recommended} {mat.unit}</td>
@@ -1568,7 +1586,7 @@ export default function Materials({ isOwner = true }) {
                     const numInp = { width: 64, padding: "4px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 12, textAlign: "right", fontFamily: "inherit" };
                     return (
                       <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
-                        <td style={{ padding: "7px 14px", fontWeight: 500 }}>{mat.name}{mat.color_number ? <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 6 }}>#{mat.color_number}</span> : null}</td>
+                        <td style={{ padding: "7px 14px", fontWeight: 500 }}>{mat.name}{mat.color_number ? <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 6 }}>#{fmtColorNumber(mat.color_number)}</span> : null}</td>
                         <td style={{ padding: "7px 10px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{fmtQty(mat.qty_full)} {mat.unit}</td>
                         <td style={{ padding: "7px 10px", textAlign: "center" }}>
                           <input type="number" min="0" step="0.5" value={facts.qty_full ?? ""} onChange={e => setFact("qty_full", e.target.value)} style={numInp} placeholder="—" />
