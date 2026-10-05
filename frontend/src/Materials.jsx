@@ -1,5 +1,6 @@
 import React from "react";
 import { useAuth } from "./AuthContext";
+import { round1, fmtQty, stockValue, isLow, lowAction } from "./materialsUtils.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -32,11 +33,6 @@ async function apiFetch(path, options = {}) {
   return data;
 }
 
-function isLow(mat) {
-  if (mat.min_threshold == null) return false;
-  const qty = (Number(mat.qty_full) || 0) + (Number(mat.qty_half) || 0) * 0.5;
-  return qty <= Number(mat.min_threshold);
-}
 
 function fmtDate(d) {
   if (!d) return "—";
@@ -265,12 +261,12 @@ export default function Materials({ isOwner = true }) {
         color_number: editMatForm.color_number || null,
         brand: editMatForm.brand || null,
         unit: editMatForm.unit || "шт",
-        qty_full: Number(editMatForm.qty_full) || 0,
-        qty_half: editMatForm.qty_half !== "" && editMatForm.qty_half != null ? Number(editMatForm.qty_half) : null,
-        qty_almost_empty: editMatForm.qty_almost_empty !== "" && editMatForm.qty_almost_empty != null ? Number(editMatForm.qty_almost_empty) : null,
-        qty_reserve: editMatForm.qty_reserve !== "" && editMatForm.qty_reserve != null ? Number(editMatForm.qty_reserve) : null,
-        qty_warehouse: editMatForm.qty_warehouse !== "" && editMatForm.qty_warehouse != null ? Number(editMatForm.qty_warehouse) : null,
-        min_threshold: editMatForm.min_threshold !== "" && editMatForm.min_threshold != null ? Number(editMatForm.min_threshold) : null,
+        qty_full: round1(Number(editMatForm.qty_full) || 0),
+        qty_half: editMatForm.qty_half !== "" && editMatForm.qty_half != null ? round1(Number(editMatForm.qty_half)) : null,
+        qty_almost_empty: editMatForm.qty_almost_empty !== "" && editMatForm.qty_almost_empty != null ? round1(Number(editMatForm.qty_almost_empty)) : null,
+        qty_reserve: editMatForm.qty_reserve !== "" && editMatForm.qty_reserve != null ? round1(Number(editMatForm.qty_reserve)) : null,
+        qty_warehouse: editMatForm.qty_warehouse !== "" && editMatForm.qty_warehouse != null ? round1(Number(editMatForm.qty_warehouse)) : null,
+        min_threshold: editMatForm.min_threshold !== "" && editMatForm.min_threshold != null ? round1(Number(editMatForm.min_threshold)) : null,
         last_counted_at: editMatForm.last_counted_at || null,
         notes: editMatForm.notes || null,
         updated_at: new Date().toISOString(),
@@ -290,7 +286,7 @@ export default function Materials({ isOwner = true }) {
               material_id: editMat.id,
               type: "корректировка",
               field: f,
-              delta: newVal - oldVal,
+              delta: round1(newVal - oldVal),
               comment: "Ручное редактирование карточки материала",
               created_by: user?.id || null,
               created_by_name: authorName,
@@ -317,8 +313,8 @@ export default function Materials({ isOwner = true }) {
     if (!delta || delta <= 0) { alert("Введите корректное количество"); return; }
     const field = moveForm.field;
     const currentVal = Number(moveMat[field]) || 0;
-    const actualDelta = moveForm.type === "приход" ? delta : -delta;
-    const newVal = currentVal + actualDelta;
+    const actualDelta = round1(moveForm.type === "приход" ? delta : -delta);
+    const newVal = round1(currentVal + actualDelta);
     if (newVal < 0) { alert("Остаток не может уйти в минус. Текущий остаток: " + currentVal); return; }
 
     try {
@@ -353,8 +349,8 @@ export default function Materials({ isOwner = true }) {
     try {
       const body = {
         cycle_label: reqForm.cycle_label.trim(),
-        needed_qty: Number(reqForm.needed_qty),
-        available_qty: reqForm.available_qty !== "" ? Number(reqForm.available_qty) : null,
+        needed_qty: round1(Number(reqForm.needed_qty)),
+        available_qty: reqForm.available_qty !== "" ? round1(Number(reqForm.available_qty)) : null,
         note: reqForm.note.trim() || null,
         requested_by: user?.id || null,
         requested_by_name: authorName,
@@ -421,7 +417,7 @@ export default function Materials({ isOwner = true }) {
     const today = new Date().toISOString().split("T")[0];
     let parsedValue;
     if (NUM_INLINE_FIELDS.includes(field)) {
-      parsedValue = rawValue === "" || rawValue == null ? null : Number(rawValue);
+      parsedValue = rawValue === "" || rawValue == null ? null : round1(Number(rawValue));
       if (parsedValue !== null && Number.isNaN(parsedValue)) return;
     } else if (field === "unit") {
       parsedValue = (rawValue || "").trim() || "шт";
@@ -488,7 +484,10 @@ export default function Materials({ isOwner = true }) {
   // 9 always-visible columns: Название, № цвета, Ед., Целых, На складе, Мин., Пересчёт, Заметки, Действия
   const colCount = 9 + (catHasBrand ? 1 : 0) + (catHasHalf ? 1 : 0) + (catHasAlmostEmpty ? 1 : 0) + (catHasReserve ? 1 : 0);
 
-  const lowCount = materials.filter(isLow).length;
+  const lowMats = materials.filter(isLow);
+  const buyCount = lowMats.filter(m => lowAction(m) === 'buy').length;
+  const warehouseCount = lowMats.filter(m => lowAction(m) === 'warehouse').length;
+  const reserveCount = lowMats.filter(m => lowAction(m) === 'reserve').length;
 
   const filteredMats = materials.filter(m => {
     if (!matSearch) return true;
@@ -535,14 +534,14 @@ export default function Materials({ isOwner = true }) {
       for (const f of relevantFields) {
         const factStr = facts[f];
         if (factStr == null || factStr === "") continue;
-        const newVal = Number(factStr);
+        const newVal = round1(Number(factStr));
         const oldVal = mat[f] != null ? Number(mat[f]) : 0;
         if (newVal === oldVal) continue;
         patch[f] = newVal;
         try {
           await apiFetch("material_transactions", {
             method: "POST", headers: { Prefer: "return=minimal" },
-            body: JSON.stringify({ material_id: mat.id, type: "корректировка", field: f, delta: newVal - oldVal, comment: `Инвентаризация ${today}`, created_by: user?.id || null, created_by_name: authorName }),
+            body: JSON.stringify({ material_id: mat.id, type: "корректировка", field: f, delta: round1(newVal - oldVal), comment: `Инвентаризация ${today}`, created_by: user?.id || null, created_by_name: authorName }),
           });
         } catch (e) { console.error(e); }
       }
@@ -562,12 +561,9 @@ export default function Materials({ isOwner = true }) {
     if (!cycleLabel || !cycleLabel.trim()) return;
     const cycle = cycleLabel.trim();
     try {
-      const mats = await apiFetch("materials?select=id,name,unit,qty_full,qty_half,min_threshold&min_threshold=not.is.null");
-      const belowThreshold = (Array.isArray(mats) ? mats : []).filter(m => {
-        const qty = (Number(m.qty_full) || 0) + (Number(m.qty_half) || 0) * 0.5;
-        return qty <= Number(m.min_threshold);
-      });
-      if (belowThreshold.length === 0) { alert("Все остатки выше порога, добавлять нечего"); return; }
+      const mats = await apiFetch("materials?select=id,name,unit,qty_full,qty_half,qty_almost_empty,qty_reserve,qty_warehouse,min_threshold&min_threshold=not.is.null");
+      const belowThreshold = (Array.isArray(mats) ? mats : []).filter(m => isLow(m) && lowAction(m) === 'buy');
+      if (belowThreshold.length === 0) { alert("Нет материалов, которые нужно купить (всё есть в запасе или на складе)"); return; }
       const existingIds = new Set(
         requests
           .filter(r => r.cycle_label === cycle && (r.status === "новая" || r.status === "заказано") && r.material_id)
@@ -577,11 +573,11 @@ export default function Materials({ isOwner = true }) {
       if (toAdd.length === 0) { alert("Все материалы ниже порога уже есть в заявках этого цикла"); return; }
       const created = [];
       for (const m of toAdd) {
-        const qty = (Number(m.qty_full) || 0) + (Number(m.qty_half) || 0) * 0.5;
-        const needed = Math.max(1, Math.ceil(Number(m.min_threshold) - qty));
+        const sv = stockValue(m);
+        const needed = round1(Math.max(1, Math.ceil(Number(m.min_threshold) - sv)));
         const data = await apiFetch("purchase_requests", {
           method: "POST",
-          body: JSON.stringify({ cycle_label: cycle, material_id: m.id, needed_qty: needed, available_qty: qty, status: "новая", requested_by: user?.id || null, requested_by_name: authorName }),
+          body: JSON.stringify({ cycle_label: cycle, material_id: m.id, needed_qty: needed, available_qty: round1(sv), status: "новая", requested_by: user?.id || null, requested_by_name: authorName }),
         });
         const r = Array.isArray(data) ? data[0] : data;
         if (r) created.push(r);
@@ -675,9 +671,9 @@ export default function Materials({ isOwner = true }) {
                   <input value={matSearch} onChange={e => setMatSearch(e.target.value)}
                     placeholder="Поиск по названию или номеру цвета..."
                     style={{ ...inputStyle, width: 280, flex: "0 0 auto" }} />
-                  {lowCount > 0 && (
+                  {(buyCount > 0 || warehouseCount > 0 || reserveCount > 0) && (
                     <span style={{ fontSize: 12, background: "#fff0f0", color: "#c0392b", border: "1px solid #fcc", borderRadius: 12, padding: "3px 10px", fontWeight: 600 }}>
-                      Мало осталось: {lowCount}
+                      {[buyCount > 0 && `Купить: ${buyCount}`, warehouseCount > 0 && `Со склада: ${warehouseCount}`, reserveCount > 0 && `Из запаса: ${reserveCount}`].filter(Boolean).join(' · ')}
                     </span>
                   )}
                   <button onClick={() => setShowEditMode(v => !v)}
@@ -721,12 +717,15 @@ export default function Materials({ isOwner = true }) {
                       <tbody>
                         {(() => {
                           const renderRow = (mat) => {
-                            const low = isLow(mat);
+                            const action = lowAction(mat);
+                            const rowBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
                             return (
-                              <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: low ? "#fff0f0" : "white" }}>
-                                <td style={{ padding: "7px 12px", fontWeight: low ? 600 : 400, color: low ? "#c0392b" : "#222" }}>
+                              <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: rowBg }}>
+                                <td style={{ padding: "7px 12px", fontWeight: action ? 600 : 400, color: action === 'buy' ? "#c0392b" : "#222" }}>
                                   {mat.name}
-                                  {low && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>мало</span>}
+                                  {action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
+                                  {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
+                                  {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
                                 </td>
                                 <td style={{ padding: "7px 12px", color: "#888" }}>{mat.color_number || "—"}</td>
                                 {catHasBrand && (
@@ -744,33 +743,33 @@ export default function Materials({ isOwner = true }) {
                                 <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
                                   {showEditMode
                                     ? <input key={`${mat.id}_qty_full_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_full != null ? String(mat.qty_full) : "0"} onBlur={e => saveInlineField(mat, "qty_full", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                    : (mat.qty_full ?? 0)}
+                                    : fmtQty(mat.qty_full)}
                                 </td>
                                 {catHasHalf && (
                                   <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
                                     {showEditMode
                                       ? <input key={`${mat.id}_qty_half_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_half != null ? String(mat.qty_half) : ""} onBlur={e => saveInlineField(mat, "qty_half", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : (mat.qty_half != null ? mat.qty_half : "—")}
+                                      : fmtQty(mat.qty_half)}
                                   </td>
                                 )}
                                 {catHasAlmostEmpty && (
                                   <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
                                     {showEditMode
                                       ? <input key={`${mat.id}_qty_ae_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_almost_empty != null ? String(mat.qty_almost_empty) : ""} onBlur={e => saveInlineField(mat, "qty_almost_empty", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : (mat.qty_almost_empty != null ? mat.qty_almost_empty : "—")}
+                                      : fmtQty(mat.qty_almost_empty)}
                                   </td>
                                 )}
                                 {catHasReserve && (
                                   <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
                                     {showEditMode
                                       ? <input key={`${mat.id}_qty_res_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_reserve != null ? String(mat.qty_reserve) : ""} onBlur={e => saveInlineField(mat, "qty_reserve", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : (mat.qty_reserve != null ? mat.qty_reserve : "—")}
+                                      : fmtQty(mat.qty_reserve)}
                                   </td>
                                 )}
                                 <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
                                   {showEditMode
                                     ? <input key={`${mat.id}_qty_wh_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_warehouse != null ? String(mat.qty_warehouse) : ""} onBlur={e => saveInlineField(mat, "qty_warehouse", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
-                                    : (mat.qty_warehouse != null ? mat.qty_warehouse : "—")}
+                                    : fmtQty(mat.qty_warehouse)}
                                 </td>
                                 <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#aaa" }}>
                                   {showEditMode ? (
@@ -784,7 +783,7 @@ export default function Materials({ isOwner = true }) {
                                   ) : (
                                     <span onClick={() => { setInlineMinId(mat.id); setInlineMinVal(mat.min_threshold != null ? String(mat.min_threshold) : ""); }}
                                       style={{ cursor: "pointer", borderBottom: "1px dashed #ccc", paddingBottom: 1 }} title="Нажмите для редактирования">
-                                      {mat.min_threshold != null ? mat.min_threshold : "—"}
+                                      {fmtQty(mat.min_threshold)}
                                     </span>
                                   )}
                                 </td>
@@ -896,8 +895,8 @@ export default function Materials({ isOwner = true }) {
                     {reqByCycle[cycle].map(r => (
                       <tr key={r.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
                         <td style={{ padding: "7px 12px" }}>{reqMatName(r)}</td>
-                        <td style={{ padding: "7px 12px", textAlign: "right" }}>{r.needed_qty}</td>
-                        <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{r.available_qty != null ? r.available_qty : "—"}</td>
+                        <td style={{ padding: "7px 12px", textAlign: "right" }}>{fmtQty(r.needed_qty)}</td>
+                        <td style={{ padding: "7px 12px", textAlign: "right", color: "#888" }}>{fmtQty(r.available_qty)}</td>
                         <td style={{ padding: "7px 12px" }}>
                           <select value={r.status} onChange={e => updateRequestStatus(r.id, e.target.value)}
                             style={{ fontSize: 12, padding: "3px 8px", borderRadius: 5, border: "1px solid #ddd", background: STATUS_COLORS[r.status] || "white", color: STATUS_TEXT[r.status] || "#333", cursor: "pointer" }}>
@@ -971,7 +970,7 @@ export default function Materials({ isOwner = true }) {
                       const matName = r.material?.name || `#${r.material_id}`;
                       const clientName = r.client?.name || "—";
                       const qty = r.mode === 'точный'
-                        ? `${r.qty_exact != null ? r.qty_exact : "—"} ${r.material?.unit || ""}`.trim()
+                        ? `${fmtQty(r.qty_exact)} ${r.material?.unit || ""}`.trim()
                         : (r.qualitative_unit || "—");
                       const createdAt = r.created_at
                         ? new Date(r.created_at).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -1085,7 +1084,7 @@ export default function Materials({ isOwner = true }) {
                               {t.created_at ? new Date(t.created_at).toLocaleDateString("ru-RU") : "—"}
                             </td>
                             <td style={{ ...tdS, textAlign: "right", color: "#c0392b", fontWeight: 600 }}>
-                              −{Math.abs(Number(t.delta))} {t.material?.unit || ""}
+                              −{fmtQty(Math.abs(Number(t.delta)))} {t.material?.unit || ""}
                             </td>
                             <td style={{ ...tdS, color: "#666", fontSize: 12 }}>{t.comment || "—"}</td>
                           </tr>
@@ -1117,8 +1116,8 @@ export default function Materials({ isOwner = true }) {
                           return (
                             <tr key={i} style={{ background: urgent ? "#fff0f0" : warn ? "#fffbe6" : "white", borderBottom: "1px solid #f5f5f5" }}>
                               <td style={{ ...tdS, fontWeight: 500, borderBottom: "none" }}>{r.name}</td>
-                              <td style={{ ...tdS, textAlign: "right", color: "#555", borderBottom: "none" }}>{r.qty} {r.unit}</td>
-                              <td style={{ ...tdS, textAlign: "right", color: "#888", borderBottom: "none" }}>{r.expense30} {r.unit}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#555", borderBottom: "none" }}>{fmtQty(r.qty)} {r.unit}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#888", borderBottom: "none" }}>{fmtQty(r.expense30)} {r.unit}</td>
                               <td style={{ ...tdS, textAlign: "right", fontWeight: 600, borderBottom: "none", color: urgent ? "#c0392b" : warn ? "#e67e22" : "#27ae60" }}>
                                 {r.daysLeft === Infinity ? "∞" : `${r.daysLeft} дн.`}
                               </td>
@@ -1222,7 +1221,7 @@ export default function Materials({ isOwner = true }) {
                     return (
                       <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5" }}>
                         <td style={{ padding: "7px 14px", fontWeight: 500 }}>{mat.name}{mat.color_number ? <span style={{ color: "#aaa", fontWeight: 400, marginLeft: 6 }}>#{mat.color_number}</span> : null}</td>
-                        <td style={{ padding: "7px 10px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{mat.qty_full ?? 0} {mat.unit}</td>
+                        <td style={{ padding: "7px 10px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{fmtQty(mat.qty_full)} {mat.unit}</td>
                         <td style={{ padding: "7px 10px", textAlign: "center" }}>
                           <input type="number" min="0" step="0.5" value={facts.qty_full ?? ""} onChange={e => setFact("qty_full", e.target.value)} style={numInp} placeholder="—" />
                         </td>

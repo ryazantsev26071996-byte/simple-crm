@@ -2,6 +2,7 @@ import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
 import Events from "./Events.jsx";
+import { round1 } from "./materialsUtils.js";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
@@ -273,7 +274,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                 await apiFetch(`materials?id=eq.${um.material_id}`, {
                   method: "PATCH",
                   headers: { Prefer: "return=minimal" },
-                  body: JSON.stringify({ qty_full: currentQty - deduct }),
+                  body: JSON.stringify({ qty_full: round1(currentQty - deduct) }),
                 });
                 await apiFetch("material_transactions", {
                   method: "POST",
@@ -282,7 +283,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                     material_id: um.material_id,
                     type: 'расход',
                     field: 'qty_full',
-                    delta: -deduct,
+                    delta: round1(-deduct),
                     comment: `Списано с занятия ${modal.date}`,
                     client_id: Number(form.client_id) || null,
                     created_by: userId || null,

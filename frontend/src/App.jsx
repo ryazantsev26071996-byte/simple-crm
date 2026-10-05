@@ -188,13 +188,14 @@ export default function App() {
     async function fetchLowStock() {
       try {
         const token = await getToken();
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/materials?select=qty_full,qty_half,min_threshold&min_threshold=not.is.null`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/materials?select=qty_full,qty_half,qty_almost_empty,qty_reserve,qty_warehouse,min_threshold&min_threshold=not.is.null`, {
           headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            setLowStockCount(data.filter(m => (Number(m.qty_full) || 0) + (Number(m.qty_half) || 0) * 0.5 <= Number(m.min_threshold)).length);
+            const sv = (m) => (Number(m.qty_full)||0) + (Number(m.qty_half)||0)*0.5 + (Number(m.qty_almost_empty)||0)*0.25;
+            setLowStockCount(data.filter(m => sv(m) <= Number(m.min_threshold)).length);
           }
         }
       } catch (e) {}
