@@ -40,7 +40,7 @@ function fmtDate(d) {
   return dt.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-const TABS = ["Справочник", "Заявки на закупку", "Журнал расхода", "Аналитика"];
+const TABS = ["Справочник", "Что кончается", "Заявки на закупку", "Журнал расхода", "Аналитика"];
 const STATUS_LABELS = { "новая": "Новая", "заказано": "Заказано", "куплено": "Куплено" };
 const QUALITATIVE_UNITS = [
   { label: "Капля", weight: 1 },
@@ -129,7 +129,7 @@ export default function Materials({ isOwner = true }) {
   }, []);
 
   React.useEffect(() => {
-    if (tab === "Заявки на закупку") loadRequests();
+    if (tab === "Заявки на закупку" || tab === "Что кончается") loadRequests();
     if (tab === "Журнал расхода") loadUsageLog();
     if (tab === "Аналитика") loadAnalytics();
   }, [tab]);
@@ -543,6 +543,12 @@ export default function Materials({ isOwner = true }) {
     return groupOrder.map(k => groupMap[k]);
   }, [globalSearchActive, globalSearchResults, filteredMats]);
 
+  const activeRequestMatIds = React.useMemo(() => {
+    const ids = new Set();
+    requests.filter(r => r.status === 'новая' || r.status === 'заказано').forEach(r => { if (r.material_id) ids.add(r.material_id); });
+    return ids;
+  }, [requests]);
+
   async function saveInlineMin(mat) {
     const val = inlineMinVal.trim() === "" ? null : Number(inlineMinVal);
     setInlineMinId(null);
@@ -615,6 +621,35 @@ export default function Materials({ isOwner = true }) {
       }
       setRequests(prev => [...prev, ...created]);
       alert(`Добавлено ${created.length} позиций`);
+    } catch (e) { alert("Ошибка: " + e.message); }
+  }
+
+  async function getOrCreateCycle() {
+    const activeCycle = reqCycles.find(c => !c.archived);
+    if (activeCycle) return activeCycle.cycle_label;
+    const now = new Date();
+    const month = now.toLocaleString("ru-RU", { month: "long" });
+    const hint = `${month.charAt(0).toUpperCase() + month.slice(1)} ${now.getFullYear()} (до 25 числа)`;
+    const label = window.prompt("Введите название цикла заявки:", hint);
+    if (!label || !label.trim()) return null;
+    return label.trim();
+  }
+
+  async function addToCart(mat) {
+    const cycle = await getOrCreateCycle();
+    if (!cycle) return;
+    const alreadyIn = requests.some(r => r.material_id === mat.id && (r.status === 'новая' || r.status === 'заказано'));
+    if (alreadyIn) { alert(`«${mat.name}» уже есть в активной заявке`); return; }
+    const sv = stockValue(mat);
+    const needed = round1(Math.max(1, Math.ceil(Number(mat.min_threshold) - sv)));
+    try {
+      const data = await apiFetch("purchase_requests", {
+        method: "POST",
+        body: JSON.stringify({ cycle_label: cycle, material_id: mat.id, needed_qty: needed, available_qty: round1(sv), status: "новая", requested_by: user?.id || null, requested_by_name: authorName }),
+      });
+      const created = Array.isArray(data) ? data[0] : data;
+      if (created) setRequests(prev => [...prev, created]);
+      alert(`Добавлено: «${mat.name}» в цикл «${cycle}»`);
     } catch (e) { alert("Ошибка: " + e.message); }
   }
 
@@ -762,6 +797,10 @@ export default function Materials({ isOwner = true }) {
                             <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
                             <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
                             <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍 Аналоги</button>
+                            {isLow(mat) && (activeRequestMatIds.has(mat.id)
+                              ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
+                              : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
+                            )}
                             <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
                           </td>
                         </tr>
@@ -947,6 +986,10 @@ export default function Materials({ isOwner = true }) {
                                     <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
                                     <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
                                     <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
+                                    {isLow(mat) && (activeRequestMatIds.has(mat.id)
+                                      ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
+                                      : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
+                                    )}
                                     <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
                                   </td>
                                 </tr>
@@ -989,6 +1032,149 @@ export default function Materials({ isOwner = true }) {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {tab === "Что кончается" && (
+        <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+          {(() => {
+            const lowAll = allMaterials.filter(isLow);
+            const reserveList = lowAll.filter(m => lowAction(m) === 'reserve');
+            const warehouseList = lowAll.filter(m => lowAction(m) === 'warehouse');
+            const buyList = lowAll.filter(m => lowAction(m) === 'buy');
+            const thS = { padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap", background: "#fafafa" };
+            const tdS = { padding: "7px 12px", borderBottom: "1px solid #f5f5f5" };
+            const renderCartBtn = (mat) => activeRequestMatIds.has(mat.id)
+              ? <span style={{ fontSize: 11, padding: "2px 7px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", display: "inline-block" }}>уже в заявке</span>
+              : <button onClick={() => addToCart(mat)} style={{ fontSize: 11, padding: "2px 7px", borderRadius: 5, border: "1px solid #7c3aed", background: "white", cursor: "pointer", color: "#7c3aed" }}>🛒 В список покупок</button>;
+            return (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <span style={{ fontSize: 13, color: "#888" }}>Позиций ниже порога: <strong style={{ color: "#c0392b" }}>{lowAll.length}</strong></span>
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#27ae60", marginBottom: 8 }}>🟢 Достать из запаса ({reserveList.length})</div>
+                  {reserveList.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 13 }}>Ничего не нужно</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead><tr style={{ borderBottom: "1px solid #eee" }}>
+                        <th style={thS}>Материал</th>
+                        <th style={thS}>Производитель</th>
+                        <th style={thS}>№ цвета</th>
+                        <th style={{ ...thS, textAlign: "right" }}>В запасе</th>
+                        <th style={{ ...thS, textAlign: "center" }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {reserveList.map(mat => (
+                          <tr key={mat.id} style={{ background: "#f6fff8", borderBottom: "1px solid #f0f0f0" }}>
+                            <td style={{ ...tdS, fontWeight: 500 }}>{mat.name}</td>
+                            <td style={{ ...tdS, color: "#888" }}>{mat.brand || "—"}</td>
+                            <td style={{ ...tdS, color: "#888" }}>{mat.color_number || "—"}</td>
+                            <td style={{ ...tdS, textAlign: "right", color: "#27ae60", fontWeight: 600 }}>{fmtQty(mat.qty_reserve)}</td>
+                            <td style={{ ...tdS, textAlign: "center" }}>{renderCartBtn(mat)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#2980b9", marginBottom: 8 }}>🔵 Заказать со склада ({warehouseList.length})</div>
+                  {warehouseList.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 13 }}>Ничего не нужно</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead><tr style={{ borderBottom: "1px solid #eee" }}>
+                        <th style={thS}>Материал</th>
+                        <th style={thS}>Производитель</th>
+                        <th style={thS}>№ цвета</th>
+                        <th style={{ ...thS, textAlign: "right" }}>На складе</th>
+                        <th style={{ ...thS, textAlign: "center" }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {warehouseList.map(mat => (
+                          <tr key={mat.id} style={{ background: "#edf7ff", borderBottom: "1px solid #f0f0f0" }}>
+                            <td style={{ ...tdS, fontWeight: 500 }}>{mat.name}</td>
+                            <td style={{ ...tdS, color: "#888" }}>{mat.brand || "—"}</td>
+                            <td style={{ ...tdS, color: "#888" }}>{mat.color_number || "—"}</td>
+                            <td style={{ ...tdS, textAlign: "right", color: "#2980b9", fontWeight: 600 }}>{fmtQty(mat.qty_warehouse)}</td>
+                            <td style={{ ...tdS, textAlign: "center" }}>{renderCartBtn(mat)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#c0392b" }}>🔴 Купить ({buyList.length})</div>
+                    {buyList.length > 0 && (
+                      <button onClick={async () => {
+                        const cycle = await getOrCreateCycle();
+                        if (!cycle) return;
+                        const toAdd = buyList.filter(mat => !activeRequestMatIds.has(mat.id));
+                        if (toAdd.length === 0) { alert("Все материалы уже в активной заявке"); return; }
+                        const created = [];
+                        for (const mat of toAdd) {
+                          const sv = stockValue(mat);
+                          const needed = round1(Math.max(1, Math.ceil(Number(mat.min_threshold) - sv)));
+                          try {
+                            const data = await apiFetch("purchase_requests", {
+                              method: "POST",
+                              body: JSON.stringify({ cycle_label: cycle, material_id: mat.id, needed_qty: needed, available_qty: round1(sv), status: "новая", requested_by: user?.id || null, requested_by_name: authorName }),
+                            });
+                            const r = Array.isArray(data) ? data[0] : data;
+                            if (r) created.push(r);
+                          } catch (e) { console.error(e); }
+                        }
+                        if (created.length > 0) setRequests(prev => [...prev, ...created]);
+                        alert(`Добавлено ${created.length} позиций в цикл «${cycle}»`);
+                      }}
+                        style={{ fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "1px solid #7c3aed", background: "white", cursor: "pointer", color: "#7c3aed" }}>
+                        🛒 Добавить все в список покупок
+                      </button>
+                    )}
+                  </div>
+                  {buyList.length === 0 ? (
+                    <div style={{ color: "#aaa", fontSize: 13 }}>Ничего не нужно</div>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <thead><tr style={{ borderBottom: "1px solid #eee" }}>
+                        <th style={thS}>Материал</th>
+                        <th style={thS}>Производитель</th>
+                        <th style={thS}>№ цвета</th>
+                        <th style={{ ...thS, textAlign: "right" }}>Остаток</th>
+                        <th style={{ ...thS, textAlign: "right" }}>Мин.</th>
+                        <th style={{ ...thS, textAlign: "right" }}>Рекомендуется купить</th>
+                        <th style={{ ...thS, textAlign: "center" }}></th>
+                      </tr></thead>
+                      <tbody>
+                        {buyList.map(mat => {
+                          const sv = stockValue(mat);
+                          const recommended = Math.max(1, Math.ceil(Number(mat.min_threshold) - sv));
+                          return (
+                            <tr key={mat.id} style={{ background: "#fff0f0", borderBottom: "1px solid #f0f0f0" }}>
+                              <td style={{ ...tdS, fontWeight: 500 }}>{mat.name}</td>
+                              <td style={{ ...tdS, color: "#888" }}>{mat.brand || "—"}</td>
+                              <td style={{ ...tdS, color: "#888" }}>{mat.color_number || "—"}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#c0392b", fontWeight: 600 }}>{fmtQty(sv)}</td>
+                              <td style={{ ...tdS, textAlign: "right", color: "#888" }}>{fmtQty(mat.min_threshold)}</td>
+                              <td style={{ ...tdS, textAlign: "right", fontWeight: 600, color: "#7c3aed" }}>{recommended} {mat.unit}</td>
+                              <td style={{ ...tdS, textAlign: "center" }}>{renderCartBtn(mat)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
