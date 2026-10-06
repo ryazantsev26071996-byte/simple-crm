@@ -206,6 +206,13 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
   const [newItem, setNewItem] = React.useState("");
   const [showHistory, setShowHistory] = React.useState(false);
 
+  // For editing existing tasks: add back any person already in the task but absent from active profiles
+  const extraNames = [form.assigned_to, form.created_by_name, ...form.co_executors, ...form.observers]
+    .filter(name => name && !profiles.some(p => p.full_name === name));
+  const effectiveProfiles = extraNames.length > 0
+    ? [...profiles, ...[...new Set(extraNames)].map(name => ({ id: name, full_name: name }))]
+    : profiles;
+
   React.useEffect(() => {
     if (!clientSearch || clientSearch.length < 2) { setClientResults([]); return; }
     if (task?.client?.name && clientSearch === task.client.name) return;
@@ -304,14 +311,14 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
           {changingCreator ? (
             <select value={form.created_by_name}
               onChange={e => {
-                const p = profiles.find(p => p.full_name === e.target.value);
+                const p = effectiveProfiles.find(p => p.full_name === e.target.value);
                 setForm(f => ({ ...f, created_by_name: e.target.value, created_by: p?.id || null }));
                 setChangingCreator(false);
               }}
               onBlur={() => setChangingCreator(false)}
               autoFocus style={iStyle}>
               <option value="">— выбрать —</option>
-              {profiles.map(p => <option key={p.id} value={p.full_name}>{p.full_name}</option>)}
+              {effectiveProfiles.map(p => <option key={p.id} value={p.full_name}>{p.full_name}</option>)}
             </select>
           ) : (
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -330,7 +337,7 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
             <label style={lStyle}>Ответственный</label>
             <select value={form.assigned_to} onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))} style={iStyle}>
               <option value="">— не назначен —</option>
-              {profiles.map(p => <option key={p.id} value={p.full_name}>{p.full_name}</option>)}
+              {effectiveProfiles.map(p => <option key={p.id} value={p.full_name}>{p.full_name}</option>)}
             </select>
           </div>
           <div style={{ flex: 1 }}>
@@ -346,12 +353,12 @@ export default function TaskModal({ task, profiles, defaultAssignee, defaultClie
         {/* Соисполнители */}
         <PeopleChips label="Соисполнители" value={form.co_executors}
           onChange={v => setForm(f => ({ ...f, co_executors: v }))}
-          profiles={profiles} excludeNames={[form.assigned_to, form.created_by_name, ...form.observers].filter(Boolean)} />
+          profiles={effectiveProfiles} excludeNames={[form.assigned_to, form.created_by_name, ...form.observers].filter(Boolean)} />
 
         {/* Наблюдатели */}
         <PeopleChips label="Наблюдатели" value={form.observers}
           onChange={v => setForm(f => ({ ...f, observers: v }))}
-          profiles={profiles} excludeNames={[form.assigned_to, form.created_by_name, ...form.co_executors].filter(Boolean)} />
+          profiles={effectiveProfiles} excludeNames={[form.assigned_to, form.created_by_name, ...form.co_executors].filter(Boolean)} />
 
         {/* Клиент */}
         <div style={{ marginBottom: 10, position: "relative" }}>

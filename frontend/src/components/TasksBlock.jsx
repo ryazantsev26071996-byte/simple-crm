@@ -1,5 +1,6 @@
 import React from "react";
 import TaskModal from "./TaskModal";
+import { isActiveStaff } from "../inactiveStaff.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -65,7 +66,7 @@ export default function TasksBlock({ client, currentUserId, authorName }) {
   async function loadProfiles() {
     try {
       const data = await apiFetch("profiles?select=id,full_name&order=full_name.asc");
-      setProfiles((data || []).filter(p => p.full_name));
+      setProfiles((data || []).filter(p => p.full_name && isActiveStaff(p.full_name)));
     } catch {}
   }
 

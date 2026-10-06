@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
+import { isActiveStaff } from "./inactiveStaff.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -63,7 +64,7 @@ export default function TeamOnline() {
       supabase.from("profiles").select("id, full_name, role"),
       supabase.from("user_presence").select("user_id, last_seen"),
     ]);
-    if (profs) setProfiles(profs);
+    if (profs) setProfiles(profs.filter(p => isActiveStaff(p.full_name)));
     if (pres) {
       const map = {};
       pres.forEach(p => { map[p.user_id] = p.last_seen; });

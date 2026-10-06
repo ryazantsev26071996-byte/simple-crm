@@ -1,5 +1,6 @@
 import React from "react";
 import { RecurringTasksAdmin, TodayRecurringTasks } from "./RecurringTasks.jsx";
+import { isActiveStaff } from "./inactiveStaff.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -940,7 +941,7 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
   React.useEffect(() => {
     if (!isAdmin) return;
     apiFetch(supabase, "profiles?select=id,full_name,role,email,position&order=full_name.asc")
-      .then(rows => setEmployees(rows))
+      .then(rows => setEmployees((rows || []).filter(r => isActiveStaff(r.full_name))))
       .catch(() => {});
   }, [isAdmin]);
 
