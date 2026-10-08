@@ -289,9 +289,9 @@ export default function StudentProgress({ client, authorName }) {
 
                 {isDone && !isEditing && (
                   <div style={{ marginTop: 6, fontSize: 12, color: "#666" }}>
-                    {review.covered && <div style={{ marginBottom: 3 }}><span style={{ color: "#888" }}>Что пройдено: </span>{review.covered}</div>}
-                    {review.not_covered && <div style={{ marginBottom: 3 }}><span style={{ color: "#888" }}>Что не пройдено: </span>{review.not_covered}</div>}
-                    {review.next_steps && <div style={{ marginBottom: 3 }}><span style={{ color: "#888" }}>Что дальше: </span>{review.next_steps}</div>}
+                    {review.covered && <div style={{ marginBottom: 6 }}><div style={{ color: "#888" }}>Что пройдено:</div><div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{review.covered}</div></div>}
+                    {review.not_covered && <div style={{ marginBottom: 6 }}><div style={{ color: "#888" }}>Что не пройдено:</div><div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{review.not_covered}</div></div>}
+                    {review.next_steps && <div style={{ marginBottom: 6 }}><div style={{ color: "#888" }}>Что дальше:</div><div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{review.next_steps}</div></div>}
                     <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>отметил(а) {review.done_by_name}, {fmtDate(review.done_at)}</div>
                   </div>
                 )}
