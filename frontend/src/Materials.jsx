@@ -608,7 +608,12 @@ export default function Materials({ isOwner = true }) {
       if (!groupMap[key]) { groupMap[key] = { colorName: m.name, key, mats: [] }; groupOrder.push(key); }
       groupMap[key].mats.push(m);
     });
-    return groupOrder.map(k => groupMap[k]);
+    const allGroups = groupOrder.map(k => groupMap[k]);
+    const multiGroups = allGroups.filter(g => g.mats.length >= 2).sort((a, b) => a.colorName.localeCompare(b.colorName, 'ru'));
+    const soloMats = allGroups.filter(g => g.mats.length === 1).map(g => g.mats[0]);
+    return soloMats.length > 0
+      ? [...multiGroups, { key: '__solo__', colorName: null, mats: soloMats }]
+      : multiGroups;
   }, [globalSearchActive, globalSearchResults, sortedMats]);
 
   const activeRequestMatIds = React.useMemo(() => {
@@ -753,6 +758,16 @@ export default function Materials({ isOwner = true }) {
 
   const inputStyle = { padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: isMobile ? 16 : 13, outline: "none", width: "100%", boxSizing: "border-box" };
   const labelStyle = { fontSize: 12, color: "#666", marginBottom: 3, display: "block" };
+
+  function fmtGroupTotal(mats) {
+    const byUnit = {};
+    mats.forEach(m => {
+      const u = m.unit || '';
+      if (!byUnit[u]) byUnit[u] = 0;
+      byUnit[u] += stockValue(m);
+    });
+    return Object.entries(byUnit).map(([u, v]) => `${fmtQty(v)}${u ? ' ' + u : ''}`).join(' + ');
+  }
 
   function handleSort(col) {
     if (sortCol === col) {
@@ -963,15 +978,14 @@ export default function Materials({ isOwner = true }) {
                   ) : (() => {
                       if (isMobile) {
                         if (groupBy === "color") {
-                          return colorGroups.map(grp => grp.mats.length === 1
-                            ? renderMobileCard(grp.mats[0], true)
-                            : (<React.Fragment key={grp.key}>
-                              <div style={{ padding: "6px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>
-                                {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
+                          return colorGroups.map(grp => (
+                            <React.Fragment key={grp.key}>
+                              <div style={{ padding: "6px 12px", background: grp.key === '__solo__' ? "#f5f5f5" : "#f0ecfa", fontWeight: 700, fontSize: 12, color: grp.key === '__solo__' ? "#888" : "#7c3aed" }}>
+                                {grp.key === '__solo__' ? `Без аналогов (${grp.mats.length})` : `${grp.colorName} — итого: ${fmtGroupTotal(grp.mats)}`}
                               </div>
                               {grp.mats.map(m => renderMobileCard(m, true))}
-                            </React.Fragment>)
-                          );
+                            </React.Fragment>
+                          ));
                         }
                         return globalSearchResults.map(mat => renderMobileCard(mat, true));
                       }
@@ -1024,17 +1038,14 @@ export default function Materials({ isOwner = true }) {
                             <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500 }}>Действия</th>
                           </tr></thead>
                           <tbody>
-                            {colorGroups.map(grp => grp.mats.length === 1
-                              ? renderGlobalRow(grp.mats[0])
-                              : (
-                                <React.Fragment key={grp.key}>
-                                  <tr><td colSpan={globalColCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>
-                                    {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
-                                  </td></tr>
-                                  {grp.mats.map(renderGlobalRow)}
-                                </React.Fragment>
-                              )
-                            )}
+                            {colorGroups.map(grp => (
+                              <React.Fragment key={grp.key}>
+                                <tr><td colSpan={globalColCount} style={{ padding: "5px 12px", background: grp.key === '__solo__' ? "#f5f5f5" : "#f0ecfa", fontWeight: 700, fontSize: 12, color: grp.key === '__solo__' ? "#888" : "#7c3aed" }}>
+                                  {grp.key === '__solo__' ? `Без аналогов (${grp.mats.length})` : `${grp.colorName} — итого: ${fmtGroupTotal(grp.mats)}`}
+                                </td></tr>
+                                {grp.mats.map(renderGlobalRow)}
+                              </React.Fragment>
+                            ))}
                           </tbody>
                         </table>
                       );
@@ -1102,15 +1113,14 @@ export default function Materials({ isOwner = true }) {
                       <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Нет материалов</div>
                     ) : isMobile ? (() => {
                       if (groupBy === "color") {
-                        return colorGroups.map(grp => grp.mats.length === 1
-                          ? renderMobileCard(grp.mats[0])
-                          : (<React.Fragment key={grp.key}>
-                            <div style={{ padding: "6px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>
-                              {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
+                        return colorGroups.map(grp => (
+                          <React.Fragment key={grp.key}>
+                            <div style={{ padding: "6px 12px", background: grp.key === '__solo__' ? "#f5f5f5" : "#f0ecfa", fontWeight: 700, fontSize: 12, color: grp.key === '__solo__' ? "#888" : "#7c3aed" }}>
+                              {grp.key === '__solo__' ? `Без аналогов (${grp.mats.length})` : `${grp.colorName} — итого: ${fmtGroupTotal(grp.mats)}`}
                             </div>
                             {grp.mats.map(m => renderMobileCard(m))}
-                          </React.Fragment>)
-                        );
+                          </React.Fragment>
+                        ));
                       }
                       if (catHasBrand && groupBy === "brand" && brandGroups) {
                         return brandGroups.map(({ brand, mats }) => (
@@ -1254,17 +1264,14 @@ export default function Materials({ isOwner = true }) {
                               );
                             };
                             if (groupBy === "color") {
-                              return colorGroups.map(grp => grp.mats.length === 1
-                                ? renderRow(grp.mats[0])
-                                : (
-                                  <React.Fragment key={grp.key}>
-                                    <tr><td colSpan={colCount} style={{ padding: "5px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed", letterSpacing: 0.2 }}>
-                                      {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
-                                    </td></tr>
-                                    {grp.mats.map(renderRow)}
-                                  </React.Fragment>
-                                )
-                              );
+                              return colorGroups.map(grp => (
+                                <React.Fragment key={grp.key}>
+                                  <tr><td colSpan={colCount} style={{ padding: "5px 12px", background: grp.key === '__solo__' ? "#f5f5f5" : "#f0ecfa", fontWeight: 700, fontSize: 12, color: grp.key === '__solo__' ? "#888" : "#7c3aed", letterSpacing: 0.2 }}>
+                                    {grp.key === '__solo__' ? `Без аналогов (${grp.mats.length})` : `${grp.colorName} — итого: ${fmtGroupTotal(grp.mats)}`}
+                                  </td></tr>
+                                  {grp.mats.map(renderRow)}
+                                </React.Fragment>
+                              ));
                             }
                             if (catHasBrand && groupBy === "brand" && brandGroups) {
                               return brandGroups.map(({ brand, mats }) => (
