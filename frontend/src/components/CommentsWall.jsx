@@ -33,7 +33,7 @@ async function logAudit(action, entity, entityId, oldValue, newValue, userId, us
   if (error) console.error('audit_log insert failed:', error);
 }
 
-export default function CommentsWall({ role, authorName, comments, onCreate, onCommentsChange, client, onClientUpdate, currentUserId }) {
+export default function CommentsWall({ role, authorName, userEmail, comments, onCreate, onCommentsChange, client, onClientUpdate, currentUserId }) {
   const [message, setMessage] = React.useState("");
   const [lessons, setLessons] = React.useState(0);
   const [lessonDate, setLessonDate] = React.useState(new Date().toISOString().split('T')[0]);
@@ -249,7 +249,7 @@ export default function CommentsWall({ role, authorName, comments, onCreate, onC
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {client?.id && <TasksBlock client={client} currentUserId={currentUserId} authorName={authorName} />}
+      {client?.id && <TasksBlock client={client} currentUserId={currentUserId} authorName={authorName} userEmail={userEmail} userRole={role} />}
       <div style={{ flexShrink: 0, borderBottom: '1px solid #eee', paddingBottom: 12, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
           <div style={{ fontWeight: 500, fontSize: 14 }}>Комментарии</div>

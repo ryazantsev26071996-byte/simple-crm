@@ -1,6 +1,7 @@
 import React from "react";
 import TaskModal from "./TaskModal";
 import { isActiveStaff } from "../inactiveStaff.js";
+import { canSeeTask } from "../taskVisibility.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -38,7 +39,7 @@ function writeAuditLog(entry, currentUserId, authorName) {
   }).catch(() => {});
 }
 
-export default function TasksBlock({ client, currentUserId, authorName }) {
+export default function TasksBlock({ client, currentUserId, authorName, userEmail, userRole }) {
   const clientId = client?.id;
   const [tasks, setTasks] = React.useState([]);
   const [profiles, setProfiles] = React.useState([]);
@@ -58,7 +59,8 @@ export default function TasksBlock({ client, currentUserId, authorName }) {
     setLoading(true);
     try {
       const data = await apiFetch(`tasks?client_id=eq.${clientId}&order=due_date.asc.nullslast,created_at.asc`);
-      setTasks(data || []);
+      const all = data || [];
+      setTasks(all.filter(t => canSeeTask(t, { email: userEmail, role: userRole, name: authorName })));
     } catch (e) { console.error(e); }
     setLoading(false);
   }

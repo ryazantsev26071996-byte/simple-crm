@@ -58,6 +58,7 @@ import Tasks from "./Tasks.jsx";
 import MyOffice from "./MyOffice.jsx";
 import Mailings from "./Mailings.jsx";
 import Materials from "./Materials.jsx";
+import { canSeeTask } from "./taskVisibility.js";
 import MailingsPopup from "./components/MailingsPopup.jsx";
 import StageHistory from "./components/StageHistory.jsx";
 import TeacherAbonementCard from "./components/TeacherAbonementCard.jsx";
@@ -156,9 +157,13 @@ export default function App() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  const visibleTasks = React.useMemo(() =>
+    allTasks.filter(t => canSeeTask(t, { email: user?.email, role, name: authorName })),
+  [allTasks, user?.email, role, authorName]);
+
   const taskBadges = React.useMemo(() => {
     const map = {};
-    allTasks.forEach(t => {
+    visibleTasks.forEach(t => {
       if (!map[t.client_id]) map[t.client_id] = { count: 0, color: '#4a90e2' };
       map[t.client_id].count++;
       if (t.due_date) {
@@ -167,21 +172,21 @@ export default function App() {
       }
     });
     return map;
-  }, [allTasks, today]);
+  }, [visibleTasks, today]);
 
   const pendingTasks = React.useMemo(() =>
-    allTasks.filter(t => t.due_date && t.due_date <= today)
+    visibleTasks.filter(t => t.due_date && t.due_date <= today)
       .sort((a, b) => a.due_date.localeCompare(b.due_date)),
-  [allTasks, today]);
+  [visibleTasks, today]);
 
   const myTasksBadge = React.useMemo(() => {
     const isAdmin = user?.email === 'crm@artschool.ru';
-    return allTasks.filter(t => {
+    return visibleTasks.filter(t => {
       if (!t.due_date || t.due_date > today) return false;
       if (!isAdmin && t.assigned_to !== authorName) return false;
       return true;
     }).length;
-  }, [allTasks, today, user?.email, authorName]);
+  }, [visibleTasks, today, user?.email, authorName]);
 
   const [lowStockCount, setLowStockCount] = React.useState(0);
   React.useEffect(() => {
@@ -639,6 +644,7 @@ export default function App() {
               <CommentsWall
                 role={role}
                 authorName={authorName}
+                userEmail={user?.email}
                 comments={comments}
                 client={selectedClient}
                 currentUserId={user?.id}
