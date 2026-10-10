@@ -126,8 +126,15 @@ export default function Materials({ isOwner = true }) {
 
   // inline edit mode for справочник
   const [showEditMode, setShowEditMode] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
 
   const authorName = profile?.full_name || user?.email || "";
+
+  React.useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   React.useEffect(() => {
     loadCategories();
@@ -697,16 +704,61 @@ export default function Materials({ isOwner = true }) {
     return m ? m.name : `#${r.material_id}`;
   }
 
-  const inputStyle = { padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" };
+  const inputStyle = { padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: isMobile ? 16 : 13, outline: "none", width: "100%", boxSizing: "border-box" };
   const labelStyle = { fontSize: 12, color: "#666", marginBottom: 3, display: "block" };
+
+  function renderMobileCard(mat, showCat = false) {
+    const action = lowAction(mat);
+    const cardBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
+    const catName = mat.category?.name || categories.find(c => c.id === mat.category_id)?.name || null;
+    return (
+      <div key={mat.id} style={{ background: cardBg, borderBottom: "1px solid #eee", padding: "10px 12px" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
+          <span style={{ fontWeight: 700, fontSize: 14, color: action === 'buy' ? "#c0392b" : "#222", flex: 1, lineHeight: 1.3 }}>{mat.name}</span>
+          {action === 'buy' && <span style={{ fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Мало — купить</span>}
+          {action === 'reserve' && <span style={{ fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Из запаса ({fmtQty(mat.qty_reserve)})</span>}
+          {action === 'warehouse' && <span style={{ fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Со склада ({fmtQty(mat.qty_warehouse)})</span>}
+        </div>
+        {(mat.brand || mat.color_number) && (
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
+            {[mat.brand, mat.color_number ? `№ ${fmtColorNumber(mat.color_number)}` : null].filter(Boolean).join(" · ")}
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, fontSize: 13, flexWrap: "wrap" }}>
+          <span style={{ fontWeight: 600 }}>Остаток: {fmtQty(stockValue(mat))} {mat.unit}</span>
+          {mat.min_threshold != null && <span style={{ fontSize: 11, color: "#aaa" }}>Мин.: {fmtQty(mat.min_threshold)}</span>}
+          {Number(mat.qty_reserve) > 0 && <span style={{ fontSize: 11, color: "#27ae60" }}>Запас: {fmtQty(mat.qty_reserve)}</span>}
+          {Number(mat.qty_warehouse) > 0 && <span style={{ fontSize: 11, color: "#2980b9" }}>Склад: {fmtQty(mat.qty_warehouse)}</span>}
+        </div>
+        {showCat && catName && (
+          <div style={{ marginBottom: 6 }}>
+            <button onClick={() => { setSelectedCat(mat.category_id); setMatSearch(""); }}
+              style={{ fontSize: 11, padding: "2px 7px", borderRadius: 4, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>
+              {catName}
+            </button>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button onClick={() => openMove(mat)} title="Движение" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>📦</button>
+          <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>
+          <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги" style={{ minWidth: 36, minHeight: 36, fontSize: 14, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🔍</button>
+          {isLow(mat) && (activeRequestMatIds.has(mat.id)
+            ? <span style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "#f0f0f0", color: "#aaa", minHeight: 36, display: "flex", alignItems: "center" }}>в заявке</span>
+            : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🛒</button>
+          )}
+          <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Top tab bar */}
-      <div style={{ display: "flex", gap: 4, padding: "10px 16px 0", borderBottom: "1px solid #eee", flexShrink: 0 }}>
+      <div style={{ display: "flex", gap: 4, padding: "10px 16px 0", borderBottom: "1px solid #eee", flexShrink: 0, overflowX: isMobile ? "auto" : "visible" }}>
         {(isOwner ? TABS : ["Заявки на закупку"]).map(t => (
           <button key={t} onClick={() => setTab(t)}
-            style={{ fontSize: 13, padding: "6px 16px", borderRadius: "6px 6px 0 0", border: "1px solid #ddd", borderBottom: tab === t ? "2px solid #7c3aed" : "1px solid #ddd", background: tab === t ? "#f5f3ff" : "white", color: tab === t ? "#7c3aed" : "#555", fontWeight: tab === t ? 600 : 400, cursor: "pointer" }}>
+            style={{ fontSize: isMobile ? 11 : 13, padding: isMobile ? "5px 10px" : "6px 16px", borderRadius: "6px 6px 0 0", border: "1px solid #ddd", borderBottom: tab === t ? "2px solid #7c3aed" : "1px solid #ddd", background: tab === t ? "#f5f3ff" : "white", color: tab === t ? "#7c3aed" : "#555", fontWeight: tab === t ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {t}
           </button>
         ))}
@@ -715,46 +767,85 @@ export default function Materials({ isOwner = true }) {
       {tab === "Справочник" && (
         <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
           {/* Глобальный поиск + группировка + фильтры */}
-          <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 8, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
-            <div style={{ position: "relative", flex: "1 1 260px", maxWidth: 440 }}>
-              <input value={matSearch} onChange={e => setMatSearch(e.target.value)}
-                placeholder="Найти материал по названию, номеру цвета или производителю…"
-                style={{ ...inputStyle, paddingRight: matSearch ? 30 : 10 }} />
-              {matSearch && (
-                <button onClick={() => setMatSearch("")}
-                  style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", lineHeight: 1, padding: 0 }}>×</button>
-              )}
+          {isMobile ? (
+            <div style={{ padding: "8px", borderBottom: "1px solid #eee", display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
+              <div style={{ position: "relative" }}>
+                <input value={matSearch} onChange={e => setMatSearch(e.target.value)}
+                  placeholder="Найти материал…"
+                  style={{ ...inputStyle, paddingRight: matSearch ? 30 : 10 }} />
+                {matSearch && (
+                  <button onClick={() => setMatSearch("")}
+                    style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", lineHeight: 1, padding: 0 }}>×</button>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 5, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 2 }}>
+                <button onClick={() => setSearchEverywhere(v => !v)}
+                  style={{ fontSize: 11, padding: "4px 9px", borderRadius: 12, border: `1px solid ${searchEverywhere ? "#7c3aed" : "#ddd"}`, background: searchEverywhere ? "#f5f3ff" : "white", color: searchEverywhere ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  Искать везде
+                </button>
+                <button onClick={() => setGroupBy("brand")}
+                  style={{ fontSize: 11, padding: "4px 9px", borderRadius: 12, border: `1px solid ${groupBy === "brand" ? "#7c3aed" : "#ddd"}`, background: groupBy === "brand" ? "#f5f3ff" : "white", color: groupBy === "brand" ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  По производителю
+                </button>
+                <button onClick={() => setGroupBy("color")}
+                  style={{ fontSize: 11, padding: "4px 9px", borderRadius: 12, border: `1px solid ${groupBy === "color" ? "#7c3aed" : "#ddd"}`, background: groupBy === "color" ? "#f5f3ff" : "white", color: groupBy === "color" ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                  По цвету
+                </button>
+                {[
+                  { key: "low", label: "Только мало", active: filterLow, set: setFilterLow },
+                  { key: "reserve", label: "Есть в запасе", active: filterReserve, set: setFilterReserve },
+                  { key: "warehouse", label: "Есть на складе", active: filterWarehouse, set: setFilterWarehouse },
+                ].map(f => (
+                  <button key={f.key} onClick={() => f.set(v => !v)}
+                    style={{ fontSize: 11, padding: "4px 9px", borderRadius: 12, border: `1px solid ${f.active ? "#7c3aed" : "#ddd"}`, background: f.active ? "#f5f3ff" : "white", color: f.active ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {f.label}
+                  </button>
+                ))}
+                {matSearch.trim() && <span style={{ fontSize: 11, color: "#888", whiteSpace: "nowrap", flexShrink: 0, alignSelf: "center" }}>Найдено: {globalSearchActive ? globalSearchResults.length : filteredMats.length}</span>}
+              </div>
             </div>
-            <button onClick={() => setSearchEverywhere(v => !v)}
-              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 12, border: `1px solid ${searchEverywhere ? "#7c3aed" : "#ddd"}`, background: searchEverywhere ? "#f5f3ff" : "white", color: searchEverywhere ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap" }}>
-              Искать везде
-            </button>
-            <div style={{ display: "flex" }}>
-              <button onClick={() => setGroupBy("brand")}
-                style={{ fontSize: 12, padding: "5px 10px", borderRadius: "5px 0 0 5px", border: `1px solid ${groupBy === "brand" ? "#7c3aed" : "#ddd"}`, background: groupBy === "brand" ? "#f5f3ff" : "white", color: groupBy === "brand" ? "#7c3aed" : "#666", cursor: "pointer" }}>
-                По производителю
+          ) : (
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 8, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+              <div style={{ position: "relative", flex: "1 1 260px", maxWidth: 440 }}>
+                <input value={matSearch} onChange={e => setMatSearch(e.target.value)}
+                  placeholder="Найти материал по названию, номеру цвета или производителю…"
+                  style={{ ...inputStyle, paddingRight: matSearch ? 30 : 10 }} />
+                {matSearch && (
+                  <button onClick={() => setMatSearch("")}
+                    style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", lineHeight: 1, padding: 0 }}>×</button>
+                )}
+              </div>
+              <button onClick={() => setSearchEverywhere(v => !v)}
+                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 12, border: `1px solid ${searchEverywhere ? "#7c3aed" : "#ddd"}`, background: searchEverywhere ? "#f5f3ff" : "white", color: searchEverywhere ? "#7c3aed" : "#666", cursor: "pointer", whiteSpace: "nowrap" }}>
+                Искать везде
               </button>
-              <button onClick={() => setGroupBy("color")}
-                style={{ fontSize: 12, padding: "5px 10px", borderRadius: "0 5px 5px 0", border: `1px solid ${groupBy === "color" ? "#7c3aed" : "#ddd"}`, borderLeft: "none", background: groupBy === "color" ? "#f5f3ff" : "white", color: groupBy === "color" ? "#7c3aed" : "#666", cursor: "pointer" }}>
-                По цвету
-              </button>
+              <div style={{ display: "flex" }}>
+                <button onClick={() => setGroupBy("brand")}
+                  style={{ fontSize: 12, padding: "5px 10px", borderRadius: "5px 0 0 5px", border: `1px solid ${groupBy === "brand" ? "#7c3aed" : "#ddd"}`, background: groupBy === "brand" ? "#f5f3ff" : "white", color: groupBy === "brand" ? "#7c3aed" : "#666", cursor: "pointer" }}>
+                  По производителю
+                </button>
+                <button onClick={() => setGroupBy("color")}
+                  style={{ fontSize: 12, padding: "5px 10px", borderRadius: "0 5px 5px 0", border: `1px solid ${groupBy === "color" ? "#7c3aed" : "#ddd"}`, borderLeft: "none", background: groupBy === "color" ? "#f5f3ff" : "white", color: groupBy === "color" ? "#7c3aed" : "#666", cursor: "pointer" }}>
+                  По цвету
+                </button>
+              </div>
+              {[
+                { key: "low", label: "Только мало", active: filterLow, set: setFilterLow },
+                { key: "reserve", label: "Есть в запасе", active: filterReserve, set: setFilterReserve },
+                { key: "warehouse", label: "Есть на складе", active: filterWarehouse, set: setFilterWarehouse },
+              ].map(f => (
+                <button key={f.key} onClick={() => f.set(v => !v)}
+                  style={{ fontSize: 12, padding: "4px 10px", borderRadius: 12, border: `1px solid ${f.active ? "#7c3aed" : "#ddd"}`, background: f.active ? "#f5f3ff" : "white", color: f.active ? "#7c3aed" : "#666", cursor: "pointer" }}>
+                  {f.label}
+                </button>
+              ))}
+              {matSearch.trim() && <span style={{ fontSize: 12, color: "#888" }}>Найдено: {globalSearchActive ? globalSearchResults.length : filteredMats.length}</span>}
             </div>
-            {[
-              { key: "low", label: "Только мало", active: filterLow, set: setFilterLow },
-              { key: "reserve", label: "Есть в запасе", active: filterReserve, set: setFilterReserve },
-              { key: "warehouse", label: "Есть на складе", active: filterWarehouse, set: setFilterWarehouse },
-            ].map(f => (
-              <button key={f.key} onClick={() => f.set(v => !v)}
-                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 12, border: `1px solid ${f.active ? "#7c3aed" : "#ddd"}`, background: f.active ? "#f5f3ff" : "white", color: f.active ? "#7c3aed" : "#666", cursor: "pointer" }}>
-                {f.label}
-              </button>
-            ))}
-            {matSearch.trim() && <span style={{ fontSize: 12, color: "#888" }}>Найдено: {globalSearchActive ? globalSearchResults.length : filteredMats.length}</span>}
-          </div>
+          )}
 
           <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
             {/* Left: categories */}
-            <div style={{ width: 220, borderRight: "1px solid #eee", display: "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
+            <div style={{ width: 220, borderRight: "1px solid #eee", display: isMobile ? "none" : "flex", flexDirection: "column", flexShrink: 0, overflow: "hidden" }}>
               <div style={{ padding: "10px 12px", borderBottom: "1px solid #f0f0f0", fontWeight: 600, fontSize: 13, color: "#555" }}>Категории</div>
               <div style={{ flex: 1, overflowY: "auto" }}>
                 {categories.map(cat => (
@@ -784,11 +875,33 @@ export default function Materials({ isOwner = true }) {
 
             {/* Right: materials table */}
             <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {isMobile && !globalSearchActive && (
+                <div style={{ padding: "8px", borderBottom: "1px solid #eee", flexShrink: 0 }}>
+                  <select value={selectedCat || ""} onChange={e => { setSelectedCat(Number(e.target.value)); setMatSearch(""); }}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: 16, outline: "none", background: "white", boxSizing: "border-box" }}>
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  </select>
+                </div>
+              )}
               {globalSearchActive ? (
                 <div style={{ flex: 1, overflowY: "auto" }}>
                   {globalSearchResults.length === 0 ? (
                     <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Ничего не найдено</div>
                   ) : (() => {
+                      if (isMobile) {
+                        if (groupBy === "color") {
+                          return colorGroups.map(grp => grp.mats.length === 1
+                            ? renderMobileCard(grp.mats[0], true)
+                            : (<React.Fragment key={grp.key}>
+                              <div style={{ padding: "6px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>
+                                {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
+                              </div>
+                              {grp.mats.map(m => renderMobileCard(m, true))}
+                            </React.Fragment>)
+                          );
+                        }
+                        return globalSearchResults.map(mat => renderMobileCard(mat, true));
+                      }
                     const renderGlobalRow = (mat) => {
                       const action = lowAction(mat);
                       const rowBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
@@ -871,9 +984,9 @@ export default function Materials({ isOwner = true }) {
                 </div>
               ) : selectedCat ? (
                 <>
-                  <div style={{ padding: "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
+                  <div style={{ padding: isMobile ? "6px 8px" : "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: isMobile ? 6 : 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
                     {(buyCount > 0 || warehouseCount > 0 || reserveCount > 0) && (
-                      <span style={{ fontSize: 12, background: "#fff0f0", color: "#c0392b", border: "1px solid #fcc", borderRadius: 12, padding: "3px 10px", fontWeight: 600 }}>
+                      <span style={{ fontSize: 12, background: "#fff0f0", color: "#c0392b", border: "1px solid #fcc", borderRadius: 12, padding: "3px 10px", fontWeight: 600, ...(isMobile ? { width: "100%", boxSizing: "border-box" } : {}) }}>
                         {[buyCount > 0 && `Купить: ${buyCount}`, warehouseCount > 0 && `Со склада: ${warehouseCount}`, reserveCount > 0 && `Из запаса: ${reserveCount}`].filter(Boolean).join(' · ')}
                       </span>
                     )}
@@ -881,15 +994,15 @@ export default function Materials({ isOwner = true }) {
                       <span style={{ fontSize: 12, color: "#888" }}>Показано: {filteredMats.length} из {materials.length}</span>
                     )}
                     <button onClick={() => setShowEditMode(v => !v)}
-                      style={{ marginLeft: "auto", fontSize: 13, padding: "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
-                      ✏️ {showEditMode ? "Режим вкл." : "Режим редактирования"}
+                      style={{ marginLeft: isMobile ? 0 : "auto", fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
+                      ✏️ {showEditMode ? (isMobile ? "Вкл." : "Режим вкл.") : (isMobile ? "Ред." : "Режим редактирования")}
                     </button>
                     <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
-                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
-                      📝 Инвентаризация
+                      style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
+                      📝 {isMobile ? "Инв." : "Инвентаризация"}
                     </button>
                     <button onClick={() => setShowAddMat(true)}
-                      style={{ fontSize: 13, padding: "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
+                      style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
                       + Материал
                     </button>
                   </div>
@@ -899,7 +1012,28 @@ export default function Materials({ isOwner = true }) {
                       <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Загрузка...</div>
                     ) : filteredMats.length === 0 ? (
                       <div style={{ padding: 24, color: "#aaa", textAlign: "center" }}>Нет материалов</div>
-                    ) : (
+                    ) : isMobile ? (() => {
+                      if (groupBy === "color") {
+                        return colorGroups.map(grp => grp.mats.length === 1
+                          ? renderMobileCard(grp.mats[0])
+                          : (<React.Fragment key={grp.key}>
+                            <div style={{ padding: "6px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>
+                              {grp.colorName} — итого: {fmtQty(grp.mats.reduce((s, m) => s + stockValue(m), 0))} {grp.mats[0]?.unit || ""}
+                            </div>
+                            {grp.mats.map(m => renderMobileCard(m))}
+                          </React.Fragment>)
+                        );
+                      }
+                      if (catHasBrand && groupBy === "brand" && brandGroups) {
+                        return brandGroups.map(({ brand, mats }) => (
+                          <React.Fragment key={brand ?? "__no_brand__"}>
+                            <div style={{ padding: "6px 12px", background: "#f0ecfa", fontWeight: 700, fontSize: 12, color: "#7c3aed" }}>{brand || "Без производителя"}</div>
+                            {mats.map(m => renderMobileCard(m))}
+                          </React.Fragment>
+                        ));
+                      }
+                      return filteredMats.map(m => renderMobileCard(m));
+                    })() : (
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                           <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
@@ -1076,7 +1210,7 @@ export default function Materials({ isOwner = true }) {
                   {reserveList.length === 0 ? (
                     <div style={{ color: "#aaa", fontSize: 13 }}>Ничего не нужно</div>
                   ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead><tr style={{ borderBottom: "1px solid #eee" }}>
                         <th style={thS}>Материал</th>
                         <th style={thS}>Производитель</th>
@@ -1095,7 +1229,7 @@ export default function Materials({ isOwner = true }) {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </div>
 
@@ -1104,7 +1238,7 @@ export default function Materials({ isOwner = true }) {
                   {warehouseList.length === 0 ? (
                     <div style={{ color: "#aaa", fontSize: 13 }}>Ничего не нужно</div>
                   ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead><tr style={{ borderBottom: "1px solid #eee" }}>
                         <th style={thS}>Материал</th>
                         <th style={thS}>Производитель</th>
@@ -1123,7 +1257,7 @@ export default function Materials({ isOwner = true }) {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </div>
 
@@ -1160,7 +1294,7 @@ export default function Materials({ isOwner = true }) {
                   {buyList.length === 0 ? (
                     <div style={{ color: "#aaa", fontSize: 13 }}>Ничего не нужно</div>
                   ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead><tr style={{ borderBottom: "1px solid #eee" }}>
                         <th style={thS}>Материал</th>
                         <th style={thS}>Производитель</th>
@@ -1187,7 +1321,7 @@ export default function Materials({ isOwner = true }) {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </div>
               </>
@@ -1247,7 +1381,7 @@ export default function Materials({ isOwner = true }) {
                     )}
                   </div>
                 </div>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
                       <th style={{ padding: "6px 12px", textAlign: "left", fontWeight: 500 }}>Материал</th>
@@ -1273,7 +1407,7 @@ export default function Materials({ isOwner = true }) {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </div>
             );
           })}
@@ -1319,7 +1453,7 @@ export default function Materials({ isOwner = true }) {
               });
               if (filtered.length === 0) return <div style={{ padding: 32, color: "#aaa", textAlign: "center" }}>Записей не найдено</div>;
               return (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee", position: "sticky", top: 0 }}>
                       <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Дата занятия</th>
@@ -1366,7 +1500,7 @@ export default function Materials({ isOwner = true }) {
                       );
                     })}
                   </tbody>
-                </table>
+                </table></div>
               );
             })()}
           </div>
@@ -1433,7 +1567,7 @@ export default function Materials({ isOwner = true }) {
                   {discrepancies.length === 0 ? (
                     <div style={{ color: "#27ae60", fontSize: 13, padding: "8px 0" }}>Расхождений не обнаружено ✓</div>
                   ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #eee" }}>
                           <th style={thS}>Материал</th>
@@ -1456,7 +1590,7 @@ export default function Materials({ isOwner = true }) {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </div>
 
@@ -1466,7 +1600,7 @@ export default function Materials({ isOwner = true }) {
                   {speedRows.length === 0 ? (
                     <div style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Нет данных о расходе за последние 30 дней</div>
                   ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #eee" }}>
                           <th style={thS}>Материал</th>
@@ -1491,7 +1625,7 @@ export default function Materials({ isOwner = true }) {
                           );
                         })}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </div>
 
@@ -1501,7 +1635,7 @@ export default function Materials({ isOwner = true }) {
                     <div style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Нет данных об использовании красок за последние 30 дней</div>
                   ) : (
                     <>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                      <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                           <tr style={{ borderBottom: "1px solid #eee" }}>
                             <th style={thS}>Материал</th>
@@ -1518,7 +1652,7 @@ export default function Materials({ isOwner = true }) {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                       <div style={{ fontSize: 11, color: "#aaa", marginTop: 8, lineHeight: 1.6 }}>
                         Это условные единицы (капля=1, горошина=3, полтюбика=50, тюбик=100), не литры и не тюбики — используйте для сравнения материалов между собой и с предыдущими периодами, не как точный остаток.
                       </div>
@@ -1531,7 +1665,7 @@ export default function Materials({ isOwner = true }) {
                   {clientRows.length === 0 ? (
                     <div style={{ color: "#aaa", fontSize: 13, padding: "8px 0" }}>Нет данных</div>
                   ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <div style={{ overflowX: "auto" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid #eee" }}>
                           <th style={thS}>Ученик</th>
@@ -1548,7 +1682,7 @@ export default function Materials({ isOwner = true }) {
                           </tr>
                         ))}
                       </tbody>
-                    </table>
+                    </table></div>
                   )}
                 </div>
               </>
@@ -1560,7 +1694,7 @@ export default function Materials({ isOwner = true }) {
       {/* Inventory modal */}
       {showInventory && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ background: "white", borderRadius: 12, width: 680, maxWidth: "97vw", maxHeight: "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ background: "white", borderRadius: isMobile ? 0 : 12, width: isMobile ? "100%" : 680, maxWidth: isMobile ? "100vw" : "97vw", maxHeight: isMobile ? "100dvh" : "92vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ padding: "14px 18px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
               <strong style={{ fontSize: 14 }}>📝 Инвентаризация: {selectedCatName}</strong>
               <button onClick={() => setShowInventory(false)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "#aaa" }}>×</button>
@@ -1615,7 +1749,7 @@ export default function Materials({ isOwner = true }) {
       {showAddMat && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => setShowAddMat(false)}>
-          <div style={{ background: "white", borderRadius: 12, width: 420, maxWidth: "95vw", padding: 0, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: "white", borderRadius: isMobile ? 0 : 12, width: isMobile ? "100%" : 420, maxWidth: isMobile ? "100vw" : "95vw", padding: 0, overflow: "hidden", maxHeight: isMobile ? "100dvh" : "none", overflowY: isMobile ? "auto" : "visible" }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: "14px 18px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong style={{ fontSize: 14 }}>Новый материал</strong>
               <button onClick={() => setShowAddMat(false)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "#aaa" }}>×</button>
@@ -1625,7 +1759,7 @@ export default function Materials({ isOwner = true }) {
                 <label style={labelStyle}>Название *</label>
                 <input value={addMatForm.name} onChange={e => setAddMatForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} placeholder="Название материала" />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Производитель</label>
                   <input value={addMatForm.brand} onChange={e => setAddMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг..." />
@@ -1639,7 +1773,7 @@ export default function Materials({ isOwner = true }) {
                   <input value={addMatForm.unit} onChange={e => setAddMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} placeholder="шт, тюбик..." />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Целых (нач. остаток)</label>
                   <input type="number" min="0" value={addMatForm.qty_full} onChange={e => setAddMatForm(f => ({ ...f, qty_full: e.target.value }))} style={inputStyle} placeholder="0" />
@@ -1674,7 +1808,7 @@ export default function Materials({ isOwner = true }) {
       {editMat && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => setEditMat(null)}>
-          <div style={{ background: "white", borderRadius: 12, width: 480, maxWidth: "95vw", maxHeight: "90vh", overflow: "auto", padding: 0 }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: "white", borderRadius: isMobile ? 0 : 12, width: isMobile ? "100%" : 480, maxWidth: isMobile ? "100vw" : "95vw", maxHeight: isMobile ? "100dvh" : "90vh", overflow: "auto", padding: 0 }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: "14px 18px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "white", zIndex: 1 }}>
               <strong style={{ fontSize: 14 }}>Редактирование: {editMat.name}</strong>
               <button onClick={() => setEditMat(null)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "#aaa" }}>×</button>
@@ -1684,7 +1818,7 @@ export default function Materials({ isOwner = true }) {
                 <label style={labelStyle}>Название</label>
                 <input value={editMatForm.name} onChange={e => setEditMatForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
               </div>
-              <div style={{ display: "flex", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Производитель</label>
                   <input value={editMatForm.brand} onChange={e => setEditMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг" />
@@ -1698,7 +1832,7 @@ export default function Materials({ isOwner = true }) {
                   <input value={editMatForm.unit} onChange={e => setEditMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Целых</label>
                   <input type="number" min="0" step="0.5" value={editMatForm.qty_full} onChange={e => setEditMatForm(f => ({ ...f, qty_full: e.target.value }))} style={inputStyle} />
@@ -1724,7 +1858,7 @@ export default function Materials({ isOwner = true }) {
                   <input type="number" min="0" step="0.5" value={editMatForm.qty_warehouse} onChange={e => setEditMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Мин. порог</label>
                   <input type="number" min="0" step="0.5" value={editMatForm.min_threshold} onChange={e => setEditMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} />
@@ -1752,7 +1886,7 @@ export default function Materials({ isOwner = true }) {
       {moveMat && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center" }}
           onClick={() => setMoveMat(null)}>
-          <div style={{ background: "white", borderRadius: 12, width: 380, maxWidth: "95vw", padding: 0, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
+          <div style={{ background: "white", borderRadius: isMobile ? 0 : 12, width: isMobile ? "100%" : 380, maxWidth: isMobile ? "100vw" : "95vw", padding: 0, overflow: "hidden", maxHeight: isMobile ? "100dvh" : "none", overflowY: isMobile ? "auto" : "visible" }} onClick={e => e.stopPropagation()}>
             <div style={{ padding: "14px 18px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong style={{ fontSize: 14 }}>📦 Движение: {moveMat.name}</strong>
               <button onClick={() => setMoveMat(null)} style={{ fontSize: 20, background: "none", border: "none", cursor: "pointer", color: "#aaa" }}>×</button>
