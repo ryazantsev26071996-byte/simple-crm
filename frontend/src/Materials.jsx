@@ -127,6 +127,9 @@ export default function Materials({ isOwner = true }) {
   // inline edit mode for справочник
   const [showEditMode, setShowEditMode] = React.useState(false);
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
+  const [sortCol, setSortCol] = React.useState(null);
+  const [sortDir, setSortDir] = React.useState(null);
+  const [colFilters, setColFilters] = React.useState({});
 
   const authorName = profile?.full_name || user?.email || "";
 
@@ -191,6 +194,8 @@ export default function Materials({ isOwner = true }) {
   React.useEffect(() => {
     if (selectedCat) loadMaterials(selectedCat);
   }, [selectedCat]);
+
+  React.useEffect(() => { setColFilters({}); }, [selectedCat]);
 
   async function loadCategories() {
     try {
@@ -519,8 +524,50 @@ export default function Materials({ isOwner = true }) {
     if (filterLow) list = list.filter(isLow);
     if (filterReserve) list = list.filter(m => Number(m.qty_reserve) > 0);
     if (filterWarehouse) list = list.filter(m => Number(m.qty_warehouse) > 0);
+    if (colFilters.brand !== undefined) list = list.filter(m => (m.brand || '') === colFilters.brand);
+    if (colFilters.color_number !== undefined) list = list.filter(m => fmtColorNumber(m.color_number) === colFilters.color_number);
+    if (colFilters.name !== undefined) list = list.filter(m => normName(m.name) === colFilters.name);
+    if (colFilters.unit !== undefined) list = list.filter(m => (m.unit || '') === colFilters.unit);
     return list;
-  }, [materials, matSearch, searchEverywhere, filterLow, filterReserve, filterWarehouse]);
+  }, [materials, matSearch, searchEverywhere, filterLow, filterReserve, filterWarehouse, colFilters]);
+
+  const sortedMats = React.useMemo(() => {
+    if (!sortCol || !sortDir) return filteredMats;
+    const numCols = ['qty_full', 'qty_half', 'qty_almost_empty', 'qty_reserve', 'qty_warehouse', 'min_threshold'];
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...filteredMats].sort((a, b) => {
+      if (numCols.includes(sortCol)) {
+        const va = a[sortCol] != null ? Number(a[sortCol]) : null;
+        const vb = b[sortCol] != null ? Number(b[sortCol]) : null;
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        return (va - vb) * dir;
+      }
+      if (sortCol === 'last_counted_at') {
+        const va = a.last_counted_at || '';
+        const vb = b.last_counted_at || '';
+        if (!va && !vb) return 0;
+        if (!va) return 1;
+        if (!vb) return -1;
+        return va.localeCompare(vb) * dir;
+      }
+      if (sortCol === 'color_number') {
+        const va = a.color_number != null ? String(a.color_number).replace(/\.0$/, '') : null;
+        const vb = b.color_number != null ? String(b.color_number).replace(/\.0$/, '') : null;
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        return va.localeCompare(vb, 'ru', { numeric: true }) * dir;
+      }
+      const va = (a[sortCol] != null ? String(a[sortCol]) : '');
+      const vb = (b[sortCol] != null ? String(b[sortCol]) : '');
+      if (!va && !vb) return 0;
+      if (!va) return 1;
+      if (!vb) return -1;
+      return va.localeCompare(vb, 'ru') * dir;
+    });
+  }, [filteredMats, sortCol, sortDir]);
 
   const globalSearchActive = matSearch.trim().length > 0 && searchEverywhere;
 
@@ -542,7 +589,7 @@ export default function Materials({ isOwner = true }) {
     if (!catHasBrand) return null;
     const groupMap = {};
     const groupOrder = [];
-    filteredMats.forEach(m => {
+    sortedMats.forEach(m => {
       const key = m.brand || "__no_brand__";
       if (!groupMap[key]) { groupMap[key] = { brand: m.brand || null, mats: [] }; groupOrder.push(key); }
       groupMap[key].mats.push(m);
@@ -550,10 +597,10 @@ export default function Materials({ isOwner = true }) {
     const noBrand = groupOrder.includes("__no_brand__") ? ["__no_brand__"] : [];
     const withBrand = groupOrder.filter(k => k !== "__no_brand__");
     return [...withBrand, ...noBrand].map(k => groupMap[k]);
-  }, [filteredMats, catHasBrand]);
+  }, [sortedMats, catHasBrand]);
 
   const colorGroups = React.useMemo(() => {
-    const sourceList = globalSearchActive ? globalSearchResults : filteredMats;
+    const sourceList = globalSearchActive ? globalSearchResults : sortedMats;
     const groupMap = {};
     const groupOrder = [];
     sourceList.forEach(m => {
@@ -562,7 +609,7 @@ export default function Materials({ isOwner = true }) {
       groupMap[key].mats.push(m);
     });
     return groupOrder.map(k => groupMap[k]);
-  }, [globalSearchActive, globalSearchResults, filteredMats]);
+  }, [globalSearchActive, globalSearchResults, sortedMats]);
 
   const activeRequestMatIds = React.useMemo(() => {
     const ids = new Set();
@@ -707,6 +754,30 @@ export default function Materials({ isOwner = true }) {
   const inputStyle = { padding: "6px 10px", borderRadius: 6, border: "1px solid #ddd", fontSize: isMobile ? 16 : 13, outline: "none", width: "100%", boxSizing: "border-box" };
   const labelStyle = { fontSize: 12, color: "#666", marginBottom: 3, display: "block" };
 
+  function handleSort(col) {
+    if (sortCol === col) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else { setSortCol(null); setSortDir(null); }
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  }
+
+  function toggleColFilter(field, value) {
+    setColFilters(prev => {
+      if (prev[field] === value) { const next = { ...prev }; delete next[field]; return next; }
+      return { ...prev, [field]: value };
+    });
+  }
+
+  const thSortStyle = (col, align = 'left') => ({
+    padding: "8px 12px", textAlign: align, fontWeight: 500, whiteSpace: "nowrap",
+    cursor: "pointer", userSelect: "none",
+    background: sortCol === col ? "#f5f3ff" : undefined,
+    color: sortCol === col ? "#7c3aed" : undefined,
+  });
+
   function renderMobileCard(mat, showCat = false) {
     const action = lowAction(mat);
     const cardBg = action === 'buy' ? "#fff0f0" : action === 'reserve' ? "#fffdf0" : action === 'warehouse' ? "#edf7ff" : "white";
@@ -721,7 +792,9 @@ export default function Materials({ isOwner = true }) {
         </div>
         {(mat.brand || mat.color_number) && (
           <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
-            {[mat.brand, mat.color_number ? `№ ${fmtColorNumber(mat.color_number)}` : null].filter(Boolean).join(" · ")}
+            {mat.brand && <span onClick={() => toggleColFilter('brand', mat.brand)} style={{ cursor: "pointer" }} title={`Показать только: ${mat.brand}`}>{mat.brand}</span>}
+            {mat.brand && mat.color_number && " · "}
+            {mat.color_number && <span onClick={() => toggleColFilter('color_number', fmtColorNumber(mat.color_number))} style={{ cursor: "pointer" }} title={`Показать только: ${fmtColorNumber(mat.color_number)}`}>№ {fmtColorNumber(mat.color_number)}</span>}
           </div>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6, fontSize: 13, flexWrap: "wrap" }}>
@@ -993,6 +1066,21 @@ export default function Materials({ isOwner = true }) {
                     {filteredMats.length !== materials.length && (
                       <span style={{ fontSize: 12, color: "#888" }}>Показано: {filteredMats.length} из {materials.length}</span>
                     )}
+                    {Object.entries(colFilters).map(([field, val]) => {
+                      const labelMap = { brand: 'Производитель', color_number: '№ цвета', name: 'Название', unit: 'Ед.' };
+                      return (
+                        <span key={field} style={{ fontSize: 12, background: "#f5f3ff", color: "#7c3aed", border: "1px solid #e0d7f9", borderRadius: 12, padding: "2px 6px 2px 10px", display: "flex", alignItems: "center", gap: 4 }}>
+                          {labelMap[field]}: {val}
+                          <button onClick={() => setColFilters(prev => { const n = { ...prev }; delete n[field]; return n; })}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "#7c3aed", padding: 0, fontSize: 16, lineHeight: 1, marginLeft: 2 }}>×</button>
+                        </span>
+                      );
+                    })}
+                    {Object.keys(colFilters).length > 0 && (
+                      <button onClick={() => setColFilters({})} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 12, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
+                        Сбросить все
+                      </button>
+                    )}
                     <button onClick={() => setShowEditMode(v => !v)}
                       style={{ marginLeft: isMobile ? 0 : "auto", fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
                       ✏️ {showEditMode ? (isMobile ? "Вкл." : "Режим вкл.") : (isMobile ? "Ред." : "Режим редактирования")}
@@ -1032,22 +1120,22 @@ export default function Materials({ isOwner = true }) {
                           </React.Fragment>
                         ));
                       }
-                      return filteredMats.map(m => renderMobileCard(m));
+                      return sortedMats.map(m => renderMobileCard(m));
                     })() : (
                       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                         <thead>
                           <tr style={{ background: "#fafafa", borderBottom: "1px solid #eee" }}>
-                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Название</th>
-                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>№ цвета</th>
-                            {catHasBrand && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Производитель</th>}
-                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Ед.</th>
-                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Целых</th>
-                            {catHasHalf && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>{halfColLabel}</th>}
-                            {catHasAlmostEmpty && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Скоро закончится</th>}
-                            {catHasReserve && <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Запас</th>}
-                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>На складе</th>
-                            <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 500, whiteSpace: "nowrap" }}>Мин.</th>
-                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Пересчёт</th>
+                            <th onClick={() => handleSort('name')} style={thSortStyle('name', 'left')}>Название{sortCol === 'name' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                            <th onClick={() => handleSort('color_number')} style={thSortStyle('color_number', 'left')}>№ цвета{sortCol === 'color_number' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                            {catHasBrand && <th onClick={() => handleSort('brand')} style={thSortStyle('brand', 'left')}>Производитель{sortCol === 'brand' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                            <th onClick={() => handleSort('unit')} style={thSortStyle('unit', 'left')}>Ед.{sortCol === 'unit' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                            <th onClick={() => handleSort('qty_full')} style={thSortStyle('qty_full', 'right')}>Целых{sortCol === 'qty_full' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                            {catHasHalf && <th onClick={() => handleSort('qty_half')} style={thSortStyle('qty_half', 'right')}>{halfColLabel}{sortCol === 'qty_half' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                            {catHasAlmostEmpty && <th onClick={() => handleSort('qty_almost_empty')} style={thSortStyle('qty_almost_empty', 'right')}>Скоро закончится{sortCol === 'qty_almost_empty' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                            {catHasReserve && <th onClick={() => handleSort('qty_reserve')} style={thSortStyle('qty_reserve', 'right')}>Запас{sortCol === 'qty_reserve' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                            <th onClick={() => handleSort('qty_warehouse')} style={thSortStyle('qty_warehouse', 'right')}>На складе{sortCol === 'qty_warehouse' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                            <th onClick={() => handleSort('min_threshold')} style={thSortStyle('min_threshold', 'right')}>Мин.{sortCol === 'min_threshold' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
+                            <th onClick={() => handleSort('last_counted_at')} style={thSortStyle('last_counted_at', 'left')}>Пересчёт{sortCol === 'last_counted_at' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
                             <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>
                             <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500, whiteSpace: "nowrap" }}>Действия</th>
                           </tr>
@@ -1060,23 +1148,41 @@ export default function Materials({ isOwner = true }) {
                               return (
                                 <tr key={mat.id} style={{ borderBottom: "1px solid #f5f5f5", background: rowBg }}>
                                   <td style={{ padding: "7px 12px", fontWeight: action ? 600 : 400, color: action === 'buy' ? "#c0392b" : "#222" }}>
-                                    {mat.name}
+                                    <span onClick={!showEditMode ? () => toggleColFilter('name', normName(mat.name)) : undefined}
+                                      style={!showEditMode ? { cursor: "pointer", textDecoration: colFilters.name === normName(mat.name) ? "underline" : "none" } : {}}
+                                      title={!showEditMode ? `Показать только: ${mat.name}` : undefined}>
+                                      {mat.name}
+                                    </span>
                                     {action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
                                     {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
                                     {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
                                   </td>
-                                  <td style={{ padding: "7px 12px", color: "#888" }}>{fmtColorNumber(mat.color_number)}</td>
+                                  <td style={{ padding: "7px 12px", color: "#888" }}>
+                                    <span onClick={!showEditMode && mat.color_number ? () => toggleColFilter('color_number', fmtColorNumber(mat.color_number)) : undefined}
+                                      style={!showEditMode && mat.color_number ? { cursor: "pointer", textDecoration: colFilters.color_number === fmtColorNumber(mat.color_number) ? "underline" : "none" } : {}}
+                                      title={!showEditMode && mat.color_number ? `Показать только: ${fmtColorNumber(mat.color_number)}` : undefined}>
+                                      {fmtColorNumber(mat.color_number)}
+                                    </span>
+                                  </td>
                                   {catHasBrand && (
                                     <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12 }}>
                                       {showEditMode
                                         ? <input key={`${mat.id}_brand_${mat.updated_at||''}`} type="text" defaultValue={mat.brand || ""} onBlur={e => saveInlineField(mat, "brand", e.target.value)} style={{ width: "100%", minWidth: 80, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
-                                        : (mat.brand || "—")}
+                                        : <span onClick={mat.brand ? () => toggleColFilter('brand', mat.brand) : undefined}
+                                            style={mat.brand ? { cursor: "pointer", textDecoration: colFilters.brand === mat.brand ? "underline" : "none" } : {}}
+                                            title={mat.brand ? `Показать только: ${mat.brand}` : undefined}>
+                                            {mat.brand || "—"}
+                                          </span>}
                                     </td>
                                   )}
                                   <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888" }}>
                                     {showEditMode
                                       ? <input key={`${mat.id}_unit_${mat.updated_at||''}`} type="text" defaultValue={mat.unit || ""} onBlur={e => saveInlineField(mat, "unit", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
-                                      : mat.unit}
+                                      : <span onClick={() => toggleColFilter('unit', mat.unit || '')}
+                                          style={{ cursor: "pointer", textDecoration: colFilters.unit === (mat.unit || '') ? "underline" : "none" }}
+                                          title={`Показать только: ${mat.unit}`}>
+                                          {mat.unit}
+                                        </span>}
                                   </td>
                                   <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
                                     {showEditMode
@@ -1172,7 +1278,7 @@ export default function Materials({ isOwner = true }) {
                                 </React.Fragment>
                               ));
                             }
-                            return filteredMats.map(renderRow);
+                            return sortedMats.map(renderRow);
                           })()}
                         </tbody>
                       </table>
