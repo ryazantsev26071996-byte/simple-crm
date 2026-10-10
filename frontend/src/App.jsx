@@ -185,6 +185,7 @@ export default function App() {
 
   const [lowStockCount, setLowStockCount] = React.useState(0);
   React.useEffect(() => {
+    if (user?.email !== 'crm@artschool.ru' && role !== 'supervisor') return;
     async function fetchLowStock() {
       try {
         const token = await getToken();
@@ -201,7 +202,7 @@ export default function App() {
       } catch (e) {}
     }
     fetchLowStock();
-  }, []);
+  }, [user?.email, role]);
 
   const selectedClient = clients.find((c) => c.id === selectedId) || null;
 
@@ -227,7 +228,7 @@ export default function App() {
     { key: 'students', label: 'Ученики' },
     { key: 'tasks', label: 'Задачи' },
     ...(role === 'admin' || role === 'manager' || role === 'supervisor' ? [{ key: 'mailings', label: 'Рассылки' }] : []),
-    ...((user?.email === 'crm@artschool.ru' || role === 'supervisor') ? [{ key: 'materials', label: 'Материалы' }] : []),
+    ...((user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') ? [{ key: 'materials', label: 'Материалы' }] : []),
   ];
 
 
@@ -307,10 +308,10 @@ export default function App() {
                 {myTasksBadge > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{myTasksBadge}</span>}
               </button>
               {(role === 'admin' || role === 'manager' || role === 'supervisor') && <button className="tabBtn" onClick={() => setView('mailings')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'mailings' ? '#e67e22' : 'white', color: view === 'mailings' ? 'white' : '#e67e22', cursor: 'pointer' }}>Рассылки</button>}
-              {(user?.email === 'crm@artschool.ru' || role === 'supervisor') && (
+              {(user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') && (
                 <button className="tabBtn" onClick={() => setView('materials')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'materials' ? '#7c3aed' : 'white', color: view === 'materials' ? 'white' : '#7c3aed', cursor: 'pointer', position: 'relative' }}>
                   Материалы
-                  {lowStockCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{lowStockCount}</span>}
+                  {lowStockCount > 0 && role !== 'teacher' && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{lowStockCount}</span>}
                 </button>
               )}
             </div>
@@ -406,7 +407,7 @@ export default function App() {
           {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
           {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
           {view === 'mailings' && (role === 'admin' || role === 'manager' || role === 'supervisor') && <Mailings clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated?.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? { ...c, ...updated } : c) : [updated, ...prev]; }); }} />}
-          {view === 'materials' && (user?.email === 'crm@artschool.ru' || role === 'supervisor') && <Materials isOwner={user?.email === 'crm@artschool.ru'} />}
+          {view === 'materials' && (user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') && <Materials isOwner={user?.email === 'crm@artschool.ru'} readOnly={role === 'teacher'} />}
 
           {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>

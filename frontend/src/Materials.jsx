@@ -56,9 +56,9 @@ const QUALITATIVE_UNITS = [
 const STATUS_COLORS = { "новая": "#fff3cd", "заказано": "#cce5ff", "куплено": "#d4edda" };
 const STATUS_TEXT = { "новая": "#856404", "заказано": "#004085", "куплено": "#155724" };
 
-export default function Materials({ isOwner = true }) {
+export default function Materials({ isOwner = true, readOnly = false }) {
   const { user, profile } = useAuth();
-  const [tab, setTab] = React.useState(isOwner ? "Справочник" : "Заявки на закупку");
+  const [tab, setTab] = React.useState((isOwner || readOnly) ? "Справочник" : "Заявки на закупку");
 
   // categories
   const [categories, setCategories] = React.useState([]);
@@ -175,7 +175,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function saveEditLogEntry() {
-    if (!editLogEntry) return;
+    if (readOnly || !editLogEntry) return;
     try {
       let patch = {};
       const actualMode = editLogEntry.material?.tracking_mode;
@@ -251,6 +251,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function addMaterial() {
+    if (readOnly) return;
     if (!addMatForm.name.trim()) { alert("Введите название"); return; }
     if (!selectedCat) return;
     try {
@@ -276,7 +277,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function saveMaterial() {
-    if (!editMat) return;
+    if (readOnly || !editMat) return;
     try {
       const body = {
         name: editMatForm.name,
@@ -330,7 +331,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function saveMovement() {
-    if (!moveMat) return;
+    if (readOnly || !moveMat) return;
     const delta = Number(moveForm.delta);
     if (!delta || delta <= 0) { alert("Введите корректное количество"); return; }
     const field = moveForm.field;
@@ -365,6 +366,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function addRequest() {
+    if (readOnly) return;
     if (!reqForm.cycle_label.trim()) { alert("Укажите цикл заявки"); return; }
     if (!reqForm.needed_qty || Number(reqForm.needed_qty) <= 0) { alert("Укажите нужное количество"); return; }
     if (!reqForm.material_id && !reqForm.material_name_manual.trim()) { alert("Выберите материал или введите его название вручную"); return; }
@@ -436,6 +438,7 @@ export default function Materials({ isOwner = true }) {
   const NUM_INLINE_FIELDS = [...QTY_INLINE_FIELDS, "min_threshold"];
 
   async function saveInlineField(mat, field, rawValue) {
+    if (readOnly) return;
     const today = new Date().toISOString().split("T")[0];
     let parsedValue;
     if (NUM_INLINE_FIELDS.includes(field)) {
@@ -488,6 +491,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function deleteMaterial(mat) {
+    if (readOnly) return;
     if (!window.confirm(`Удалить материал из справочника?\n«${mat.name}»`)) return;
     try {
       await apiFetch(`materials?id=eq.${mat.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
@@ -504,7 +508,7 @@ export default function Materials({ isOwner = true }) {
   const selectedCatName = categories.find(c => c.id === selectedCat)?.name || "";
   const halfColLabel = selectedCatName === "Карандаши" ? "Огрызки" : "Половина";
   // 9 always-visible columns: Название, № цвета, Ед., Целых, На складе, Мин., Пересчёт, Заметки, Действия
-  const colCount = 9 + (catHasBrand ? 1 : 0) + (catHasHalf ? 1 : 0) + (catHasAlmostEmpty ? 1 : 0) + (catHasReserve ? 1 : 0);
+  const colCount = (readOnly ? 6 : 9) + (catHasBrand ? 1 : 0) + (catHasHalf ? 1 : 0) + (catHasAlmostEmpty ? 1 : 0) + (catHasReserve ? 1 : 0);
 
   const lowMats = materials.filter(isLow);
   const buyCount = lowMats.filter(m => lowAction(m) === 'buy').length;
@@ -623,6 +627,7 @@ export default function Materials({ isOwner = true }) {
   }, [requests]);
 
   async function saveInlineMin(mat) {
+    if (readOnly) return;
     const val = inlineMinVal.trim() === "" ? null : Number(inlineMinVal);
     setInlineMinId(null);
     if (val === mat.min_threshold || (val === null && mat.min_threshold == null)) return;
@@ -633,6 +638,7 @@ export default function Materials({ isOwner = true }) {
   }
 
   async function saveInventory() {
+    if (readOnly) return;
     const today = new Date().toISOString().split("T")[0];
     const relevantFields = ["qty_full", ...(catHasHalf ? ["qty_half"] : []), ...(catHasAlmostEmpty ? ["qty_almost_empty"] : [])];
     let updatedCount = 0;
@@ -801,9 +807,9 @@ export default function Materials({ isOwner = true }) {
       <div key={mat.id} style={{ background: cardBg, borderBottom: "1px solid #eee", padding: "10px 12px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 3 }}>
           <span style={{ fontWeight: 700, fontSize: 14, color: action === 'buy' ? "#c0392b" : "#222", flex: 1, lineHeight: 1.3 }}>{mat.name}</span>
-          {action === 'buy' && <span style={{ fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Мало — купить</span>}
-          {action === 'reserve' && <span style={{ fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Из запаса ({fmtQty(mat.qty_reserve)})</span>}
-          {action === 'warehouse' && <span style={{ fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Со склада ({fmtQty(mat.qty_warehouse)})</span>}
+          {!readOnly && action === 'buy' && <span style={{ fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Мало — купить</span>}
+          {!readOnly && action === 'reserve' && <span style={{ fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Из запаса ({fmtQty(mat.qty_reserve)})</span>}
+          {!readOnly && action === 'warehouse' && <span style={{ fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "2px 5px", whiteSpace: "nowrap", flexShrink: 0 }}>Со склада ({fmtQty(mat.qty_warehouse)})</span>}
         </div>
         {(mat.brand || mat.color_number) && (
           <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>
@@ -827,14 +833,14 @@ export default function Materials({ isOwner = true }) {
           </div>
         )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button onClick={() => openMove(mat)} title="Движение" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>📦</button>
-          <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>
+          {!readOnly && <button onClick={() => openMove(mat)} title="Движение" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>📦</button>}
+          {!readOnly && <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>}
           <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги" style={{ minWidth: 36, minHeight: 36, fontSize: 14, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🔍</button>
-          {isLow(mat) && (activeRequestMatIds.has(mat.id)
+          {!readOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
             ? <span style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "#f0f0f0", color: "#aaa", minHeight: 36, display: "flex", alignItems: "center" }}>в заявке</span>
             : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🛒</button>
           )}
-          <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
+          {!readOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
         </div>
       </div>
     );
@@ -844,7 +850,7 @@ export default function Materials({ isOwner = true }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Top tab bar */}
       <div style={{ display: "flex", gap: 4, padding: "10px 16px 0", borderBottom: "1px solid #eee", flexShrink: 0, overflowX: isMobile ? "auto" : "visible" }}>
-        {(isOwner ? TABS : ["Заявки на закупку"]).map(t => (
+        {(readOnly ? ["Справочник"] : (isOwner ? TABS : ["Заявки на закупку"])).map(t => (
           <button key={t} onClick={() => setTab(t)}
             style={{ fontSize: isMobile ? 11 : 13, padding: isMobile ? "5px 10px" : "6px 16px", borderRadius: "6px 6px 0 0", border: "1px solid #ddd", borderBottom: tab === t ? "2px solid #7c3aed" : "1px solid #ddd", background: tab === t ? "#f5f3ff" : "white", color: tab === t ? "#7c3aed" : "#555", fontWeight: tab === t ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {t}
@@ -943,7 +949,7 @@ export default function Materials({ isOwner = true }) {
                   </div>
                 ))}
               </div>
-              <div style={{ padding: 10, borderTop: "1px solid #f0f0f0" }}>
+              {!readOnly && <div style={{ padding: 10, borderTop: "1px solid #f0f0f0" }}>
                 {addingCat ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
@@ -958,7 +964,7 @@ export default function Materials({ isOwner = true }) {
                 ) : (
                   <button onClick={() => setAddingCat(true)} style={{ width: "100%", fontSize: 12, padding: "6px 0", borderRadius: 6, border: "1px dashed #bbb", background: "white", cursor: "pointer", color: "#888" }}>+ Категория</button>
                 )}
-              </div>
+              </div>}
             </div>
 
             {/* Right: materials table */}
@@ -1069,7 +1075,7 @@ export default function Materials({ isOwner = true }) {
               ) : selectedCat ? (
                 <>
                   <div style={{ padding: isMobile ? "6px 8px" : "10px 16px", borderBottom: "1px solid #eee", display: "flex", gap: isMobile ? 6 : 10, alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}>
-                    {(buyCount > 0 || warehouseCount > 0 || reserveCount > 0) && (
+                    {!readOnly && (buyCount > 0 || warehouseCount > 0 || reserveCount > 0) && (
                       <span style={{ fontSize: 12, background: "#fff0f0", color: "#c0392b", border: "1px solid #fcc", borderRadius: 12, padding: "3px 10px", fontWeight: 600, ...(isMobile ? { width: "100%", boxSizing: "border-box" } : {}) }}>
                         {[buyCount > 0 && `Купить: ${buyCount}`, warehouseCount > 0 && `Со склада: ${warehouseCount}`, reserveCount > 0 && `Из запаса: ${reserveCount}`].filter(Boolean).join(' · ')}
                       </span>
@@ -1092,18 +1098,18 @@ export default function Materials({ isOwner = true }) {
                         Сбросить все
                       </button>
                     )}
-                    <button onClick={() => setShowEditMode(v => !v)}
+                    {!readOnly && <button onClick={() => setShowEditMode(v => !v)}
                       style={{ marginLeft: isMobile ? 0 : "auto", fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
                       ✏️ {showEditMode ? (isMobile ? "Вкл." : "Режим вкл.") : (isMobile ? "Ред." : "Режим редактирования")}
-                    </button>
-                    <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
+                    </button>}
+                    {!readOnly && <button onClick={() => { setInventoryFact({}); setShowInventory(true); }}
                       style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
                       📝 {isMobile ? "Инв." : "Инвентаризация"}
-                    </button>
-                    <button onClick={() => setShowAddMat(true)}
+                    </button>}
+                    {!readOnly && <button onClick={() => setShowAddMat(true)}
                       style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
                       + Материал
-                    </button>
+                    </button>}
                   </div>
 
                   <div style={{ flex: 1, overflowY: "auto" }}>
@@ -1144,9 +1150,9 @@ export default function Materials({ isOwner = true }) {
                             {catHasAlmostEmpty && <th onClick={() => handleSort('qty_almost_empty')} style={thSortStyle('qty_almost_empty', 'right')}>Скоро закончится{sortCol === 'qty_almost_empty' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                             {catHasReserve && <th onClick={() => handleSort('qty_reserve')} style={thSortStyle('qty_reserve', 'right')}>Запас{sortCol === 'qty_reserve' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
                             <th onClick={() => handleSort('qty_warehouse')} style={thSortStyle('qty_warehouse', 'right')}>На складе{sortCol === 'qty_warehouse' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                            <th onClick={() => handleSort('min_threshold')} style={thSortStyle('min_threshold', 'right')}>Мин.{sortCol === 'min_threshold' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                            <th onClick={() => handleSort('last_counted_at')} style={thSortStyle('last_counted_at', 'left')}>Пересчёт{sortCol === 'last_counted_at' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>
-                            <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>
+                            {!readOnly && <th onClick={() => handleSort('min_threshold')} style={thSortStyle('min_threshold', 'right')}>Мин.{sortCol === 'min_threshold' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                            {!readOnly && <th onClick={() => handleSort('last_counted_at')} style={thSortStyle('last_counted_at', 'left')}>Пересчёт{sortCol === 'last_counted_at' ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</th>}
+                            {!readOnly && <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 500, whiteSpace: "nowrap" }}>Заметки</th>}
                             <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 500, whiteSpace: "nowrap" }}>Действия</th>
                           </tr>
                         </thead>
@@ -1163,9 +1169,9 @@ export default function Materials({ isOwner = true }) {
                                       title={!showEditMode ? `Показать только: ${mat.name}` : undefined}>
                                       {mat.name}
                                     </span>
-                                    {action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
-                                    {action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
-                                    {action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
+                                    {!readOnly && action === 'buy' && <span style={{ marginLeft: 6, fontSize: 10, background: "#e53935", color: "white", borderRadius: 3, padding: "1px 4px" }}>Мало — купить</span>}
+                                    {!readOnly && action === 'reserve' && <span style={{ marginLeft: 6, fontSize: 10, background: "#27ae60", color: "white", borderRadius: 3, padding: "1px 4px" }}>Возьмите из запаса ({fmtQty(mat.qty_reserve)})</span>}
+                                    {!readOnly && action === 'warehouse' && <span style={{ marginLeft: 6, fontSize: 10, background: "#2980b9", color: "white", borderRadius: 3, padding: "1px 4px" }}>Закажите со склада ({fmtQty(mat.qty_warehouse)})</span>}
                                   </td>
                                   <td style={{ padding: "7px 12px", color: "#888" }}>
                                     <span onClick={!showEditMode && mat.color_number ? () => toggleColFilter('color_number', fmtColorNumber(mat.color_number)) : undefined}
@@ -1225,7 +1231,7 @@ export default function Materials({ isOwner = true }) {
                                       ? <input key={`${mat.id}_qty_wh_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_warehouse != null ? String(mat.qty_warehouse) : ""} onBlur={e => saveInlineField(mat, "qty_warehouse", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                       : fmtQty(mat.qty_warehouse)}
                                   </td>
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#aaa" }}>
+                                  {!readOnly && <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#aaa" }}>
                                     {showEditMode ? (
                                       <input key={`${mat.id}_min_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.min_threshold != null ? String(mat.min_threshold) : ""} onBlur={e => saveInlineField(mat, "min_threshold", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                     ) : inlineMinId === mat.id ? (
@@ -1240,25 +1246,25 @@ export default function Materials({ isOwner = true }) {
                                         {fmtQty(mat.min_threshold)}
                                       </span>
                                     )}
-                                  </td>
-                                  <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>
+                                  </td>}
+                                  {!readOnly && <td style={{ padding: "7px 12px", color: "#aaa", fontSize: 12, whiteSpace: "nowrap" }}>
                                     {fmtDate(mat.last_counted_at)}
                                     {(()=>{ const stale = !mat.last_counted_at || (Date.now() - new Date(mat.last_counted_at+"T00:00:00").getTime()) > 30*24*60*60*1000; return stale ? <span title="Давно не пересчитывалось" style={{marginLeft:4,color:"#f39c12",cursor:"default"}}>⏰</span> : null; })()}
-                                  </td>
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12, maxWidth: showEditMode ? "none" : 160, whiteSpace: showEditMode ? "normal" : "nowrap", overflow: showEditMode ? "visible" : "hidden", textOverflow: showEditMode ? "clip" : "ellipsis" }} title={mat.notes || ""}>
+                                  </td>}
+                                  {!readOnly && <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", color: "#888", fontSize: 12, maxWidth: showEditMode ? "none" : 160, whiteSpace: showEditMode ? "normal" : "nowrap", overflow: showEditMode ? "visible" : "hidden", textOverflow: showEditMode ? "clip" : "ellipsis" }} title={mat.notes || ""}>
                                     {showEditMode
                                       ? <input key={`${mat.id}_notes_${mat.updated_at||''}`} type="text" defaultValue={mat.notes || ""} onBlur={e => saveInlineField(mat, "notes", e.target.value)} style={{ width: "100%", minWidth: 120, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, fontFamily: "inherit", background: "#faf7ff" }} />
                                       : (mat.notes || "—")}
-                                  </td>
+                                  </td>}
                                   <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
-                                    <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
-                                    <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
+                                    {!readOnly && <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>}
+                                    {!readOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
                                     <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
-                                    {isLow(mat) && (activeRequestMatIds.has(mat.id)
+                                    {!readOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
                                       ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
                                       : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
                                     )}
-                                    <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
+                                    {!readOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
                                   </td>
                                 </tr>
                               );
