@@ -103,6 +103,12 @@ export default function App() {
   const [sortDir, setSortDir] = React.useState("asc");
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
+  const [scheduleFocus, setScheduleFocus] = React.useState(null);
+
+  function openLessonFromAnalytics(entry) {
+    setScheduleFocus({ id: entry.id, date: entry.date, time: entry.time });
+    setView('schedule');
+  }
 
   React.useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 768);
@@ -407,10 +413,10 @@ export default function App() {
         <div style={{ flex: (!isMobile && selectedId) ? '0 0 60%' : '1', overflow: 'auto', borderRight: (!isMobile && selectedId) ? '1px solid #eee' : 'none' }}>
           {view === 'myoffice' && <MyOffice userEmail={user?.email} userName={authorName} role={role} supabase={supabase} />}
           {view === 'analytics' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && <Analytics />}
-          {view === 'teacheranalytics' && (role === 'admin' || role === 'supervisor') && <TeacherAnalytics />}
+          {view === 'teacheranalytics' && (role === 'admin' || role === 'supervisor') && <TeacherAnalytics onOpenLesson={openLessonFromAnalytics} />}
           {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher' || role === 'supervisor') && <WorkSchedule />}
           {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
-          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
+          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} focusEntry={scheduleFocus} onFocusHandled={() => setScheduleFocus(null)} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
           {view === 'mailings' && (role === 'admin' || role === 'manager' || role === 'supervisor') && <Mailings clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated?.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? { ...c, ...updated } : c) : [updated, ...prev]; }); }} />}
           {view === 'materials' && (user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') && <Materials isOwner={user?.email === 'crm@artschool.ru'} readOnly={role === 'teacher'} />}
 

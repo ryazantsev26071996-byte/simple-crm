@@ -348,8 +348,139 @@ function FeedbackSection({ teacherNames }) {
   );
 }
 
+// ── UnmarkedLessonsSection ─────────────────────────────────────────────────────
+function UnmarkedLessonsSection({ start, end, periodLabel, onOpenLesson }) {
+  const [lessons, setLessons] = React.useState([]);
+  const [workSchedule, setWorkSchedule] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [teacherFilter, setTeacherFilter] = React.useState(null);
+  const [typeFilter, setTypeFilter] = React.useState("");
+
+  React.useEffect(() => {
+    if (!start || !end) return;
+    setTeacherFilter(null);
+    setTypeFilter("");
+    setLoading(true);
+    Promise.all([
+      apiFetch(`schedule?date=gte.${start}&date=lte.${end}&attended=is.null&select=id,date,time,teacher,client_id,client_name,lesson_type,cancelled,recorded_by&order=date.asc,time.asc`),
+      apiFetch(`work_schedule?date=gte.${start}&date=lte.${end}&select=date,employee_name,employee_role,start_time,end_time`),
+    ])
+      .then(([ld, wd]) => { setLessons(Array.isArray(ld) ? ld : []); setWorkSchedule(Array.isArray(wd) ? wd : []); })
+      .catch(() => { setLessons([]); setWorkSchedule([]); })
+      .finally(() => setLoading(false));
+  }, [start, end]);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const nowTime = (() => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); })();
+
+  const pastLessons = lessons.filter(l => {
+    if (l.cancelled) return false;
+    if (l.date < today) return true;
+    if (l.date === today) return l.time <= nowTime;
+    return false;
+  });
+
+  const teacherNames = [...new Set(pastLessons.map(l => l.teacher || ""))].sort((a, b) => a.localeCompare(b, "ru"));
+  const lessonTypes = [...new Set(pastLessons.map(l => l.lesson_type || "").filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru"));
+
+  const filtered = pastLessons.filter(l => {
+    if (teacherFilter !== null && (l.teacher || "") !== teacherFilter) return false;
+    if (typeFilter && l.lesson_type !== typeFilter) return false;
+    return true;
+  });
+
+  const byDate = {};
+  for (const l of filtered) {
+    if (!byDate[l.date]) byDate[l.date] = [];
+    byDate[l.date].push(l);
+  }
+  const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
+
+  function fmtDateHeader(ds) {
+    const d = new Date(ds + "T00:00:00");
+    const DOW = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}, ${DOW[d.getDay()]}`;
+  }
+
+  function getWorkingTeachers(ds) {
+    return workSchedule
+      .filter(w => w.date === ds && w.employee_role === "Педагоги")
+      .map(w => `${w.employee_name}${w.start_time ? " " + w.start_time.slice(0, 5) : ""}${w.end_time ? "–" + w.end_time.slice(0, 5) : ""}`)
+      .join(", ");
+  }
+
+  return (
+    <div style={CARD}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: "#1e293b" }}>⚠️ Неотмеченные занятия</div>
+      <div style={{ fontSize: 12, color: "#888", marginBottom: 14 }}>
+        Не отмечено: <strong style={{ color: pastLessons.length > 0 ? "#e55" : "#27ae60" }}>{pastLessons.length}</strong> за {periodLabel}
+      </div>
+
+      {loading && <div style={{ color: "#aaa", fontSize: 13 }}>Загрузка...</div>}
+
+      {!loading && <>
+        {teacherNames.length > 0 && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {teacherNames.map(t => {
+              const label = t || "не назначен";
+              const count = pastLessons.filter(l => (l.teacher || "") === t).length;
+              const active = teacherFilter === t;
+              return (
+                <button key={t || "__none__"} type="button" onClick={() => setTeacherFilter(active ? null : t)}
+                  style={{ padding: "4px 12px", borderRadius: 20, border: `1px solid ${active ? "#4a90e2" : "#ddd"}`, background: active ? "#e8f0fe" : "white", color: active ? "#4a90e2" : "#555", cursor: "pointer", fontSize: 12, fontWeight: active ? 600 : 400 }}>
+                  {label} — {count}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {lessonTypes.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+              style={{ padding: "5px 8px", borderRadius: 6, border: "1px solid #ddd", fontSize: 13 }}>
+              <option value="">Все типы</option>
+              {lessonTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+        )}
+
+        {pastLessons.length === 0 && (
+          <div style={{ color: "#27ae60", fontSize: 13, fontWeight: 500 }}>Все занятия за период отмечены ✓</div>
+        )}
+
+        {sortedDates.map(ds => {
+          const dayLessons = byDate[ds];
+          const working = getWorkingTeachers(ds);
+          return (
+            <div key={ds} style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4, marginBottom: 8, paddingBottom: 6, borderBottom: "1px solid #eef0ff" }}>
+                <span style={{ fontWeight: 700, fontSize: 13, color: "#4a90e2" }}>{fmtDateHeader(ds)}</span>
+                <span style={{ fontSize: 11, color: "#888" }}>Работали: {working || "по графику никого"}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {dayLessons.map(l => (
+                  <div key={l.id} onClick={() => onOpenLesson && onOpenLesson(l)}
+                    style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "7px 12px", borderRadius: 8, border: "1px solid #e8eaf6", background: "white", cursor: "pointer" }}
+                    onMouseEnter={e => e.currentTarget.style.background = "#f0f4ff"}
+                    onMouseLeave={e => e.currentTarget.style.background = "white"}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#555", minWidth: 48, flexShrink: 0 }}>{l.time}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1e293b", flex: 1, minWidth: 100 }}>{l.client_name || "—"}</span>
+                    {l.lesson_type && <span style={{ fontSize: 12, color: "#7c3aed", background: "#f3f0ff", padding: "2px 8px", borderRadius: 10, flexShrink: 0 }}>{l.lesson_type}</span>}
+                    <span style={{ fontSize: 12, color: l.teacher ? "#4a90e2" : "#aaa", flexShrink: 0 }}>{l.teacher || "педагог не назначен"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </>}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function TeacherAnalytics() {
+export default function TeacherAnalytics({ onOpenLesson }) {
   const now = new Date();
   const [month, setMonth] = React.useState(now.getMonth() + 1);
   const [year, setYear] = React.useState(now.getFullYear());
@@ -567,6 +698,14 @@ export default function TeacherAnalytics() {
 
       {/* ── Section 6: Обратная связь от учеников ── */}
       <FeedbackSection teacherNames={allTeachers} />
+
+      {/* ── Section 7: Неотмеченные занятия ── */}
+      <UnmarkedLessonsSection
+        start={start}
+        end={end}
+        periodLabel={(dateFrom && dateTo) ? `${dateFrom.split("-").reverse().join(".")} — ${dateTo.split("-").reverse().join(".")}` : `${MONTH_NAMES[month - 1]} ${year}`}
+        onOpenLesson={onOpenLesson}
+      />
 
     </div>
   );

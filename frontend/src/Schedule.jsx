@@ -51,7 +51,7 @@ function fmt(date) { const d = new Date(date); return d.getFullYear() + "-" + St
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 
-export default function Schedule({ clients, role, authorName, userId, userEmail, onClientsChange }) {
+export default function Schedule({ clients, role, authorName, userId, userEmail, onClientsChange, focusEntry, onFocusHandled }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
   const [showEvents, setShowEvents] = React.useState(false);
   const [pendingModalRestore] = React.useState(() => {
@@ -119,6 +119,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
 
   React.useEffect(() => { loadSlots(); loadBlocks(); }, [weekStart]);
 
+  const pendingFocusRef = React.useRef(null);
   const restoredModalRef = React.useRef(false);
   React.useEffect(() => {
     if (!pendingModalRestore || restoredModalRef.current || !slotsReady) return;
@@ -133,6 +134,22 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     const cl = clients.find(c => c.id === pendingClientRestore);
     if (cl) { setClientModal(cl); setPendingClientRestore(null); }
   }, [clients, pendingClientRestore]);
+
+  React.useEffect(() => {
+    if (!focusEntry) return;
+    pendingFocusRef.current = focusEntry;
+    setWeekStart(new Date(focusEntry.date));
+  }, [focusEntry]);
+
+  React.useEffect(() => {
+    if (!pendingFocusRef.current || !slotsReady) return;
+    const fe = pendingFocusRef.current;
+    if (!days.some(d => fmt(d) === fe.date)) return;
+    pendingFocusRef.current = null;
+    const entry = slots.find(s => s.id === fe.id) || null;
+    openModal(fe.date, fe.time, entry);
+    if (onFocusHandled) onFocusHandled();
+  }, [slots, slotsReady]);
 
   function openClientModal(clientId) {
     const cl = clients.find(c => c.id === clientId);
