@@ -29,6 +29,7 @@ import { supabase } from "../supabase";
 import MailingsPopup from "./MailingsPopup.jsx";
 import StageHistory from "./StageHistory.jsx";
 import TeacherAbonementCard from "./TeacherAbonementCard.jsx";
+import ClientPhotos from "./ClientPhotos.jsx";
 
 async function logAudit(action, entity, entityId, oldValue, newValue, userId, userName) {
   const { error } = await supabase.from('audit_log').insert({
@@ -111,6 +112,9 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
   const [error, setError] = React.useState("");
   const [showHistory, setShowHistory] = React.useState(false);
   const [showMailings, setShowMailings] = React.useState(false);
+  const photosRef = React.useRef();
+  const [photoThumbUrl, setPhotoThumbUrl] = React.useState(null);
+  React.useEffect(() => { setPhotoThumbUrl(null); }, [client?.id]);
 
   React.useEffect(() => {
     if (!client) return;
@@ -125,12 +129,22 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
   const card = (
     <div style={{ display: 'flex', flexDirection: 'column', height: asModal ? '100%' : 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, flexShrink: 0 }}>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{client.name}</div>
-          <div style={{ fontSize: 13, color: '#888' }}>
-            {role !== 'teacher' && client.phone && <span>{renderContact(client.phone)} · </span>}
-            {role !== 'teacher' && client.source && <span>{client.source} · </span>}
-            <span>{client.stage || '—'}</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          {photoThumbUrl && (
+            <img
+              src={photoThumbUrl}
+              onClick={() => photosRef.current?.openViewer(0)}
+              title="Открыть фото"
+              style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #e9ecef', flexShrink: 0, marginTop: 2 }}
+            />
+          )}
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{client.name}</div>
+            <div style={{ fontSize: 13, color: '#888' }}>
+              {role !== 'teacher' && client.phone && <span>{renderContact(client.phone)} · </span>}
+              {role !== 'teacher' && client.source && <span>{client.source} · </span>}
+              <span>{client.stage || '—'}</span>
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -165,6 +179,16 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
 
         {role !== 'teacher' && <StageHistory clientId={client.id} role={role} currentStage={client.stage} />}
         {role === 'teacher' && <TeacherAbonementCard client={client} />}
+
+        <ClientPhotos
+          ref={photosRef}
+          client={client}
+          role={role}
+          userId={userId}
+          userEmail={userEmail}
+          authorName={authorName}
+          onFirstUrl={setPhotoThumbUrl}
+        />
 
         {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <ClientForm mode="Редактировать" initialValue={client} disabled={false} submitLabel="Сохранить"

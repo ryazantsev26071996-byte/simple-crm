@@ -63,6 +63,7 @@ import { canDelete } from "./permissions.js";
 import MailingsPopup from "./components/MailingsPopup.jsx";
 import StageHistory from "./components/StageHistory.jsx";
 import TeacherAbonementCard from "./components/TeacherAbonementCard.jsx";
+import ClientPhotos from "./components/ClientPhotos.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -105,6 +106,9 @@ export default function App() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth <= 768);
   const [showMobileMenu, setShowMobileMenu] = React.useState(false);
   const [scheduleFocus, setScheduleFocus] = React.useState(null);
+  const photosRef = React.useRef();
+  const [photoThumbUrl, setPhotoThumbUrl] = React.useState(null);
+  React.useEffect(() => { setPhotoThumbUrl(null); }, [selectedId]);
 
   function openLessonFromAnalytics(entry) {
     setScheduleFocus({ id: entry.id, date: entry.date, time: entry.time });
@@ -563,12 +567,22 @@ export default function App() {
               <button onClick={() => setSelectedId(null)} style={{ fontSize: 14, padding: '6px 14px', borderRadius: 6, border: '1px solid #ddd', background: 'white', cursor: 'pointer', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>← Назад</button>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{selectedClient.name}</div>
-                <div style={{ fontSize: 13, color: '#888' }}>
-                  {role !== 'teacher' && selectedClient.phone && <span>{selectedClient.phone} · </span>}
-                  {role !== 'teacher' && selectedClient.source && <span>{selectedClient.source} · </span>}
-                  <span>{selectedClient.stage || '—'}</span>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                {photoThumbUrl && (
+                  <img
+                    src={photoThumbUrl}
+                    onClick={() => photosRef.current?.openViewer(0)}
+                    title="Открыть фото"
+                    style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #e9ecef', flexShrink: 0, marginTop: 2 }}
+                  />
+                )}
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{selectedClient.name}</div>
+                  <div style={{ fontSize: 13, color: '#888' }}>
+                    {role !== 'teacher' && selectedClient.phone && <span>{selectedClient.phone} · </span>}
+                    {role !== 'teacher' && selectedClient.source && <span>{selectedClient.source} · </span>}
+                    <span>{selectedClient.stage || '—'}</span>
+                  </div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -607,6 +621,16 @@ export default function App() {
 
             {role !== 'teacher' && <StageHistory clientId={selectedClient.id} role={role} currentStage={selectedClient.stage} />}
             {role === 'teacher' && <TeacherAbonementCard client={selectedClient} />}
+
+            <ClientPhotos
+              ref={photosRef}
+              client={selectedClient}
+              role={role}
+              userId={user?.id}
+              userEmail={user?.email}
+              authorName={authorName}
+              onFirstUrl={setPhotoThumbUrl}
+            />
 
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
