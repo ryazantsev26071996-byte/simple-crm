@@ -726,7 +726,11 @@ export default function App() {
           </div>
         </div>
       )}
-      {showAudit && <AuditLog onClose={() => setShowAudit(false)} />}
+      {showAudit && <AuditLog
+        onClose={() => setShowAudit(false)}
+        onOpenClient={(id) => { handleClientSelect(id); setShowAudit(false); }}
+        onOpenTasksTab={() => { setView('tasks'); setShowAudit(false); }}
+      />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
       {showMerge && <MergeDuplicates onClose={() => setShowMerge(false)} onMerged={reloadClients} />}
       {showInlineMailings && selectedClient && <MailingsPopup client={selectedClient} onClose={() => setShowInlineMailings(false)} />}
