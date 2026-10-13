@@ -1,6 +1,7 @@
 import React from "react";
 import TaskModal from "./components/TaskModal";
 import { isActiveStaff } from "./inactiveStaff.js";
+import { canDelete } from "./permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -274,6 +275,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
   }
 
   async function handleDelete(id) {
+    if (!canDelete(user, profile?.role)) return;
     if (!window.confirm("Удалить задачу?")) return;
     await apiFetch(`tasks?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     setTasks(prev => prev.filter(t => t.id !== id));
@@ -544,7 +546,7 @@ export default function Tasks({ user, profile, onClientSelect }) {
           currentUserName={myName}
           currentUserId={user?.id}
           onSave={handleSave}
-          onDelete={handleDelete}
+          onDelete={canDelete(user, profile?.role) ? handleDelete : undefined}
           onClose={() => setShowModal(false)}
         />
       )}

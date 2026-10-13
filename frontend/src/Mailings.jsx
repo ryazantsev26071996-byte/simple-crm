@@ -1,5 +1,6 @@
 import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
+import { canDelete } from "./permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -174,6 +175,7 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
   }
 
   async function deleteCampaign(id) {
+    if (!canDelete({ email: userEmail }, role)) return;
     const count = mailings.filter(m => m.campaign_id === id).length;
     const camp = campaigns.find(c => c.id === id);
     const suffix = count > 0 ? ` В ней ${count} кл. — они будут удалены из этой кампании.` : "";
@@ -230,6 +232,7 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
   }
 
   async function deleteStatus(id) {
+    if (!canDelete({ email: userEmail }, role)) return;
     const st = statuses.find(s => s.id === id);
     if (!window.confirm(`Удалить статус "${st?.name}"?`)) return;
     try {
@@ -368,9 +371,11 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
                     <button onClick={() => { setEditingCampaignId(camp.id); setEditingCampaignName(camp.name); }}
                       title="Переименовать"
                       style={{ fontSize: 10, padding: "1px 3px", background: "none", border: "none", cursor: "pointer", color: "#bbb", lineHeight: 1, flexShrink: 0 }}>✏️</button>
-                    <button onClick={() => deleteCampaign(camp.id)}
-                      title="Удалить кампанию"
-                      style={{ fontSize: 10, padding: "1px 3px", background: "none", border: "none", cursor: "pointer", color: "#e55", lineHeight: 1, flexShrink: 0 }}>🗑️</button>
+                    {canDelete({ email: userEmail }, role) && (
+                      <button onClick={() => deleteCampaign(camp.id)}
+                        title="Удалить кампанию"
+                        style={{ fontSize: 10, padding: "1px 3px", background: "none", border: "none", cursor: "pointer", color: "#e55", lineHeight: 1, flexShrink: 0 }}>🗑️</button>
+                    )}
                   </div>
                 )}
               </div>
@@ -458,8 +463,10 @@ export default function Mailings({ clients, role, authorName, userId, userEmail,
                     )}
                     <button onClick={() => { setEditingStatusId(s.id); setEditingStatusName(s.name); }}
                       style={{ fontSize: 12, padding: "2px 8px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#555" }}>✏️</button>
-                    <button onClick={() => deleteStatus(s.id)}
-                      style={{ fontSize: 12, padding: "2px 8px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e55" }}>🗑️</button>
+                    {canDelete({ email: userEmail }, role) && (
+                      <button onClick={() => deleteStatus(s.id)}
+                        style={{ fontSize: 12, padding: "2px 8px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e55" }}>🗑️</button>
+                    )}
                   </div>
                 );
               })}

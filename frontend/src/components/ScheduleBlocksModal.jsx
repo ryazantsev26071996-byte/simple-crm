@@ -26,7 +26,7 @@ async function apiFetch(path, options = {}) {
 
 function fmt(date) { return date instanceof Date ? date.toISOString().split("T")[0] : date; }
 
-export default function ScheduleBlocksModal({ onClose, scheduleType, days }) {
+export default function ScheduleBlocksModal({ onClose, scheduleType, days, canDelete = true }) {
   const [blocks, setBlocks] = React.useState([]);
   const [loading, setLoading] = React.useState(false);
   const [form, setForm] = React.useState({ date: fmt(new Date()), time: "", block_type: "slot", reason: "", extra_time: "" });
@@ -70,6 +70,7 @@ export default function ScheduleBlocksModal({ onClose, scheduleType, days }) {
   }
 
   async function handleDelete(id) {
+    if (!canDelete) return;
     if (!window.confirm("Удалить?")) return;
     await apiFetch(`schedule_blocks?id=eq.${id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     loadBlocks();
@@ -146,7 +147,7 @@ export default function ScheduleBlocksModal({ onClose, scheduleType, days }) {
                     <div style={{fontSize:13,fontWeight:500}}>{blockLabel(b)}</div>
                     {b.reason && <div style={{fontSize:11,color:"#888"}}>{b.reason}</div>}
                   </div>
-                  <button onClick={()=>handleDelete(b.id)} style={{fontSize:12,padding:"2px 8px",borderRadius:4,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>
+                  {canDelete && <button onClick={()=>handleDelete(b.id)} style={{fontSize:12,padding:"2px 8px",borderRadius:4,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
                 </div>
               ))}
             </div>

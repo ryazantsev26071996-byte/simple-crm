@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase } from "../supabase";
 import TasksBlock from "./TasksBlock.jsx";
+import { canDelete } from "../permissions.js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -225,6 +226,7 @@ export default function CommentsWall({ role, authorName, userEmail, comments, on
   }
 
   async function handleDelete(comment) {
+    if (!canDelete({ email: userEmail }, role)) return;
     if (!window.confirm('Удалить комментарий?')) return;
     const oldText = comment.text || comment.message || '';
     const { error } = await supabase.from('comments').delete().eq('id', comment.id);
@@ -388,8 +390,10 @@ export default function CommentsWall({ role, authorName, userEmail, comments, on
                     <div style={{ display: 'flex', gap: 3 }}>
                       <button onClick={() => { setEditingId(c.id); setEditText(c.text || c.message || ''); }}
                         style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#888' }}>✏️</button>
-                      <button onClick={() => handleDelete(c)}
-                        style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, border: '1px solid #fcc', background: 'white', cursor: 'pointer', color: '#e55' }}>🗑️</button>
+                      {canDelete({ email: userEmail }, role) && (
+                        <button onClick={() => handleDelete(c)}
+                          style={{ fontSize: 11, padding: '1px 5px', borderRadius: 4, border: '1px solid #fcc', background: 'white', cursor: 'pointer', color: '#e55' }}>🗑️</button>
+                      )}
                     </div>
                   )}
                 </div>

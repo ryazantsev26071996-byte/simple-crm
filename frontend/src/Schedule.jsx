@@ -3,6 +3,7 @@ import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
 import Events from "./Events.jsx";
 import { round1 } from "./materialsUtils.js";
+import { canDelete } from "./permissions.js";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
@@ -320,6 +321,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   }
 
   async function handleDelete() {
+    if (!canDelete({ email: userEmail }, role)) return;
     if (!modal.entry || !window.confirm("Удалить запись?")) return;
     await apiFetch(`schedule?id=eq.${modal.entry.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
     setModal(null);
@@ -557,13 +559,13 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
               <button onClick={handleSave} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
                 {modal.entry?"Сохранить":"Записать"}
               </button>
-              {modal.entry&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
+              {modal.entry&&canDelete({ email: userEmail }, role)&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
             </div>
           </div>
         </div>
       )}
 
-      {showBlocks && <ScheduleBlocksModal onClose={() => setShowBlocks(false)} scheduleType="lessons" days={days} />}
+      {showBlocks && <ScheduleBlocksModal onClose={() => setShowBlocks(false)} scheduleType="lessons" days={days} canDelete={canDelete({ email: userEmail }, role)} />}
       {clientModal && (
         <ClientCard
           client={clientModal}

@@ -1,6 +1,7 @@
 import React from "react";
 import { RecurringTasksAdmin, TodayRecurringTasks } from "./RecurringTasks.jsx";
 import { isActiveStaff } from "./inactiveStaff.js";
+import { canDelete } from "./permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -347,14 +348,16 @@ function RegulationCard({ filePath, deleting, onOpen, onDelete, onEdit, supabase
             ✏️
           </button>
         )}
-        <button
-          onClick={e => { e.stopPropagation(); onDelete(); }}
-          disabled={deleting}
-          title="Удалить"
-          style={{ background: "none", border: "none", fontSize: 16, cursor: deleting ? "default" : "pointer", padding: "2px 4px", color: "#ef4444", lineHeight: 1, opacity: deleting ? 0.5 : 1 }}
-        >
-          🗑️
-        </button>
+        {onDelete && (
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(); }}
+            disabled={deleting}
+            title="Удалить"
+            style={{ background: "none", border: "none", fontSize: 16, cursor: deleting ? "default" : "pointer", padding: "2px 4px", color: "#ef4444", lineHeight: 1, opacity: deleting ? 0.5 : 1 }}
+          >
+            🗑️
+          </button>
+        )}
         <span style={{ fontSize: 18, color: "#9ca3af", marginLeft: 4 }}>›</span>
       </div>
     </div>
@@ -366,7 +369,7 @@ const regActionBtn = (bg, color) => ({
   cursor: "pointer", fontWeight: 600, fontSize: 13,
 });
 
-function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, employees }) {
+function RegulationSection({ employeeEmail, employeeName, isAdmin, canDeleteContent, supabase, employees }) {
   const [html, setHtml]           = React.useState("");
   const [filePath, setFilePath]   = React.useState(null);
   const [rowExists, setRowExists] = React.useState(false);
@@ -523,7 +526,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, supabase, emp
               filePath={filePath}
               deleting={deleting}
               onOpen={() => setShowModal(true)}
-              onDelete={handleDelete}
+              onDelete={canDeleteContent ? handleDelete : undefined}
               onEdit={() => { setMode('edit'); setTimeout(() => { if (editorRef.current) editorRef.current.innerHTML = html; }, 0); }}
               supabase={supabase}
             />
@@ -740,7 +743,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
   );
 }
 
-function InstructionsSection({ isAdmin, isViewingSelf, viewRole, supabase }) {
+function InstructionsSection({ isAdmin, canDeleteContent, isViewingSelf, viewRole, supabase }) {
   const [instructions, setInstructions] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [viewModal, setViewModal] = React.useState(null);
@@ -778,6 +781,7 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, supabase }) {
   React.useEffect(() => { fetchInstructions(); }, [isAdmin, isViewingSelf, viewRole]);
 
   async function handleDelete(id) {
+    if (!canDeleteContent) return;
     if (!window.confirm("Удалить инструкцию?")) return;
     setDeleting(id);
     try {
@@ -840,10 +844,12 @@ function InstructionsSection({ isAdmin, isViewingSelf, viewRole, supabase }) {
                       style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
                       ✏️
                     </button>
-                    <button onClick={() => handleDelete(instr.id)} disabled={deleting === instr.id} title="Удалить"
-                      style={{ background: "white", border: "1px solid #fecaca", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      🗑️
-                    </button>
+                    {canDeleteContent && (
+                      <button onClick={() => handleDelete(instr.id)} disabled={deleting === instr.id} title="Удалить"
+                        style={{ background: "white", border: "1px solid #fecaca", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        🗑️
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -934,6 +940,7 @@ function TasksSection({ userName, supabase }) {
 
 export default function MyOffice({ userEmail, userName, role, supabase }) {
   const isAdmin = role === "admin" || role === "supervisor";
+  const canDeleteContent = canDelete({ email: userEmail }, role);
   const [employees, setEmployees] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(null);
   const [selectedRole, setSelectedRole] = React.useState(null);
@@ -973,18 +980,20 @@ export default function MyOffice({ userEmail, userName, role, supabase }) {
         employeeEmail={viewEmail}
         employeeName={viewName}
         isAdmin={isAdmin}
+        canDeleteContent={canDeleteContent}
         supabase={supabase}
         employees={employees}
       />
       <InstructionsSection
         isAdmin={isAdmin}
+        canDeleteContent={canDeleteContent}
         isViewingSelf={selectedId === null}
         viewRole={viewRole}
         supabase={supabase}
       />
       {!isAdmin && <TodayRecurringTasks userName={userName} supabase={supabase} />}
       <TasksSection key={`tasks-${viewName}`} userName={viewName} supabase={supabase} />
-      {isAdmin && selectedId === null && <RecurringTasksAdmin employees={employees} supabase={supabase} />}
+      {isAdmin && selectedId === null && <RecurringTasksAdmin employees={employees} supabase={supabase} canDelete={canDeleteContent} />}
 
     </div>
   );

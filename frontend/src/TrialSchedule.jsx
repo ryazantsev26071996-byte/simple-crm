@@ -2,6 +2,7 @@ import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
 import { useClientStages } from "./hooks/useClientStages.js";
+import { canDelete } from "./permissions.js";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 4;
@@ -380,6 +381,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
   }
 
   async function handleDelete() {
+    if (!canDelete({ email: userEmail }, role)) return;
     if (!modal.entry || !window.confirm("Удалить запись?")) return;
     if (modal.entry.schedule_id) {
       try {
@@ -659,13 +661,13 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
               <button onClick={handleSave} disabled={saving} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
                 {saving?"Сохранение...":(modal.entry?"Сохранить":"Записать на пробное")}
               </button>
-              {modal.entry&&(role==="manager"||role==="accountmanager"||role==="admin"||role==="supervisor")&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
+              {modal.entry&&(role==="manager"||role==="accountmanager"||role==="admin"||role==="supervisor")&&canDelete({ email: userEmail }, role)&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
             </div>
           </div>
         </div>
       )}
 
-      {showBlocks && <ScheduleBlocksModal onClose={() => setShowBlocks(false)} scheduleType="trial" days={days} />}
+      {showBlocks && <ScheduleBlocksModal onClose={() => setShowBlocks(false)} scheduleType="trial" days={days} canDelete={canDelete({ email: userEmail }, role)} />}
       {clientModal && (
         <ClientCard
           client={clientModal}

@@ -59,6 +59,7 @@ import MyOffice from "./MyOffice.jsx";
 import Mailings from "./Mailings.jsx";
 import Materials from "./Materials.jsx";
 import { canSeeTask } from "./taskVisibility.js";
+import { canDelete } from "./permissions.js";
 import MailingsPopup from "./components/MailingsPopup.jsx";
 import StageHistory from "./components/StageHistory.jsx";
 import TeacherAbonementCard from "./components/TeacherAbonementCard.jsx";
@@ -588,8 +589,9 @@ export default function App() {
                     🕓 История
                   </button>
                 )}
-                {(role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && (
+                {(role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && canDelete(user, role) && (
                   <button onClick={async () => {
+                    if (!canDelete(user, role)) return;
                     if (!window.confirm('Удалить клиента ' + selectedClient.name + '?')) return;
                     const { error } = await (await import('./supabase.js')).supabase.from('clients').delete().eq('id', selectedClient.id);
                     if (error) { alert(error.message); return; }
@@ -642,7 +644,7 @@ export default function App() {
             )}
 
             {(String(selectedClient?.stage || '').trim().toLowerCase() === 'ученик' || selectedClient?.subscription_type) && (
-              <StudentProgress client={selectedClient} authorName={authorName} />
+              <StudentProgress client={selectedClient} authorName={authorName} role={role} userEmail={user?.email} />
             )}
 
             <div style={{ marginTop: 16, height: 'calc(100vh - 300px)', display: 'flex', flexDirection: 'column' }}>

@@ -368,7 +368,7 @@ function TaskModal({ task, initChecklist, employees, supabase, onSaved, onClose 
 
 // ── Admin section ─────────────────────────────────────────────────────────────
 
-export function RecurringTasksAdmin({ employees, supabase }) {
+export function RecurringTasksAdmin({ employees, supabase, canDelete = true }) {
   const [tasks, setTasks]           = React.useState([]);
   const [instCounts, setInstCounts] = React.useState({});
   const [loading, setLoading]       = React.useState(true);
@@ -407,6 +407,7 @@ export function RecurringTasksAdmin({ employees, supabase }) {
   }
 
   async function handleDelete(task) {
+    if (!canDelete) return;
     if (!window.confirm(`Удалить «${task.title}»? Все экземпляры будут удалены.`)) return;
     setDeleting(task.id);
     try {
@@ -482,10 +483,12 @@ export function RecurringTasksAdmin({ employees, supabase }) {
                   <div style={{ display:"flex", gap:6 }}>
                     <button onClick={e => { e.stopPropagation(); handleEdit(t); }}
                       style={{ padding:"5px 10px", border:"1px solid #e5e7eb", borderRadius:6, cursor:"pointer", background:"white", fontSize:13 }}>✏️</button>
-                    <button onClick={e => { e.stopPropagation(); handleDelete(t); }} disabled={deleting === t.id}
-                      style={{ padding:"5px 10px", border:"1px solid #fcc", borderRadius:6, cursor:"pointer", background:"white", fontSize:13, color:"#e55" }}>
-                      {deleting === t.id ? "..." : "🗑️"}
-                    </button>
+                    {canDelete && (
+                      <button onClick={e => { e.stopPropagation(); handleDelete(t); }} disabled={deleting === t.id}
+                        style={{ padding:"5px 10px", border:"1px solid #fcc", borderRadius:6, cursor:"pointer", background:"white", fontSize:13, color:"#e55" }}>
+                        {deleting === t.id ? "..." : "🗑️"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

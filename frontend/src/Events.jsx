@@ -1,6 +1,7 @@
 import React from "react";
 import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
+import { canDelete } from "./permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -54,7 +55,7 @@ const EMPTY_FORM = {
 };
 
 export default function Events() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const role = profile?.role || "teacher";
 
   const now = new Date();
@@ -140,6 +141,7 @@ export default function Events() {
   }
 
   async function handleDelete() {
+    if (!canDelete(user, role)) return;
     if (!window.confirm(`Удалить "${modal.event.title}"?`)) return;
     setSaving(true);
     try {
@@ -377,7 +379,7 @@ export default function Events() {
                   Отмена
                 </button>
               </div>
-              {modal.mode === "edit" && (role === "admin" || role === "accountmanager" || role === "supervisor") && (
+              {modal.mode === "edit" && (role === "admin" || role === "accountmanager" || role === "supervisor") && canDelete(user, role) && (
                 <button onClick={handleDelete} disabled={saving}
                   style={{ padding: "7px 16px", borderRadius: 6, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 13, cursor: "pointer" }}>
                   Удалить

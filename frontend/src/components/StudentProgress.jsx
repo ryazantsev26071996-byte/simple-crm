@@ -1,5 +1,6 @@
 import React from "react";
 import { SUB_MONTHS } from "../subscriptionMonths.js";
+import { canDelete } from "../permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -51,7 +52,7 @@ function fmtDate(iso) {
   return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export default function StudentProgress({ client, authorName }) {
+export default function StudentProgress({ client, authorName, role, userEmail }) {
   const [artsquiz, setArtsquiz] = React.useState(null);
   const [topics, setTopics] = React.useState([]);
   const [monthReviews, setMonthReviews] = React.useState([]);
@@ -103,6 +104,7 @@ export default function StudentProgress({ client, authorName }) {
       } catch (e) { alert(e.message); }
       setSavingArtsquiz(false);
     } else {
+      if (!canDelete({ email: userEmail }, role)) return;
       if (!window.confirm("Снять отметку «Арт-сквиз пройден»?")) return;
       setSavingArtsquiz(true);
       try {
@@ -173,6 +175,7 @@ export default function StudentProgress({ client, authorName }) {
   }
 
   async function handleDeleteMonth(monthNo) {
+    if (!canDelete({ email: userEmail }, role)) return;
     if (!window.confirm(`Снять отметку «${monthNo} месяц пройден»? Выводы будут удалены.`)) return;
     try {
       await apiFetch(`student_month_reviews?client_id=eq.${client.id}&month_no=eq.${monthNo}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
