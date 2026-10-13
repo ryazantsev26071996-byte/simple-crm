@@ -256,7 +256,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
           const deducted = cl && !cl.is_unlimited;
           const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ")
             + (deducted ? ` [списано занятий: 1]` : "");
-          await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText }) });
+          await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText, author_id: userId || null }) });
         }
       }
       if (form.attended === true && usedMaterials.length > 0) {

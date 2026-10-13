@@ -383,7 +383,7 @@ export default function CommentsWall({ role, authorName, userEmail, comments, on
               background: (c.message||c.text||'').includes('ЗАМОРОЗКА') ? '#fff8e1' : 'white'
             }}>
               <div className="commentMeta">
-                <div className="commentAuthor">{c.full_name || c.author || authorName}</div>
+                <div className="commentAuthor">{c.full_name || c.author || <span style={{ color: '#aaa' }}>Автор не указан</span>}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <div className="commentTime">{formatTime(c.created_at || c.createdAt)}</div>
                   {canEditComment(c) && (
