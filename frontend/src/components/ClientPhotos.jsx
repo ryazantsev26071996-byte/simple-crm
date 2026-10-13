@@ -1,5 +1,4 @@
 import React from "react";
-import { canDelete } from "../permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -102,7 +101,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
     openViewer(idx = 0) { setViewerIndex(idx); setViewerOpen(true); },
   }));
 
-  const canUpload = ["admin", "manager", "accountmanager", "supervisor"].includes(role);
+  const isOwner = userEmail === "crm@artschool.ru";
 
   React.useEffect(() => {
     if (!client?.id) return;
@@ -154,6 +153,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
   }
 
   function handleFileSelect(e) {
+    if (!isOwner) return;
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     if (!files.length) return;
@@ -175,7 +175,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
   }
 
   async function doUpload() {
-    if (!captionQueue?.length) return;
+    if (!isOwner || !captionQueue?.length) return;
     const items = [...captionQueue];
     setCaptionQueue(null);
     setUploading(true);
@@ -226,6 +226,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
   }
 
   async function handleDelete(photo) {
+    if (!isOwner) return;
     if (!window.confirm("Удалить фото" + (photo.caption ? ` «${photo.caption}»` : "") + "?")) return;
     try {
       const token = await getToken();
@@ -245,6 +246,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
   }
 
   async function handleSaveCaption() {
+    if (!isOwner) return;
     const photo = photos.find(p => p.id === editingId);
     if (!photo) return;
     try {
@@ -261,18 +263,16 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
     }
   }
 
-  const canDeletePhoto = (photo) =>
-    canDelete({ email: userEmail }, role) || photo.uploaded_by === userId;
-  const canEditCaption = (photo) =>
-    role === "admin" || photo.uploaded_by === userId;
-
   const currentPhoto = photos[viewerIndex];
+
+  // Не-владелец без фото — блок не показываем
+  if (!loading && photos.length === 0 && !isOwner) return null;
 
   return (
     <div style={{ marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid #f0f0f0" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontWeight: 600, fontSize: 14, color: "#444" }}>📷 Фото</div>
-        {canUpload && photos.length < MAX_PHOTOS && (
+        {isOwner && photos.length < MAX_PHOTOS && (
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
@@ -339,22 +339,22 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
                 </div>
               )}
 
-              <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 2 }}>
-                {canEditCaption(photo) && editingId !== photo.id && (
-                  <button
-                    onClick={() => { setEditingId(photo.id); setEditingText(photo.caption || ""); }}
-                    title="Изменить подпись"
-                    style={{ fontSize: 10, padding: "1px 4px", background: "none", border: "none", cursor: "pointer", color: "#aaa" }}
-                  >✏️</button>
-                )}
-                {canDeletePhoto(photo) && (
+              {isOwner && (
+                <div style={{ display: "flex", justifyContent: "center", gap: 2, marginTop: 2 }}>
+                  {editingId !== photo.id && (
+                    <button
+                      onClick={() => { setEditingId(photo.id); setEditingText(photo.caption || ""); }}
+                      title="Изменить подпись"
+                      style={{ fontSize: 10, padding: "1px 4px", background: "none", border: "none", cursor: "pointer", color: "#aaa" }}
+                    >✏️</button>
+                  )}
                   <button
                     onClick={() => handleDelete(photo)}
                     title="Удалить фото"
                     style={{ fontSize: 10, padding: "1px 4px", background: "none", border: "none", cursor: "pointer", color: "#e55" }}
                   >🗑️</button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
