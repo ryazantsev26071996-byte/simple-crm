@@ -191,14 +191,6 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
           onFirstUrl={setPhotoThumbUrl}
         />
 
-        <ClientChatScreens
-          client={client}
-          role={role}
-          userId={userId}
-          userEmail={userEmail}
-          authorName={authorName}
-        />
-
         {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
           <ClientForm mode="Редактировать" initialValue={client} disabled={false} submitLabel="Сохранить"
             onSubmit={async (payload) => {
@@ -262,6 +254,15 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
               const list = await getComments({ role, name: authorName }, client.id);
               setComments(list);
             }}
+            betweenTasksAndComments={
+              <ClientChatScreens
+                client={client}
+                role={role}
+                userId={userId}
+                userEmail={userEmail}
+                authorName={authorName}
+              />
+            }
           />
         </div>
       </div>

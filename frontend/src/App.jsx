@@ -635,14 +635,6 @@ export default function App() {
               onFirstUrl={setPhotoThumbUrl}
             />
 
-            <ClientChatScreens
-              client={selectedClient}
-              role={role}
-              userId={user?.id}
-              userEmail={user?.email}
-              authorName={authorName}
-            />
-
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
                 onSubmit={async (payload) => {
@@ -699,6 +691,15 @@ export default function App() {
                 onCreate={async (message) => {
                   await createComment({ role, name: authorName }, selectedClient.id, { message });
                 }}
+                betweenTasksAndComments={
+                  <ClientChatScreens
+                    client={selectedClient}
+                    role={role}
+                    userId={user?.id}
+                    userEmail={user?.email}
+                    authorName={authorName}
+                  />
+                }
               />
             </div>
           </div>
