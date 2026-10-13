@@ -30,6 +30,7 @@ import MailingsPopup from "./MailingsPopup.jsx";
 import StageHistory from "./StageHistory.jsx";
 import TeacherAbonementCard from "./TeacherAbonementCard.jsx";
 import ClientPhotos from "./ClientPhotos.jsx";
+import ClientChatScreens from "./ClientChatScreens.jsx";
 
 async function logAudit(action, entity, entityId, oldValue, newValue, userId, userName) {
   const { error } = await supabase.from('audit_log').insert({
@@ -188,6 +189,14 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
           userEmail={userEmail}
           authorName={authorName}
           onFirstUrl={setPhotoThumbUrl}
+        />
+
+        <ClientChatScreens
+          client={client}
+          role={role}
+          userId={userId}
+          userEmail={userEmail}
+          authorName={authorName}
         />
 
         {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (

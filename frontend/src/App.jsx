@@ -64,6 +64,8 @@ import MailingsPopup from "./components/MailingsPopup.jsx";
 import StageHistory from "./components/StageHistory.jsx";
 import TeacherAbonementCard from "./components/TeacherAbonementCard.jsx";
 import ClientPhotos from "./components/ClientPhotos.jsx";
+import ClientChatScreens from "./components/ClientChatScreens.jsx";
+import StoragePanel from "./components/StoragePanel.jsx";
 
 export default function App() {
   const { user, profile, loading } = useAuth();
@@ -109,6 +111,7 @@ export default function App() {
   const photosRef = React.useRef();
   const [photoThumbUrl, setPhotoThumbUrl] = React.useState(null);
   React.useEffect(() => { setPhotoThumbUrl(null); }, [selectedId]);
+  const [showStorage, setShowStorage] = React.useState(false);
 
   function openLessonFromAnalytics(entry) {
     setScheduleFocus({ id: entry.id, date: entry.date, time: entry.time });
@@ -632,6 +635,14 @@ export default function App() {
               onFirstUrl={setPhotoThumbUrl}
             />
 
+            <ClientChatScreens
+              client={selectedClient}
+              role={role}
+              userId={user?.id}
+              userEmail={user?.email}
+              authorName={authorName}
+            />
+
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
               <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
                 onSubmit={async (payload) => {
@@ -755,6 +766,7 @@ export default function App() {
         onOpenClient={(id) => { handleClientSelect(id); setShowAudit(false); }}
         onOpenTasksTab={() => { setView('tasks'); setShowAudit(false); }}
       />}
+      {showStorage && <StoragePanel onClose={() => setShowStorage(false)} />}
       {showImport && <ImportClients onClose={() => setShowImport(false)} onImported={reloadClients} />}
       {showMerge && <MergeDuplicates onClose={() => setShowMerge(false)} onMerged={reloadClients} />}
       {showInlineMailings && selectedClient && <MailingsPopup client={selectedClient} onClose={() => setShowInlineMailings(false)} />}
@@ -780,6 +792,10 @@ export default function App() {
                   style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#e8a', textAlign: 'left' }}>📤 Импорт клиентов</button>
                 <button onClick={() => { exportToExcel(clients); setShowSettings(false); }}
                   style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#2a9', textAlign: 'left' }}>📥 Экспорт в Excel</button>
+                {user?.email === 'crm@artschool.ru' && (
+                  <button onClick={() => { setShowStorage(true); setShowSettings(false); }}
+                    style={{ fontSize: 13, padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', background: 'white', cursor: 'pointer', color: '#4a90e2', textAlign: 'left' }}>🗄️ Хранилище</button>
+                )}
               </div>
             </div>
           </div>

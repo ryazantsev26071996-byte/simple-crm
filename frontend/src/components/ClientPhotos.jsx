@@ -1,78 +1,5 @@
 import React from "react";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-async function getToken() {
-  try {
-    const key = `sb-${SUPABASE_URL.split("//")[1].split(".")[0]}-auth-token`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return SUPABASE_ANON_KEY;
-    return JSON.parse(raw)?.access_token || SUPABASE_ANON_KEY;
-  } catch { return SUPABASE_ANON_KEY; }
-}
-
-async function apiFetch(path, options = {}) {
-  const token = await getToken();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...options.headers,
-    },
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const text = await res.text();
-  return text ? JSON.parse(text) : null;
-}
-
-async function getSignedUrl(storagePath) {
-  const token = await getToken();
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/client-photos/${storagePath}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ expiresIn: 3600 }),
-  });
-  if (!res.ok) throw new Error("sign error");
-  const { signedURL } = await res.json();
-  return `${SUPABASE_URL}/storage/v1${signedURL}`;
-}
-
-async function compressImage(file, maxSide = 1280, quality = 0.85) {
-  let bitmap;
-  try {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-  } catch {
-    bitmap = await createImageBitmap(file);
-  }
-
-  let { width, height } = bitmap;
-  if (width > maxSide || height > maxSide) {
-    const scale = Math.min(maxSide / width, maxSide / height);
-    width = Math.round(width * scale);
-    height = Math.round(height * scale);
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
-  bitmap.close?.();
-
-  const limit = 3 * 1024 * 1024;
-  for (let q = quality; q >= 0.4; q -= 0.15) {
-    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", q));
-    if (blob && blob.size <= limit) return blob;
-  }
-  return new Promise(r => canvas.toBlob(r, "image/jpeg", 0.4));
-}
+import { apiFetch, compressImage, getSignedUrl, uploadToBucket, deleteFromBucket } from "../imageUtils.js";
 
 const MAX_PHOTOS = 6;
 
@@ -129,7 +56,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
 
       const urlMap = {};
       await Promise.all(list.map(async (p) => {
-        try { urlMap[p.id] = await getSignedUrl(p.storage_path); } catch {}
+        try { urlMap[p.id] = await getSignedUrl("client-photos", p.storage_path); } catch {}
       }));
       setSignedUrls(urlMap);
 
@@ -147,7 +74,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
 
   async function refreshSignedUrl(photoId, storagePath) {
     try {
-      const url = await getSignedUrl(storagePath);
+      const url = await getSignedUrl("client-photos", storagePath);
       setSignedUrls(prev => ({ ...prev, [photoId]: url }));
     } catch {}
   }
@@ -184,21 +111,10 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
     let hasError = false;
     for (const item of items) {
       try {
-        const blob = await compressImage(item.file);
+        const blob = await compressImage(item.file, { maxSide: 1280, quality: 0.85 });
         const path = `${client.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
-        const token = await getToken();
 
-        const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/client-photos/${path}`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "image/jpeg",
-            "x-upsert": "false",
-          },
-          body: blob,
-        });
-        if (!uploadRes.ok) throw new Error(await uploadRes.text());
+        await uploadToBucket("client-photos", path, blob);
 
         await apiFetch("client_photos", {
           method: "POST",
@@ -229,11 +145,7 @@ const ClientPhotos = React.forwardRef(function ClientPhotos(
     if (!isOwner) return;
     if (!window.confirm("Удалить фото" + (photo.caption ? ` «${photo.caption}»` : "") + "?")) return;
     try {
-      const token = await getToken();
-      await fetch(`${SUPABASE_URL}/storage/v1/object/client-photos/${photo.storage_path}`, {
-        method: "DELETE",
-        headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
-      });
+      await deleteFromBucket("client-photos", photo.storage_path);
       await apiFetch(`client_photos?id=eq.${photo.id}`, {
         method: "DELETE",
         headers: { Prefer: "return=minimal" },
