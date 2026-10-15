@@ -664,7 +664,7 @@ export default function App() {
               <StudentInfoBlock client={selectedClient} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
-              <ContractBlock client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
+              <ContractBlock client={selectedClient} role={role} userEmail={user?.email} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />
             )}
             {['ученик', 'пробный месяц', 'тест-драйв'].includes(selectedClient?.stage) && (
               <LearningStrategy client={selectedClient} role={role} onUpdate={(updated) => setClients(prev => prev.map(c => c.id === updated.id ? updated : c))} />

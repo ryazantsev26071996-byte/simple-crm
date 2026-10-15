@@ -1,4 +1,5 @@
 import React from "react";
+import { canDelete } from "../permissions.js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -59,7 +60,7 @@ const CONTRACT_FIELDS = [
   'bank_application_number', 'bank_contract_number', 'requisites',
 ]
 
-export default function ContractBlock({ client, onUpdate, role }) {
+export default function ContractBlock({ client, onUpdate, role, userEmail }) {
   const [editing, setEditing] = React.useState(false)
   const [form, setForm] = React.useState({
     contract_number: client?.contract_number || "",
@@ -145,6 +146,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
   }
 
   async function deletePaymentRow(idx) {
+    if (!canDelete({ email: userEmail }, role)) return;
     const row = schedule[idx]
     if (row.id) {
       try {
@@ -560,7 +562,7 @@ export default function ContractBlock({ client, onUpdate, role }) {
                           style={{ width: 100, padding: '2px 6px', borderRadius: 4, border: '1px solid #ccc', fontSize: 12, fontFamily: 'inherit' }} />
                       </td>
                       <td style={{ padding: '3px 4px', border: '1px solid #d8f3dc', textAlign: 'center' }}>
-                        {(role === 'admin' || role === 'manager') && (
+                        {(role === 'admin' || role === 'manager') && canDelete({ email: userEmail }, role) && (
                           <button onClick={() => deletePaymentRow(idx)}
                             style={{ padding: '1px 8px', borderRadius: 4, border: '1px solid #fcc', background: 'white', color: '#e55', fontSize: 11, cursor: 'pointer' }}>
                             ✕

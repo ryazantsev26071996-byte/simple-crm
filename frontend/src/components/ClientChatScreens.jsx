@@ -1,5 +1,6 @@
 import React from "react";
 import { apiFetch, compressImage, getSignedUrl, uploadToBucket, deleteFromBucket } from "../imageUtils.js";
+import { canDelete } from "../permissions.js";
 
 const BUCKET = "client-chats";
 const TABLE = "client_chat_screens";
@@ -29,7 +30,7 @@ export default function ClientChatScreens({ client, role, userId, userEmail, aut
 
   const isOwner = userEmail === "crm@artschool.ru";
   const canManage = (screen) => {
-    if (role === "supervisor") return false;
+    if (!canDelete({ email: userEmail }, role)) return false;
     return isOwner || screen.uploaded_by === userId;
   };
   const canUpload = role !== "supervisor";

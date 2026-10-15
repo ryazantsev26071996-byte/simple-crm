@@ -4,6 +4,7 @@ import { useAuth } from "./AuthContext";
 import ClientCard from "./components/ClientCard.jsx";
 import TeamOnline from "./TeamOnline.jsx";
 import { useClientStages } from "./hooks/useClientStages.js";
+import { canDelete } from "./permissions.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -335,6 +336,7 @@ export default function Analytics() {
   }
 
   async function handleLeadsDelete(clientId, name) {
+    if (!canDelete(user, role)) return;
     if (!window.confirm(`Удалить клиента ${name}?`)) return;
     try {
       await apiFetch(`clients?id=eq.${clientId}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
@@ -1148,8 +1150,8 @@ export default function Analytics() {
                             <div style={{ display: "flex", gap: 4 }}>
                               <button onClick={() => { setLeadsEditRow(c.id); setLeadsEditForm({ name: c.name || "", phone: c.phone || "", source: c.source || "", stage: c.stage || "новая заявка" }); }}
                                 style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #ddd", background: "white", fontSize: 12, cursor: "pointer" }}>Редактировать</button>
-                              <button onClick={() => handleLeadsDelete(c.id, c.name)}
-                                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 12, cursor: "pointer" }}>Удалить</button>
+                              {canDelete(user, role) && <button onClick={() => handleLeadsDelete(c.id, c.name)}
+                                style={{ padding: "3px 10px", borderRadius: 4, border: "1px solid #fcc", background: "white", color: "#e55", fontSize: 12, cursor: "pointer" }}>Удалить</button>}
                             </div>
                           </td>
                         </tr>
