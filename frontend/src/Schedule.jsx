@@ -249,8 +249,12 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       if (form.attended === true && form.client_id) {
         const cl = activeClients.find(c => c.id === Number(form.client_id));
         if (cl && !cl.is_unlimited) {
-          await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ lessons_used: (cl.lessons_used||0)+1, last_visit: new Date().toISOString().split("T")[0] }) });
+          const visitUpdate = { lessons_used: (cl.lessons_used||0)+1 };
+          if (!cl.last_visit || modal.date > cl.last_visit) visitUpdate.last_visit = modal.date;
+          await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify(visitUpdate) });
           try { await apiFetch("audit_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ action: 'lessons_deducted', entity: 'client', entity_id: cl.id, old_value: String(cl.lessons_used||0), new_value: `${(cl.lessons_used||0)+1} (−1 за ${modal.date})`, performed_by: userId||null, performed_by_name: authorName||null }) }); } catch (err) { console.error('audit_log insert failed:', err); }
+        } else if (cl?.is_unlimited && (!cl.last_visit || modal.date > cl.last_visit)) {
+          await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ last_visit: modal.date }) });
         }
         if (!duplicate || form.lesson_comment.trim()) {
           const deducted = cl && !cl.is_unlimited;

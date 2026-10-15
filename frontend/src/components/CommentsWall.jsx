@@ -144,33 +144,38 @@ export default function CommentsWall({ role, authorName, userEmail, comments, on
       const [y, m, d] = lessonDate.split('-');
       const datePrefix = `[${d}.${m}.${y}] `;
 
-      if (isActiveStudent) {
-        const updates = { last_visit: lessonDate };
-        if (!client?.is_unlimited && lessons > 0) {
+      if (isActiveStudent && lessons > 0) {
+        const updates = {};
+        if (!client?.last_visit || lessonDate > client.last_visit) {
+          updates.last_visit = lessonDate;
+        }
+        if (!client?.is_unlimited) {
           updates.lessons_used = (client?.lessons_used || 0) + lessons;
         }
-        const token = await getToken();
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client.id}`, {
-          method: 'PATCH',
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation',
-          },
-          body: JSON.stringify(updates),
-        });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.message || JSON.stringify(result));
-        if (updates.lessons_used !== undefined) {
-          try {
-            await logAudit('lessons_deducted', 'client', client.id,
-              String(client?.lessons_used || 0),
-              `${updates.lessons_used} (−${lessons} за ${lessonDate})`,
-              currentUserId, authorName);
-          } catch {}
+        if (Object.keys(updates).length > 0) {
+          const token = await getToken();
+          const res = await fetch(`${SUPABASE_URL}/rest/v1/clients?id=eq.${client.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation',
+            },
+            body: JSON.stringify(updates),
+          });
+          const result = await res.json();
+          if (!res.ok) throw new Error(result.message || JSON.stringify(result));
+          if (updates.lessons_used !== undefined) {
+            try {
+              await logAudit('lessons_deducted', 'client', client.id,
+                String(client?.lessons_used || 0),
+                `${updates.lessons_used} (−${lessons} за ${lessonDate})`,
+                currentUserId, authorName);
+            } catch {}
+          }
+          if (onClientUpdate) onClientUpdate({ ...client, ...updates });
         }
-        if (onClientUpdate) onClientUpdate({ ...client, ...updates });
       }
 
       const lessonText = (client?.is_unlimited || !isActiveStudent) ? '' : ` [списано занятий: ${lessons}]`;
