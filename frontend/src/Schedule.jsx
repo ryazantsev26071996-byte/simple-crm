@@ -199,9 +199,11 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         lesson_comment: "", attended: entry.attended, walk_in: entry.walk_in || false,
         digital_drawing: entry.digital_drawing || false,
         visitSlots: defaultChain, chargeSlots: defaultCharge,
+        no_new_materials: entry.no_new_materials || false,
+        materials_note: entry.materials_note || "",
       });
     } else {
-      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false, digital_drawing: false, visitSlots: 1, chargeSlots: 1 });
+      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false, digital_drawing: false, visitSlots: 1, chargeSlots: 1, no_new_materials: false, materials_note: "" });
       try {
         const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role,start_time,end_time,start_time2,end_time2`);
         if (Array.isArray(ws) && ws.length > 0) {
@@ -255,8 +257,8 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
       return;
     }
-    if (!isGroupLocked && userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0 && !form.digital_drawing) {
-      alert('Добавьте хотя бы один материал, использованный на занятии — это обязательно при отметке "Пришёл"');
+    if (!isGroupLocked && userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0 && !form.digital_drawing && !form.no_new_materials && !form.materials_note?.trim()) {
+      alert('Укажите материалы, отметьте «Без новых материалов» или напишите комментарий');
       return;
     }
     if (form.attended === true && usedMaterials.length > 0) {
@@ -280,6 +282,8 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
       lesson_type: form.lesson_type || null, comment: form.comment || null,
       attended: form.attended, walk_in: form.walk_in || false,
       digital_drawing: form.digital_drawing || false,
+      no_new_materials: form.no_new_materials || false,
+      materials_note: form.materials_note?.trim() || null,
       subscription_type: form.client_id ? (activeClients.find(c => c.id === Number(form.client_id))?.subscription_type || null) : null,
     };
     try {
@@ -299,9 +303,11 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         const chainTimes = TIMES.slice(timeIdx, Math.min(TIMES.length, timeIdx + N));
         const groupId = crypto.randomUUID();
 
+        const matExtra = { no_new_materials: form.no_new_materials || false, materials_note: form.materials_note?.trim() || null };
+
         // Пометить основную запись
         if (scheduleId) {
-          await apiFetch(`schedule?id=eq.${scheduleId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ visit_group: groupId, visit_slots: N, lessons_charged: charged }) });
+          await apiFetch(`schedule?id=eq.${scheduleId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ visit_group: groupId, visit_slots: N, lessons_charged: charged, ...matExtra }) });
         }
 
         // Дополнительные слоты цепочки
@@ -310,9 +316,9 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
           const t = chainTimes[i];
           const existing = slots.find(s => s.date === modal.date && s.time === t && s.client_id === Number(form.client_id));
           if (existing) {
-            await apiFetch(`schedule?id=eq.${existing.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: true, teacher: form.teacher || null, lesson_type: form.lesson_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0 }) });
+            await apiFetch(`schedule?id=eq.${existing.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: true, teacher: form.teacher || null, lesson_type: form.lesson_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0, ...matExtra }) });
           } else {
-            await apiFetch("schedule", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ date: modal.date, time: t, client_id: Number(form.client_id), client_name: form.client_name || null, teacher: form.teacher || null, lesson_type: form.lesson_type || null, recorded_by: form.recorded_by || null, comment: null, attended: true, walk_in: false, digital_drawing: false, subscription_type: cl?.subscription_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0 }) });
+            await apiFetch("schedule", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ date: modal.date, time: t, client_id: Number(form.client_id), client_name: form.client_name || null, teacher: form.teacher || null, lesson_type: form.lesson_type || null, recorded_by: form.recorded_by || null, comment: null, attended: true, walk_in: false, digital_drawing: false, subscription_type: cl?.subscription_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0, ...matExtra }) });
           }
         }
 
@@ -331,7 +337,10 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         const lastTime = chainTimes[chainTimes.length - 1];
         const timeRange = N > 1 ? `${modal.time}–${addTwoHours(lastTime)}` : modal.time;
         const deducted = cl && !cl.is_unlimited;
-        const commentText = [`[${modal.date} ${timeRange}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ")
+        const matCommentPart = form.no_new_materials
+          ? "Материалы: без новых (готовые с прошлого занятия)."
+          : (form.materials_note?.trim() && usedMaterials.length === 0 ? `Материалы: ${form.materials_note.trim()}.` : "");
+        const commentText = [`[${modal.date} ${timeRange}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment, matCommentPart].filter(Boolean).join(" ")
           + (deducted ? ` [списано занятий: ${fmtLessons(charged)}]` : "");
         await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText, author_id: userId || null }) });
       }
@@ -607,12 +616,12 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
               </div>
             )}
 
-            {form.attended===true&&(()=>{const matRequired=usedMaterials.length===0&&userEmail!=='crm@artschool.ru'&&!form.digital_drawing;return(
+            {form.attended===true&&(()=>{const matRequired=usedMaterials.length===0&&userEmail!=='crm@artschool.ru'&&!form.digital_drawing&&!form.no_new_materials&&!form.materials_note?.trim();return(
               <div style={{marginBottom:10,padding:"10px 12px",background:"#fafafa",borderRadius:8,border:`1px solid ${matRequired?"#e55":"#eee"}`}}>
                 <div style={{fontSize:12,fontWeight:600,color:matRequired?"#e55":"#555",marginBottom:8}}>
-                  Материалы, использованные на занятии {matRequired?"* (обязательно)":form.digital_drawing?"(необязательно — цифровое занятие)":""}
+                  Материалы, использованные на занятии {matRequired?"* (обязательно)":form.digital_drawing?"(необязательно — цифровое занятие)":form.no_new_materials?"(без новых материалов)":""}
                 </div>
-                <div style={{fontSize:11,color:"#aaa",marginBottom:8,lineHeight:1.4}}>Указывайте только то, что реально израсходовано сегодня: новый лист бумаги или холст, который взяли, или сколько краски выдавили из тюбика. Не нужно отмечать материалы, которые просто лежат на столе, но не тратились.</div>
+                <div style={{fontSize:11,color:"#aaa",marginBottom:8,lineHeight:1.4}}>Указывайте только то, что реально израсходовано сегодня: новый лист бумаги или холст, который взяли, или сколько краски выдавили из тюбика. Не нужно отмечать материалы, которые просто лежат на столе, но не тратились. Если новых материалов не было — отметьте галочку «Без новых материалов» или напишите комментарий.</div>
                 {usedMaterials.map((um, idx) => (
                   <div key={idx} style={{display:"flex",alignItems:"center",gap:6,marginBottom:6,padding:"5px 8px",background:"white",borderRadius:6,border:`1px solid ${matValidationErrors.has(idx)?"#e55":"#e8e8e8"}`}}>
                     <div style={{flex:1,fontSize:12,fontWeight:500,color:"#333",minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{um.name}</div>
@@ -668,6 +677,16 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                       ))}
                     </div>
                   )}
+                </div>
+                <label style={{display:"flex",alignItems:"flex-start",gap:7,marginTop:8,cursor:"pointer"}}>
+                  <input type="checkbox" checked={form.no_new_materials||false} onChange={e=>setForm(f=>({...f,no_new_materials:e.target.checked}))} style={{marginTop:2,flexShrink:0}} />
+                  <span style={{fontSize:12,color:"#555"}}>Без новых материалов (брали готовые цвета / материалы с прошлого занятия)</span>
+                </label>
+                <div style={{marginTop:8}}>
+                  <div style={{fontSize:11,color:"#888",marginBottom:3}}>Материалы — свободный комментарий (необязательно)</div>
+                  <textarea value={form.materials_note||""} onChange={e=>setForm(f=>({...f,materials_note:e.target.value}))}
+                    placeholder="Например: белила с прошлого занятия, готовая палитра"
+                    style={{width:"100%",padding:"5px 8px",borderRadius:4,border:"1px solid #ddd",fontSize:12,fontFamily:"inherit",resize:"vertical",minHeight:44,boxSizing:"border-box"}} />
                 </div>
               </div>
             );})()}
