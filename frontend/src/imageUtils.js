@@ -84,6 +84,23 @@ export async function uploadToBucket(bucket, path, blob) {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function uploadFileToBucket(bucket, path, file, { upsert = false, signal = null } = {}) {
+  const token = await getToken();
+  const opts = {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": file.type || "application/octet-stream",
+      "x-upsert": upsert ? "true" : "false",
+    },
+    body: file,
+  };
+  if (signal) opts.signal = signal;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, opts);
+  if (!res.ok) throw new Error(await res.text());
+}
+
 export async function deleteFromBucket(bucket, storagePath) {
   const token = await getToken();
   await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${storagePath}`, {

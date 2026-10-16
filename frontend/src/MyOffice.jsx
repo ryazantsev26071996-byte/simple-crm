@@ -2,6 +2,7 @@ import React from "react";
 import { RecurringTasksAdmin, TodayRecurringTasks } from "./RecurringTasks.jsx";
 import { isActiveStaff } from "./inactiveStaff.js";
 import { canDelete } from "./permissions.js";
+import { getSignedUrl, uploadFileToBucket, deleteFromBucket } from "./imageUtils.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -41,12 +42,11 @@ function sanitizeFilename(name) {
   return name.toLowerCase().split('').map(c => map[c] || c).join('').replace(/[^a-z0-9._-]/g, '_');
 }
 
-async function downloadStorageFile(supabase, bucket, filePath) {
+async function downloadStorageFile(bucket, filePath) {
   try {
-    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(filePath, 60);
-    if (error) throw error;
+    const url = await getSignedUrl(bucket, filePath);
     const a = document.createElement("a");
-    a.href = data.signedUrl;
+    a.href = url;
     a.download = filePath.split("/").pop();
     document.body.appendChild(a);
     a.click();
@@ -93,13 +93,13 @@ function TargetBadge({ target }) {
   );
 }
 
-function DownloadBtn({ supabase, bucket, filePath, style }) {
+function DownloadBtn({ bucket, filePath, style }) {
   const [busy, setBusy] = React.useState(false);
   const fileName = filePath?.split("/").pop() || "";
 
   async function handleClick() {
     setBusy(true);
-    await downloadStorageFile(supabase, bucket, filePath);
+    await downloadStorageFile(bucket, filePath);
     setBusy(false);
   }
 
@@ -310,7 +310,7 @@ function WorkScheduleSection({ userName, supabase }) {
 
 // ─── Regulation ───────────────────────────────────────────────────────────────
 
-function RegulationCard({ filePath, deleting, onOpen, onDelete, onEdit, supabase }) {
+function RegulationCard({ filePath, deleting, onOpen, onDelete, onEdit }) {
   const [hovered, setHovered] = React.useState(false);
   return (
     <div
@@ -332,7 +332,7 @@ function RegulationCard({ filePath, deleting, onOpen, onDelete, onEdit, supabase
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {filePath && (
           <button
-            onClick={e => { e.stopPropagation(); downloadStorageFile(supabase, "regulations", filePath); }}
+            onClick={e => { e.stopPropagation(); downloadStorageFile("regulations", filePath); }}
             title="Скачать .docx"
             style={{ background: "none", border: "none", fontSize: 16, cursor: "pointer", padding: "2px 4px", color: "#16a34a", lineHeight: 1 }}
           >
@@ -450,26 +450,65 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, canDeleteCont
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Файл слишком большой, максимум 5 МБ. Сожмите картинки или разбейте на части.");
+      return;
+    }
+
     setConverting(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    let uploadedPath = null;
+
     try {
       const mammoth = await import("mammoth/mammoth.browser");
       const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.default.convertToHtml({ arrayBuffer });
-      const convertedHtml = result.value;
+      const result = await mammoth.default.convertToHtml(
+        { arrayBuffer },
+        { convertImage: mammoth.default.images.imgElement
+            ? mammoth.default.images.imgElement(() => Promise.resolve({}))
+            : () => [] }
+      );
+      // Strip any embedded images from the HTML output
+      const convertedHtml = result.value.replace(/<img\b[^>]*>/gi, "");
+
+      if (convertedHtml.length > 300000) {
+        alert("Документ слишком большой (текст превышает 300 000 символов). Разбейте его на части или уберите лишний контент.");
+        clearTimeout(timeoutId);
+        setConverting(false);
+        return;
+      }
 
       if (!employeeEmail) throw new Error("Email сотрудника не найден");
       const identifier = employeeEmail.replace(/[^a-zA-Z0-9_\-@.]/g, "_");
       const storagePath = `regulations/${identifier}/${sanitizeFilename(file.name)}`;
-      const { error: upErr } = await supabase.storage.from("regulations").upload(storagePath, file, { upsert: true });
-      if (upErr) throw upErr;
 
-      await persistContent(convertedHtml, storagePath);
+      await uploadFileToBucket("regulations", storagePath, file, { upsert: true, signal: controller.signal });
+      uploadedPath = storagePath;
+
+      try {
+        await persistContent(convertedHtml, storagePath);
+      } catch (dbErr) {
+        try { await deleteFromBucket("regulations", uploadedPath); } catch {}
+        throw dbErr;
+      }
+
       setHtml(convertedHtml);
       setFilePath(storagePath);
       fetchAllRegs();
-    } catch(e) {
-      alert("Ошибка конвертации: " + e.message);
+    } catch (err) {
+      if (err.name === "AbortError") {
+        alert("Загрузка не удалась, попробуйте ещё раз.");
+        if (uploadedPath) {
+          try { await deleteFromBucket("regulations", uploadedPath); } catch {}
+        }
+      } else {
+        alert("Ошибка загрузки: " + err.message);
+      }
     }
+
+    clearTimeout(timeoutId);
     setConverting(false);
   }
 
@@ -477,7 +516,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, canDeleteCont
     if (!window.confirm("Удалить регламент сотрудника?")) return;
     setDeleting(true);
     try {
-      if (filePath) await supabase.storage.from("regulations").remove([filePath]);
+      if (filePath) await deleteFromBucket("regulations", filePath);
       await apiFetch(supabase, `staff_regulations?${filterParam}`, {
         method: "PATCH",
         body: JSON.stringify({ content: "", file_path: null }),
@@ -518,7 +557,7 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, canDeleteCont
         <SectionTitle>📋 Рекомендации по работе</SectionTitle>
 
         {loading || converting ? (
-          <div style={{ color: "#9ca3af", fontSize: 13 }}>{converting ? "Конвертируем файл..." : "Загрузка..."}</div>
+          <div style={{ color: "#9ca3af", fontSize: 13 }}>{converting ? "Загрузка…" : "Загрузка..."}</div>
 
         ) : isAdmin ? (
           hasContent && mode !== 'edit' ? (
@@ -528,7 +567,6 @@ function RegulationSection({ employeeEmail, employeeName, isAdmin, canDeleteCont
               onOpen={() => setShowModal(true)}
               onDelete={canDeleteContent ? handleDelete : undefined}
               onEdit={() => { setMode('edit'); setTimeout(() => { if (editorRef.current) editorRef.current.innerHTML = html; }, 0); }}
-              supabase={supabase}
             />
 
           ) : mode === 'manual' || mode === 'edit' ? (
@@ -642,10 +680,21 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
 
   async function handleSave() {
     if (!title.trim()) { alert("Введите название инструкции"); return; }
-    setSaving(true);
+
+    if (pendingFile && pendingFile.size > 5 * 1024 * 1024) {
+      alert("Файл слишком большой, максимум 5 МБ. Сожмите картинки или разбейте на части.");
+      return;
+    }
+
     const content = editorRef.current?.innerHTML || "";
+    if (content.length > 300000) {
+      alert("Содержимое инструкции слишком большое (более 300 000 символов). Разбейте на части.");
+      return;
+    }
+
+    setSaving(true);
+    let savedId = instruction?.id;
     try {
-      let savedId = instruction?.id;
       if (savedId) {
         await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
           method: "PATCH",
@@ -659,16 +708,36 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
         savedId = rows[0]?.id;
       }
 
-      // Upload file after we have an id
       if (pendingFile && savedId) {
         setUploading(true);
         const storagePath = `instructions/${savedId}/${sanitizeFilename(pendingFile.name)}`;
-        const { error: upErr } = await supabase.storage.from("instructions").upload(storagePath, pendingFile, { upsert: true });
-        if (upErr) throw upErr;
-        await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ file_path: storagePath }),
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        let uploadedPath = null;
+        try {
+          await uploadFileToBucket("instructions", storagePath, pendingFile, { upsert: true, signal: controller.signal });
+          uploadedPath = storagePath;
+          try {
+            await apiFetch(supabase, `instructions?id=eq.${savedId}`, {
+              method: "PATCH",
+              body: JSON.stringify({ file_path: storagePath }),
+            });
+          } catch (dbErr) {
+            try { await deleteFromBucket("instructions", uploadedPath); } catch {}
+            throw dbErr;
+          }
+        } catch (upErr) {
+          clearTimeout(timeoutId);
+          setUploading(false);
+          if (upErr.name === "AbortError") {
+            alert("Загрузка не удалась, попробуйте ещё раз.");
+          } else {
+            alert("Ошибка загрузки файла: " + upErr.message);
+          }
+          setSaving(false);
+          return;
+        }
+        clearTimeout(timeoutId);
         setUploading(false);
       }
 
@@ -725,7 +794,7 @@ function InstructionEditModal({ instruction, onClose, onSaved, supabase }) {
           </button>
           {pendingFile && <span style={{ fontSize: 12, color: "#4a90e2" }}>📄 {pendingFile.name}</span>}
           {!pendingFile && existingFilePath && (
-            <DownloadBtn supabase={supabase} bucket="instructions" filePath={existingFilePath} />
+            <DownloadBtn bucket="instructions" filePath={existingFilePath} />
           )}
         </div>
       </div>
@@ -833,7 +902,7 @@ function InstructionsSection({ isAdmin, canDeleteContent, isViewingSelf, viewRol
                   <div onClick={e => e.stopPropagation()} style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 4 }}>
                     {instr.file_path && (
                       <button
-                        onClick={() => downloadStorageFile(supabase, "instructions", instr.file_path)}
+                        onClick={() => downloadStorageFile("instructions", instr.file_path)}
                         title="Скачать .docx"
                         style={{ background: "white", border: "1px solid #bbf7d0", borderRadius: 6, width: 26, height: 26, cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center" }}
                       >
@@ -863,7 +932,7 @@ function InstructionsSection({ isAdmin, canDeleteContent, isViewingSelf, viewRol
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
             <TargetBadge target={viewModal.target} />
             {viewModal.file_path && (
-              <DownloadBtn supabase={supabase} bucket="instructions" filePath={viewModal.file_path} />
+              <DownloadBtn bucket="instructions" filePath={viewModal.file_path} />
             )}
           </div>
           <div dangerouslySetInnerHTML={{ __html: viewModal.content }} style={{ fontSize: 14, lineHeight: 1.7, color: "#1e293b" }} />
