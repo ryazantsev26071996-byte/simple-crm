@@ -1,4 +1,5 @@
 import React from "react";
+import { fmtLessons } from "./materialsUtils.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -539,7 +540,8 @@ export default function App() {
                     if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
                     return 0;
                   }).map(c => {
-                    const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
+                    const _llNum = c.is_unlimited ? Infinity : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
+                    const lessonsLeft = c.is_unlimited ? '∞' : fmtLessons(_llNum);
                     const freezeLeft = (c.freeze_days_total||0)-(c.freeze_days_used||0);
                     const endDate = effectiveEndDate(c);
                     return (
@@ -548,7 +550,7 @@ export default function App() {
                         <td style={{ padding: '8px 12px', fontWeight: 500, position: 'sticky', left: 0, zIndex: 1, background: c.id === selectedId ? '#f0f7ff' : 'white', borderRight: '1px solid #eee' }}>{c.name}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{c.stage || '—'}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
-                        <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
+                        <td style={{ padding: '8px 12px', color: _llNum <= 3 && !c.is_unlimited ? '#e55' : '#333', fontWeight: _llNum <= 3 && !c.is_unlimited ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{c.freeze_days_total ? freezeLeft + ' дн' : '—'}</td>
                         <td style={{ padding: '8px 12px', color: '#888' }}>{endDate ? new Date(endDate).toLocaleDateString('ru-RU') : '—'}</td>
                         <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>

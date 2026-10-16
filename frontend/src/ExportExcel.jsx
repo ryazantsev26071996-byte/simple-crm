@@ -1,4 +1,5 @@
 import { effectiveEndDate } from "./subscriptionMonths.js";
+import { fmtLessons } from "./materialsUtils.js";
 
 export function exportToExcel(clients) {
   const headers = [
@@ -9,7 +10,7 @@ export function exportToExcel(clients) {
   ]
 
   const rows = clients.map(c => {
-    const lessonsLeft = c.is_unlimited ? 'Безлимит' : Math.max(0, (c.lessons_total||0) - (c.lessons_used||0))
+    const lessonsLeft = c.is_unlimited ? 'Безлимит' : fmtLessons(Math.max(0, (c.lessons_total||0) - (c.lessons_used||0)))
     const freezeLeft = (c.freeze_days_total||0) - (c.freeze_days_used||0)
     const endDate = effectiveEndDate(c)
     return [
@@ -19,7 +20,7 @@ export function exportToExcel(clients) {
       c.stage || '',
       c.subscription_type || '',
       c.is_unlimited ? 'Безлимит' : (c.lessons_total || 0),
-      c.is_unlimited ? '—' : (c.lessons_used || 0),
+      c.is_unlimited ? '—' : fmtLessons(c.lessons_used || 0),
       lessonsLeft,
       c.freeze_days_total || 0,
       c.freeze_days_used || 0,

@@ -1,4 +1,5 @@
 import React from "react";
+import { fmtLessons } from "../materialsUtils.js";
 
 function fmtDate(v) {
   if (!v) return "—";
@@ -15,7 +16,8 @@ const valueStyle = { color: '#333', fontWeight: 500 };
 // shown to teachers instead of the full ClientForm/ContractBlock (which
 // contain phone, contract/payment details, etc. that teachers shouldn't see).
 export default function TeacherAbonementCard({ client }) {
-  const lessonsLeft = client.is_unlimited ? '∞' : Math.max(0, (client.lessons_total || 0) - (client.lessons_used || 0));
+  const _llNum = client.is_unlimited ? Infinity : Math.max(0, (client.lessons_total || 0) - (client.lessons_used || 0));
+  const lessonsLeft = client.is_unlimited ? '∞' : fmtLessons(_llNum);
   const freezeLeft = Math.max(0, (client.freeze_days_total || 0) - (client.freeze_days_used || 0));
 
   return (
@@ -35,7 +37,7 @@ export default function TeacherAbonementCard({ client }) {
       </div>
       <div style={rowStyle}>
         <span style={labelStyle}>Уже использовано занятий</span>
-        <span style={valueStyle}>{client.lessons_used || 0}</span>
+        <span style={valueStyle}>{fmtLessons(client.lessons_used || 0)}</span>
       </div>
       <div style={rowStyle}>
         <span style={labelStyle}>Уже использовано дней заморозки</span>
@@ -43,7 +45,7 @@ export default function TeacherAbonementCard({ client }) {
       </div>
       <div style={rowStyle}>
         <span style={labelStyle}>Занятий осталось</span>
-        <span style={{ ...valueStyle, color: lessonsLeft !== '∞' && lessonsLeft <= 3 ? '#e55' : '#333' }}>{lessonsLeft}</span>
+        <span style={{ ...valueStyle, color: _llNum <= 3 && !client.is_unlimited ? '#e55' : '#333' }}>{lessonsLeft}</span>
       </div>
       <div style={{ ...rowStyle, borderBottom: 'none' }}>
         <span style={labelStyle}>Заморозка осталось</span>

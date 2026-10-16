@@ -2,6 +2,7 @@ import React from "react";
 import { supabase } from "../supabase";
 import TasksBlock from "./TasksBlock.jsx";
 import { canDelete } from "../permissions.js";
+import { fmtLessons } from "../materialsUtils.js";;
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -263,7 +264,7 @@ export default function CommentsWall({ role, authorName, userEmail, comments, on
           <div style={{ fontWeight: 500, fontSize: 14 }}>Комментарии</div>
           {client && !client.is_unlimited && (
             <div style={{ fontSize: 12, color: lessonsLeft <= 3 ? '#e55' : '#888' }}>
-              Занятий: <strong>{Math.max(0, lessonsLeft)}</strong>
+              Занятий: <strong>{fmtLessons(Math.max(0, lessonsLeft))}</strong>
               {freezeLeft > 0 && <span> · Заморозка: <strong>{freezeLeft} дн</strong></span>}
             </div>
           )}
@@ -285,9 +286,9 @@ export default function CommentsWall({ role, authorName, userEmail, comments, on
             {!client?.is_unlimited && isActiveStudent && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <span style={{ fontSize: 12, color: '#888' }}>Списать:</span>
-                {[0,1,2,3,4,5].map(n => (
+                {[0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5].map(n => (
                   <button key={n} type="button" onClick={() => setLessons(n)}
-                    style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #ddd', background: lessons === n ? '#4a90e2' : 'white', color: lessons === n ? 'white' : '#333', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+                    style={{ minWidth: 28, height: 28, padding: '0 4px', borderRadius: '50%', border: '1px solid #ddd', background: lessons === n ? '#4a90e2' : 'white', color: lessons === n ? 'white' : '#333', cursor: 'pointer', fontSize: 11, fontWeight: 500 }}>
                     {n}
                   </button>
                 ))}

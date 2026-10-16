@@ -1,5 +1,6 @@
 import React from "react";
 import { effectiveEndDate } from "./subscriptionMonths.js";
+import { fmtLessons } from "./materialsUtils.js";
 
 const TEACHER_STAGES = ['ученик', 'пробный месяц', 'тест-драйв']
 
@@ -121,7 +122,8 @@ export function TeacherView({ clients, onClientSelect }) {
               {lostStudents.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#aaa' }}>Потеряшек нет</td></tr>
               ) : lostStudents.map(c => {
-                const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
+                const _llNum = c.is_unlimited ? Infinity : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0));
+                const lessonsLeft = c.is_unlimited ? '∞' : fmtLessons(_llNum);
                 return (
                   <tr key={c.id} onClick={() => onClientSelect(c.id)}
                     style={{ borderBottom: '1px solid #f0f0f0', cursor: 'pointer' }}
@@ -130,7 +132,7 @@ export function TeacherView({ clients, onClientSelect }) {
                     <td style={{ padding: '8px 12px', fontWeight: 500, position: 'sticky', left: 0, backgroundColor: 'white', zIndex: 1, borderRight: '1px solid #eee' }}>{c.name}</td>
                     <td style={{ padding: '8px 12px', color: '#888' }}>{c.phone || '—'}</td>
                     <td style={{ padding: '8px 12px', color: '#888' }}>{c.subscription_type || '—'}</td>
-                    <td style={{ padding: '8px 12px', color: lessonsLeft <= 3 && lessonsLeft !== '∞' ? '#e55' : '#333', fontWeight: lessonsLeft <= 3 && lessonsLeft !== '∞' ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
+                    <td style={{ padding: '8px 12px', color: _llNum <= 3 && !c.is_unlimited ? '#e55' : '#333', fontWeight: _llNum <= 3 && !c.is_unlimited ? 600 : 400 }}>{c.subscription_type ? lessonsLeft : '—'}</td>
                     <td style={{ padding: '8px 12px', color: '#aaa', fontSize: 12 }}>{c.last_visit ? new Date(c.last_visit).toLocaleDateString('ru-RU') : '—'}</td>
                     <td style={{ padding: '8px 12px', fontWeight: 600, color: c._daysSince === null ? '#aaa' : c._daysSince > 30 ? '#e55' : '#e8a000' }}>{c._daysSince === null ? '—' : c._daysSince}</td>
                   </tr>
@@ -155,12 +157,13 @@ export function TeacherView({ clients, onClientSelect }) {
             </thead>
             <tbody>
               {filtered.map(c => {
-                const lessonsLeft = c.is_unlimited ? '∞' : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0))
+                const _llNum = c.is_unlimited ? Infinity : Math.max(0, (c.lessons_total||0)-(c.lessons_used||0))
+                const lessonsLeft = c.is_unlimited ? '∞' : fmtLessons(_llNum)
                 const endDate = effectiveEndDate(c)
                 const days = daysLeft(endDate)
                 const isCalc = !c.subscription_end_with_freeze && !c.subscription_end && !!endDate
                 const daysColor = days !== null ? (days < 7 ? '#e55' : days < 30 ? '#f90' : '#2a9') : '#aaa'
-                const lessonsColor = lessonsLeft !== '∞' && lessonsLeft <= 3 ? '#e55' : '#333'
+                const lessonsColor = _llNum <= 3 && !c.is_unlimited ? '#e55' : '#333'
 
                 return (
                   <tr key={c.id} onClick={() => onClientSelect(c.id)}

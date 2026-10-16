@@ -2,7 +2,7 @@ import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
 import Events from "./Events.jsx";
-import { round1 } from "./materialsUtils.js";
+import { round1, fmtLessons } from "./materialsUtils.js";
 import { canDelete } from "./permissions.js";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
@@ -51,6 +51,8 @@ function getWeekDays(date) {
 function fmt(date) { const d = new Date(date); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); }
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
+function addTwoHours(timeStr) { const [h, m] = timeStr.split(':').map(Number); return `${String(h + 2).padStart(2, '0')}:${String(m).padStart(2, '0')}`; }
+function roundLessons(n) { return Math.round((Number(n) || 0) * 10) / 10; }
 
 export default function Schedule({ clients, role, authorName, userId, userEmail, onClientsChange, focusEntry, onFocusHandled }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
@@ -174,16 +176,32 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     setMatSearch("");
     setMatSuggestions([]);
     setShowMatSuggestions(false);
+
+    function computeChain(clientId) {
+      if (!clientId) return 1;
+      const timeIdx = TIMES.indexOf(time);
+      if (timeIdx < 0) return 1;
+      let chain = 1;
+      for (let i = timeIdx + 1; i < TIMES.length; i++) {
+        if (slots.some(s => s.date === date && s.time === TIMES[i] && s.client_id === Number(clientId))) chain++;
+        else break;
+      }
+      return chain;
+    }
+
     if (entry) {
+      const defaultChain = entry.visit_group ? (entry.visit_slots || 1) : computeChain(entry.client_id);
+      const defaultCharge = entry.visit_group ? (entry.lessons_charged != null ? entry.lessons_charged : 1) : defaultChain;
       setForm({
         client_id: entry.client_id || "", client_name: entry.client_name || "",
         teacher: entry.teacher || "", recorded_by: entry.recorded_by || "",
         lesson_type: entry.lesson_type || "", comment: entry.comment || "",
         lesson_comment: "", attended: entry.attended, walk_in: entry.walk_in || false,
         digital_drawing: entry.digital_drawing || false,
+        visitSlots: defaultChain, chargeSlots: defaultCharge,
       });
     } else {
-      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false, digital_drawing: false });
+      setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false, digital_drawing: false, visitSlots: 1, chargeSlots: 1 });
       try {
         const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role`);
         if (Array.isArray(ws) && ws.length > 0) {
@@ -205,12 +223,36 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   }
 
   async function handleSave() {
+    const isGroupLocked = Boolean(modal.entry?.visit_group);
+
+    // --- Снятие отметки с группового посещения ---
+    if (isGroupLocked && modal.entry?.attended === true && form.attended !== true) {
+      const groupId = modal.entry.visit_group;
+      const groupEntries = slots.filter(s => s.visit_group === groupId);
+      const N = groupEntries.length;
+      const charged = modal.entry.lessons_charged != null ? Number(modal.entry.lessons_charged) : 1;
+      if (!window.confirm(`Снять отметку со всего посещения (${N} зап.) и вернуть ${fmtLessons(charged)} занятий?`)) return;
+      try {
+        for (const ge of groupEntries) {
+          await apiFetch(`schedule?id=eq.${ge.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: null, visit_group: null, visit_slots: null, lessons_charged: 1 }) });
+        }
+        const cl = activeClients.find(c => c.id === Number(form.client_id));
+        if (cl && !cl.is_unlimited) {
+          const newUsed = Math.max(0, roundLessons((cl.lessons_used||0) - charged));
+          await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ lessons_used: newUsed }) });
+        }
+        setModal(null);
+        loadSlots();
+      } catch(e) { alert(e.message); }
+      return;
+    }
+
     const duplicate = isDuplicateSameDay();
-    if (userEmail !== 'crm@artschool.ru' && form.attended === true && !form.lesson_comment.trim() && !duplicate) {
+    if (!isGroupLocked && userEmail !== 'crm@artschool.ru' && form.attended === true && !form.lesson_comment.trim() && !duplicate) {
       alert('Заполните комментарий после занятия — он обязателен при отметке "Пришёл"');
       return;
     }
-    if (userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0 && !form.digital_drawing) {
+    if (!isGroupLocked && userEmail !== 'crm@artschool.ru' && form.attended === true && usedMaterials.length === 0 && !form.digital_drawing) {
       alert('Добавьте хотя бы один материал, использованный на занятии — это обязательно при отметке "Пришёл"');
       return;
     }
@@ -246,22 +288,49 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         const result = await apiFetch("schedule", { method: "POST", body: JSON.stringify(payload) });
         scheduleId = (Array.isArray(result) ? result[0] : result)?.id || null;
       }
-      if (form.attended === true && form.client_id) {
+
+      if (form.attended === true && form.client_id && !isGroupLocked) {
+        const N = Math.max(1, Number(form.visitSlots) || 1);
+        const charged = Number(form.chargeSlots) || N;
+        const timeIdx = TIMES.indexOf(modal.time);
+        const chainTimes = TIMES.slice(timeIdx, Math.min(TIMES.length, timeIdx + N));
+        const groupId = crypto.randomUUID();
+
+        // Пометить основную запись
+        if (scheduleId) {
+          await apiFetch(`schedule?id=eq.${scheduleId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ visit_group: groupId, visit_slots: N, lessons_charged: charged }) });
+        }
+
+        // Дополнительные слоты цепочки
         const cl = activeClients.find(c => c.id === Number(form.client_id));
+        for (let i = 1; i < chainTimes.length; i++) {
+          const t = chainTimes[i];
+          const existing = slots.find(s => s.date === modal.date && s.time === t && s.client_id === Number(form.client_id));
+          if (existing) {
+            await apiFetch(`schedule?id=eq.${existing.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: true, teacher: form.teacher || null, lesson_type: form.lesson_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0 }) });
+          } else {
+            await apiFetch("schedule", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ date: modal.date, time: t, client_id: Number(form.client_id), client_name: form.client_name || null, teacher: form.teacher || null, lesson_type: form.lesson_type || null, recorded_by: form.recorded_by || null, comment: null, attended: true, walk_in: false, digital_drawing: false, subscription_type: cl?.subscription_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0 }) });
+          }
+        }
+
+        // Списание один раз
         if (cl && !cl.is_unlimited) {
-          const visitUpdate = { lessons_used: (cl.lessons_used||0)+1 };
+          const newUsed = roundLessons((cl.lessons_used||0) + charged);
+          const visitUpdate = { lessons_used: newUsed };
           if (!cl.last_visit || modal.date > cl.last_visit) visitUpdate.last_visit = modal.date;
           await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify(visitUpdate) });
-          try { await apiFetch("audit_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ action: 'lessons_deducted', entity: 'client', entity_id: cl.id, old_value: String(cl.lessons_used||0), new_value: `${(cl.lessons_used||0)+1} (−1 за ${modal.date})`, performed_by: userId||null, performed_by_name: authorName||null }) }); } catch (err) { console.error('audit_log insert failed:', err); }
+          try { await apiFetch("audit_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ action: 'lessons_deducted', entity: 'client', entity_id: cl.id, old_value: String(cl.lessons_used||0), new_value: `${newUsed} (−${charged} за ${modal.date})`, performed_by: userId||null, performed_by_name: authorName||null }) }); } catch (err) { console.error('audit_log insert failed:', err); }
         } else if (cl?.is_unlimited && (!cl.last_visit || modal.date > cl.last_visit)) {
           await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ last_visit: modal.date }) });
         }
-        if (!duplicate || form.lesson_comment.trim()) {
-          const deducted = cl && !cl.is_unlimited;
-          const commentText = [`[${modal.date} ${modal.time}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ")
-            + (deducted ? ` [списано занятий: 1]` : "");
-          await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText, author_id: userId || null }) });
-        }
+
+        // Один комментарий на всё посещение
+        const lastTime = chainTimes[chainTimes.length - 1];
+        const timeRange = N > 1 ? `${modal.time}–${addTwoHours(lastTime)}` : modal.time;
+        const deducted = cl && !cl.is_unlimited;
+        const commentText = [`[${modal.date} ${timeRange}]`, form.teacher ? `Педагог: ${form.teacher}.` : "", form.lesson_type ? `Вид: ${form.lesson_type}.` : "", form.lesson_comment].filter(Boolean).join(" ")
+          + (deducted ? ` [списано занятий: ${fmtLessons(charged)}]` : "");
+        await apiFetch("comments", { method: "POST", body: JSON.stringify({ client_id: Number(form.client_id), text: commentText, author_id: userId || null }) });
       }
       if (form.attended === true && usedMaterials.length > 0) {
         for (const um of usedMaterials) {
@@ -428,7 +497,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                       onMouseEnter={e=>e.currentTarget.style.background="#f0f7ff"}
                       onMouseLeave={e=>e.currentTarget.style.background="white"}>
                       <div>{c.name}</div>
-                      <div style={{fontSize:11,color:"#888"}}>{c.subscription_type||"без абонемента"} · осталось {c.is_unlimited?"∞":Math.max(0,(c.lessons_total||0)-(c.lessons_used||0))} зан.</div>
+                      <div style={{fontSize:11,color:"#888"}}>{c.subscription_type||"без абонемента"} · осталось {c.is_unlimited?"∞":fmtLessons(Math.max(0,(c.lessons_total||0)-(c.lessons_used||0)))} зан.</div>
                     </div>
                   ))}
                 </div>
@@ -440,7 +509,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                   {form.client_name}
                 </span>
                 <div style={{fontSize:12,color:"#888",marginTop:2}}>
-                  {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));return cl?`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0))} зан.`:"";})()}
+                  {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));return cl?`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":fmtLessons(Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0)))} зан.`:"";})()}
                 </div>
               </div>
             )}
@@ -481,15 +550,56 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
               </label>
             </div>
 
+            {form.attended===true&&form.client_id&&(()=>{
+              const groupLocked = Boolean(modal.entry?.visit_group);
+              const timeIdx = TIMES.indexOf(modal.time);
+              const N = Math.max(1, Number(form.visitSlots)||1);
+              const chainTimes = TIMES.slice(timeIdx, Math.min(TIMES.length, timeIdx + N));
+              const trimmedN = chainTimes.length;
+              const endTime = chainTimes.length > 0 ? addTwoHours(chainTimes[chainTimes.length-1]) : "";
+              const groupHint = chainTimes.length > 1 ? `Будут отмечены: ${chainTimes.join(", ")} (до ${endTime})` : `Слот: ${modal.time} (до ${addTwoHours(modal.time)})`;
+              const dayEndWarn = N > trimmedN;
+              const charged = Number(form.chargeSlots) || N;
+              return (
+                <div style={{marginBottom:10,padding:"10px 12px",background:"#f0f7ff",borderRadius:8,border:"1px solid #c5daf7"}}>
+                  {groupLocked ? (
+                    <div style={{fontSize:12,color:"#4a90e2",fontWeight:600,marginBottom:4}}>
+                      Посещение: {modal.entry.visit_slots > 1 ? `${modal.time}–${addTwoHours(TIMES[Math.min(TIMES.length-1, TIMES.indexOf(modal.time)+(modal.entry.visit_slots||1)-1)])}` : modal.time}, {modal.entry.visit_slots||1} зан., списано {fmtLessons(modal.entry.lessons_charged||1)}
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:6}}>
+                        <label style={{fontSize:12,color:"#555",whiteSpace:"nowrap"}}>Занятий подряд (по 2 ч):</label>
+                        <select value={form.visitSlots||1} onChange={e=>{const n=Number(e.target.value);setForm(f=>({...f,visitSlots:n,chargeSlots:n}));}}
+                          style={{padding:"3px 6px",borderRadius:5,border:"1px solid #bcd",fontSize:13,background:"white"}}>
+                          {[1,2,3,4,5,6].map(n=><option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <span style={{fontSize:11,color:"#4a90e2"}}>{groupHint}</span>
+                      </div>
+                      {dayEndWarn&&<div style={{fontSize:11,color:"#f59e0b",marginBottom:6}}>⚠️ Конец дня, доступно только {trimmedN} слот(а)</div>}
+                      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:4}}>
+                        <label style={{fontSize:12,color:"#555",whiteSpace:"nowrap"}}>Списать занятий:</label>
+                        <select value={form.chargeSlots||1} onChange={e=>setForm(f=>({...f,chargeSlots:Number(e.target.value)}))}
+                          style={{padding:"3px 6px",borderRadius:5,border:"1px solid #bcd",fontSize:13,background:"white"}}>
+                          {[0.5,1,1.5,2,2.5,3,3.5,4,4.5,5,5.5,6].map(n=><option key={n} value={n}>{n}</option>)}
+                        </select>
+                        <span style={{fontSize:11,color:"#888"}}>1 занятие = 2 часа</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
             {(form.attended===true||form.attended===false)&&(
               <div style={{marginBottom:10}}>
-                {(()=>{const dup=isDuplicateSameDay();const isAdmin=userEmail==='crm@artschool.ru';const req=form.attended===true&&!dup&&!isAdmin;return(<>
+                {(()=>{const dup=isDuplicateSameDay();const isAdmin=userEmail==='crm@artschool.ru';const groupLocked=Boolean(modal.entry?.visit_group);const req=form.attended===true&&!dup&&!isAdmin&&!groupLocked;return(<>
                 <div style={{fontSize:12,marginBottom:4,color:req?"#e55":"#888",fontWeight:req?600:400}}>
                   Комментарий после занятия {req?"* (обязательно)":"(опционально)"}
                 </div>
                 <textarea style={{...inp,minHeight:80,resize:"vertical",borderColor:req&&!form.lesson_comment.trim()?"#e55":"#ddd",marginBottom:4}}
                   value={form.lesson_comment} onChange={e=>setForm(f=>({...f,lesson_comment:e.target.value}))} placeholder="Что делали, прогресс, пожелания..." />
-                {form.attended===true&&form.client_id&&<div style={{fontSize:11,color:"#888"}}>{dup?"Спишется 1 занятие (повторное в этот день)":"Спишется 1 занятие и комментарий добавится в карточку ученика"}</div>}
+                {form.attended===true&&form.client_id&&!groupLocked&&(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));const charged=Number(form.chargeSlots)||1;return(<div style={{fontSize:11,color:"#888"}}>Спишется {fmtLessons(charged)} зан. и комментарий добавится в карточку ученика</div>);})()}
                 </>);})()}
               </div>
             )}

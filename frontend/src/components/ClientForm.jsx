@@ -453,6 +453,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
             className="input"
             type="number"
             min="0"
+            step="0.5"
             max={form.lessons_total}
             value={form.lessons_used}
             disabled={disabled}
