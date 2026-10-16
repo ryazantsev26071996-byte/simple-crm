@@ -249,7 +249,7 @@ function WorkScheduleSection({ userName, supabase }) {
     setLoading(true);
     const start = dateFmt(year, month, 1);
     const end = dateFmt(year, month, new Date(year, month, 0).getDate());
-    const wsUrl = `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours,start_time,end_time`;
+    const wsUrl = `work_schedule?employee_name=eq.${encodeURIComponent(userName)}&date=gte.${start}&date=lte.${end}&hours=gt.0&order=date.asc&select=date,hours,start_time,end_time,start_time2,end_time2`;
     apiFetch(supabase, wsUrl)
       .then(rows => { setSchedule(rows); setLoading(false); })
       .catch(() => setLoading(false));
@@ -290,7 +290,7 @@ function WorkScheduleSection({ userName, supabase }) {
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#1e40af" }}>{d.getDate()}</div>
                   <div style={{ fontSize: 11, color: "#374151", marginTop: 2 }}>
                     {row.start_time && row.end_time
-                      ? `${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}`
+                      ? `${row.start_time.slice(0, 5)}–${row.end_time.slice(0, 5)}${row.start_time2 && row.end_time2 ? `, ${row.start_time2.slice(0, 5)}–${row.end_time2.slice(0, 5)}` : ""}`
                       : `${row.hours} ч`}
                   </div>
                 </div>

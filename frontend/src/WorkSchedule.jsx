@@ -186,7 +186,7 @@ export default function WorkSchedule() {
       for (const emp of names) {
         const ent = data[`${dateStr}_${emp}`];
         const defaultStart = EMPLOYEE_ROLE[emp] === "Аккаунты" ? "11:00" : "10:00";
-        form[emp] = { checked: !!ent, start: ent?.start_time || defaultStart, end: ent?.end_time || "21:00" };
+        form[emp] = { checked: !!ent, start: ent?.start_time || defaultStart, end: ent?.end_time || "21:00", start2: ent?.start_time2 || "", end2: ent?.end_time2 || "", showSecond: !!(ent?.start_time2) };
       }
     }
     setModalForm(form);
@@ -195,6 +195,13 @@ export default function WorkSchedule() {
 
   async function handleSave() {
     if (!modal || saving || (role !== 'admin' && role !== 'supervisor')) return;
+    // Validate second intervals before saving
+    for (const emp of Object.values(ACTIVE_EMPLOYEES).flat()) {
+      const f = modalForm[emp] || {};
+      if (!f.checked || !f.showSecond || !f.start2 || !f.end2) continue;
+      if (f.start2 < f.end) { alert(`${emp}: второй промежуток (${f.start2}) начинается раньше окончания первого (${f.end})`); return; }
+      if (f.start2 >= f.end2) { alert(`${emp}: второй промежуток — «до» должно быть позже «с»`); return; }
+    }
     setSaving(true);
     const dateStr = modal.date;
     try {
@@ -203,13 +210,17 @@ export default function WorkSchedule() {
           const f = modalForm[emp] || {};
           const hasExisting = !!data[`${dateStr}_${emp}`];
           if (f.checked) {
-            const hours = calcHours(f.start, f.end);
+            const hours1 = calcHours(f.start, f.end);
+            const hours2 = f.showSecond && f.start2 && f.end2 ? calcHours(f.start2, f.end2) : 0;
+            const hours = Math.round((hours1 + hours2) * 10) / 10;
             return apiFetch(`work_schedule?on_conflict=date,employee_name`, {
               method: "POST",
               headers: { Prefer: "resolution=merge-duplicates,return=representation" },
               body: JSON.stringify({
                 date: dateStr, employee_name: emp, employee_role: EMPLOYEE_ROLE[emp],
                 start_time: f.start || null, end_time: f.end || null,
+                start_time2: (f.showSecond && f.start2) ? f.start2 : null,
+                end_time2: (f.showSecond && f.end2) ? f.end2 : null,
                 hours: hours || null,
               }),
             });
@@ -330,7 +341,7 @@ export default function WorkSchedule() {
                             <div style={{ fontSize: 9, color: "#aaa", fontWeight: 600, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 1 }}>{role}</div>
                             {group.map(({ emp, entry }) => (
                               <div key={emp} style={{ fontSize: 11, color: ROLE_COLOR[role], lineHeight: 1.3 }}>
-                                {emp}{entry?.start_time && entry?.end_time ? ` ${entry.start_time.slice(0,5)}–${entry.end_time.slice(0,5)}` : ""}
+                                {emp}{entry?.start_time && entry?.end_time ? ` ${entry.start_time.slice(0,5)}–${entry.end_time.slice(0,5)}${entry.start_time2 && entry.end_time2 ? `, ${entry.start_time2.slice(0,5)}–${entry.end_time2.slice(0,5)}` : ""}` : ""}
                               </div>
                             ))}
                           </div>
@@ -599,34 +610,56 @@ export default function WorkSchedule() {
                   {role}
                 </div>
                 {names.map(emp => {
-                  const f = modalForm[emp] || { checked: false, start: EMPLOYEE_ROLE[emp] === "Аккаунты" ? "11:00" : "10:00", end: "21:00" };
-                  const hours = calcHours(f.start, f.end);
+                  const f = modalForm[emp] || { checked: false, start: EMPLOYEE_ROLE[emp] === "Аккаунты" ? "11:00" : "10:00", end: "21:00", start2: "", end2: "", showSecond: false };
+                  const hours1 = calcHours(f.start, f.end);
+                  const hours2 = f.showSecond && f.start2 && f.end2 ? calcHours(f.start2, f.end2) : 0;
+                  const hoursTotal = Math.round((hours1 + hours2) * 10) / 10;
                   return (
                     <div key={emp} style={{
-                      display: "flex", alignItems: "center", gap: 10, marginBottom: 6,
+                      display: "flex", flexDirection: "column", gap: 4, marginBottom: 6,
                       padding: "7px 12px", borderRadius: 7,
                       background: f.checked ? "#f0f9f4" : "#fafafa",
                       border: `1px solid ${f.checked ? "#a5d6a7" : "#eee"}`,
                     }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", minWidth: 100 }}>
-                        <input type="checkbox" checked={f.checked}
-                          onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, checked: e.target.checked } }))} />
-                        <span style={{ fontSize: 13, fontWeight: 500 }}>{emp}</span>
-                      </label>
-                      {f.checked && (
-                        <>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", minWidth: 100 }}>
+                          <input type="checkbox" checked={f.checked}
+                            onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, checked: e.target.checked } }))} />
+                          <span style={{ fontSize: 13, fontWeight: 500 }}>{emp}</span>
+                        </label>
+                        {f.checked && (
+                          <>
+                            <span style={{ fontSize: 12, color: "#666" }}>С</span>
+                            <input type="time" value={f.start}
+                              onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, start: e.target.value } }))}
+                              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13, width: 90 }} />
+                            <span style={{ fontSize: 12, color: "#666" }}>До</span>
+                            <input type="time" value={f.end}
+                              onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, end: e.target.value } }))}
+                              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13, width: 90 }} />
+                            {hoursTotal > 0 && <span style={{ fontSize: 12, color: "#2a9", fontWeight: 600, minWidth: 44 }}>{hoursTotal} ч.</span>}
+                            {!f.showSecond && (
+                              <button type="button" onClick={() => setModalForm(prev => ({ ...prev, [emp]: { ...f, showSecond: true, start2: f.end || "", end2: "" } }))}
+                                style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, border: "1px dashed #bbb", background: "white", cursor: "pointer", color: "#888" }}>
+                                + ещё
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
+                      {f.checked && f.showSecond && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", paddingLeft: 112 }}>
                           <span style={{ fontSize: 12, color: "#666" }}>С</span>
-                          <input type="time" value={f.start}
-                            onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, start: e.target.value } }))}
+                          <input type="time" value={f.start2}
+                            onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, start2: e.target.value } }))}
                             style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13, width: 90 }} />
                           <span style={{ fontSize: 12, color: "#666" }}>До</span>
-                          <input type="time" value={f.end}
-                            onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, end: e.target.value } }))}
+                          <input type="time" value={f.end2}
+                            onChange={e => setModalForm(prev => ({ ...prev, [emp]: { ...f, end2: e.target.value } }))}
                             style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid #ddd", fontSize: 13, width: 90 }} />
-                          {hours > 0 && (
-                            <span style={{ fontSize: 12, color: "#2a9", fontWeight: 600, minWidth: 44 }}>{hours} ч.</span>
-                          )}
-                        </>
+                          <button type="button" onClick={() => setModalForm(prev => ({ ...prev, [emp]: { ...f, showSecond: false, start2: "", end2: "" } }))}
+                            style={{ fontSize: 14, padding: "1px 6px", borderRadius: 4, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e55", lineHeight: 1 }}>×</button>
+                        </div>
                       )}
                     </div>
                   );

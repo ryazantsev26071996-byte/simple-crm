@@ -203,9 +203,12 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
     } else {
       setForm({ client_id: "", client_name: "", teacher: "", recorded_by: "", lesson_type: "", comment: "", lesson_comment: "", attended: null, walk_in: false, digital_drawing: false, visitSlots: 1, chargeSlots: 1 });
       try {
-        const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role`);
+        const ws = await apiFetch(`work_schedule?date=eq.${date}&select=employee_name,employee_role,start_time,end_time,start_time2,end_time2`);
         if (Array.isArray(ws) && ws.length > 0) {
-          const teacherRow = ws.find(r => r.employee_role === 'Педагоги');
+          const coversTime = (r, t) =>
+            (r.start_time && r.end_time && r.start_time <= t && t <= r.end_time) ||
+            (r.start_time2 && r.end_time2 && r.start_time2 <= t && t <= r.end_time2);
+          const teacherRow = ws.find(r => r.employee_role === 'Педагоги' && coversTime(r, time));
           if (teacherRow) setForm(f => ({ ...f, teacher: teacherRow.employee_name }));
         }
       } catch (e) {}

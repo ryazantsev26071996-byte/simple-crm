@@ -224,9 +224,12 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
         let autoTeacher = null;
         let needsTeacherNote = false;
         try {
-          const ws = await apiFetch(`work_schedule?date=eq.${modal.date}&select=employee_name,employee_role,start_time,end_time`);
+          const ws = await apiFetch(`work_schedule?date=eq.${modal.date}&select=employee_name,employee_role,start_time,end_time,start_time2,end_time2`);
           if (Array.isArray(ws)) {
-            const teachers = ws.filter(r => r.employee_role === 'Педагоги' && r.start_time <= modal.time && modal.time <= r.end_time);
+            const teachers = ws.filter(r => r.employee_role === 'Педагоги' && (
+              (r.start_time && r.end_time && r.start_time <= modal.time && modal.time <= r.end_time) ||
+              (r.start_time2 && r.end_time2 && r.start_time2 <= modal.time && modal.time <= r.end_time2)
+            ));
             if (teachers.length === 1) autoTeacher = teachers[0].employee_name;
             else needsTeacherNote = true;
           }

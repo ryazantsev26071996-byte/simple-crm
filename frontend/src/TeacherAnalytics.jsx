@@ -373,7 +373,7 @@ function UnmarkedLessonsSection({ start, end, periodLabel, onOpenLesson }) {
     setLoading(true);
     Promise.all([
       apiFetch(`schedule?date=gte.${start}&date=lte.${end}&attended=is.null&select=id,date,time,teacher,client_id,client_name,lesson_type,cancelled,recorded_by&order=date.asc,time.asc`),
-      apiFetch(`work_schedule?date=gte.${start}&date=lte.${end}&select=date,employee_name,employee_role,start_time,end_time`),
+      apiFetch(`work_schedule?date=gte.${start}&date=lte.${end}&select=date,employee_name,employee_role,start_time,end_time,start_time2,end_time2`),
     ])
       .then(([ld, wd]) => { setLessons(Array.isArray(ld) ? ld : []); setWorkSchedule(Array.isArray(wd) ? wd : []); })
       .catch(() => { setLessons([]); setWorkSchedule([]); })
@@ -415,8 +415,12 @@ function UnmarkedLessonsSection({ start, end, periodLabel, onOpenLesson }) {
   function getWorkingTeachers(ds) {
     return workSchedule
       .filter(w => w.date === ds && w.employee_role === "Педагоги")
-      .map(w => `${w.employee_name}${w.start_time ? " " + w.start_time.slice(0, 5) : ""}${w.end_time ? "–" + w.end_time.slice(0, 5) : ""}`)
-      .join(", ");
+      .map(w => {
+        const t1 = w.start_time && w.end_time ? `${w.start_time.slice(0,5)}–${w.end_time.slice(0,5)}` : "";
+        const t2 = w.start_time2 && w.end_time2 ? `${w.start_time2.slice(0,5)}–${w.end_time2.slice(0,5)}` : "";
+        return `${w.employee_name}${t1 ? " " + t1 : ""}${t2 ? ", " + t2 : ""}`;
+      })
+      .join("; ");
   }
 
   return (
