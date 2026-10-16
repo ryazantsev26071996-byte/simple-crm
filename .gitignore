@@ -6,3 +6,7 @@ frontend/dist
 
 .DS_Store
 
+# Резервные копии базы данных (содержат персональные данные)
+backups/*.sql.gz
+backups/*.dump
+backups/*.sql
