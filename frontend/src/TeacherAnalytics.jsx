@@ -46,18 +46,28 @@ function buildTeacherStats(records) {
   const map = {};
   for (const r of records) {
     const t = r.teacher || "—";
-    if (!map[t]) map[t] = { teacher: t, visits: [], dates: new Set(), students: [] };
-    map[t].visits.push(r);
-    if (r.date) map[t].dates.add(r.date);
-    if (r.client_name) map[t].students.push(r);
+    if (!map[t]) map[t] = { teacher: t, chargedTotal: 0, dates: new Set(), studentsByDate: {} };
+    const w = r.lessons_charged != null ? Number(r.lessons_charged) : 1;
+    map[t].chargedTotal += w;
+    if (r.date) {
+      map[t].dates.add(r.date);
+      if (!map[t].studentsByDate[r.date]) map[t].studentsByDate[r.date] = new Set();
+      if (r.client_name) map[t].studentsByDate[r.date].add(r.client_name);
+    }
   }
-  return Object.values(map).map(s => ({
-    teacher: s.teacher,
-    total: s.visits.length,
-    shifts: s.dates.size,
-    avgPerShift: s.dates.size > 0 ? (s.visits.length / s.dates.size).toFixed(1) : "—",
-    students: s.students,
-  })).sort((a, b) => b.total - a.total);
+  return Object.values(map).map(s => {
+    const totalStudentsPerDay = Object.values(s.studentsByDate).reduce((sum, set) => sum + set.size, 0);
+    const avgPerShift = s.dates.size > 0 ? (totalStudentsPerDay / s.dates.size).toFixed(1) : "—";
+    const allStudents = [];
+    for (const set of Object.values(s.studentsByDate)) for (const name of set) allStudents.push({ client_name: name });
+    return {
+      teacher: s.teacher,
+      total: Math.round(s.chargedTotal * 10) / 10,
+      shifts: s.dates.size,
+      avgPerShift,
+      students: allStudents,
+    };
+  }).sort((a, b) => b.total - a.total);
 }
 
 // ── Teacher Table ──────────────────────────────────────────────────────────────
@@ -503,7 +513,7 @@ export default function TeacherAnalytics({ onOpenLesson }) {
 
   React.useEffect(() => {
     setLoading(true);
-    apiFetch(`schedule?date=gte.${start}&date=lte.${end}&attended=eq.true&select=teacher,client_id,client_name,lesson_type,date&order=date.asc`)
+    apiFetch(`schedule?date=gte.${start}&date=lte.${end}&attended=eq.true&select=teacher,client_id,client_name,lesson_type,date,lessons_charged&order=date.asc`)
       .then(data => setRecords(Array.isArray(data) ? data : []))
       .catch(() => setRecords([]))
       .finally(() => setLoading(false));
