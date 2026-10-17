@@ -30,8 +30,9 @@ async function apiFetch(path, options = {}) {
     ...options,
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=representation", ...options.headers },
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(data?.message || text || `HTTP ${res.status}`);
   return data;
 }
 

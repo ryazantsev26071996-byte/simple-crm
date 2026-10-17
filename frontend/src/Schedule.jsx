@@ -35,8 +35,9 @@ async function apiFetch(path, options = {}) {
     ...options,
     headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "return=representation", ...options.headers },
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || JSON.stringify(data));
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(data?.message || text || `HTTP ${res.status}`);
   return data;
 }
 
@@ -307,7 +308,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
 
         // Пометить основную запись
         if (scheduleId) {
-          await apiFetch(`schedule?id=eq.${scheduleId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ visit_group: groupId, visit_slots: N, lessons_charged: charged, ...matExtra }) });
+          try { await apiFetch(`schedule?id=eq.${scheduleId}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ visit_group: groupId, visit_slots: N, lessons_charged: charged, ...matExtra }) }); } catch (e) { console.error('visit_group patch failed:', e); }
         }
 
         // Дополнительные слоты цепочки
@@ -315,11 +316,13 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
         for (let i = 1; i < chainTimes.length; i++) {
           const t = chainTimes[i];
           const existing = slots.find(s => s.date === modal.date && s.time === t && s.client_id === Number(form.client_id));
-          if (existing) {
-            await apiFetch(`schedule?id=eq.${existing.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: true, teacher: form.teacher || null, lesson_type: form.lesson_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0, ...matExtra }) });
-          } else {
-            await apiFetch("schedule", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ date: modal.date, time: t, client_id: Number(form.client_id), client_name: form.client_name || null, teacher: form.teacher || null, lesson_type: form.lesson_type || null, recorded_by: form.recorded_by || null, comment: null, attended: true, walk_in: false, digital_drawing: false, subscription_type: cl?.subscription_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0, ...matExtra }) });
-          }
+          try {
+            if (existing) {
+              await apiFetch(`schedule?id=eq.${existing.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: true, teacher: form.teacher || null, lesson_type: form.lesson_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0, ...matExtra }) });
+            } else {
+              await apiFetch("schedule", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ date: modal.date, time: t, client_id: Number(form.client_id), client_name: form.client_name || null, teacher: form.teacher || null, lesson_type: form.lesson_type || null, recorded_by: form.recorded_by || null, comment: null, attended: true, walk_in: false, digital_drawing: false, subscription_type: cl?.subscription_type || null, visit_group: groupId, visit_slots: N, lessons_charged: 0, ...matExtra }) });
+            }
+          } catch (e) { console.error('chain slot update failed:', e); }
         }
 
         // Списание один раз
