@@ -111,6 +111,13 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
     } catch (e) { alert(e.message) }
   }
 
+  async function toggleBookable(stageId, currentValue) {
+    try {
+      await supabase.from('client_stages').update({ bookable_for_lessons: !currentValue }).eq('id', stageId)
+      await reloadStages()
+    } catch (e) { alert(e.message) }
+  }
+
   async function addStage() {
     const name = window.prompt('Название новой стадии:')
     if (!name || !name.trim()) return
@@ -223,6 +230,8 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
               onMoveLeft={() => moveStage(stageObj.id, 'left')}
               onMoveRight={() => moveStage(stageObj.id, 'right')}
               onRename={() => renameStage(stageObj.id, stage)}
+              bookableForLessons={stageObj.bookable_for_lessons || false}
+              onToggleBookable={() => toggleBookable(stageObj.id, stageObj.bookable_for_lessons || false)}
             />
           )
         })}
@@ -255,7 +264,7 @@ export function KanbanBoard({ clients, role, onClientSelect, onStageChange, onAd
   );
 }
 
-function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile, taskBadges = {}, editMode = false, canMoveLeft = false, canMoveRight = false, onMoveLeft, onMoveRight, onRename }) {
+function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile, taskBadges = {}, editMode = false, canMoveLeft = false, canMoveRight = false, onMoveLeft, onMoveRight, onRename, bookableForLessons = false, onToggleBookable }) {
   const [over, setOver] = useState(false)
   const bg = over ? '#e8f4ff' : '#f5f5f5'
   const colWidth = isMobile ? 280 : 200
@@ -269,13 +278,19 @@ function Column({ stage, clients, onClientSelect, onDrop, totalAmount, isMobile,
     >
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: bg, padding: '8px 8px 4px', borderRadius: '8px 8px 0 0' }}>
         {editMode && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 3 }}>
-            <button onClick={onMoveLeft} disabled={!canMoveLeft} title="Сдвинуть влево"
-              style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: canMoveLeft ? 'pointer' : 'default', opacity: canMoveLeft ? 1 : 0.3, color: '#555' }}>◀</button>
-            <button onClick={onMoveRight} disabled={!canMoveRight} title="Сдвинуть вправо"
-              style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: canMoveRight ? 'pointer' : 'default', opacity: canMoveRight ? 1 : 0.3, color: '#555' }}>▶</button>
-            <button onClick={onRename} title="Переименовать"
-              style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#bbb' }}>✏️</button>
+          <div style={{ marginBottom: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <button onClick={onMoveLeft} disabled={!canMoveLeft} title="Сдвинуть влево"
+                style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: canMoveLeft ? 'pointer' : 'default', opacity: canMoveLeft ? 1 : 0.3, color: '#555' }}>◀</button>
+              <button onClick={onMoveRight} disabled={!canMoveRight} title="Сдвинуть вправо"
+                style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: canMoveRight ? 'pointer' : 'default', opacity: canMoveRight ? 1 : 0.3, color: '#555' }}>▶</button>
+              <button onClick={onRename} title="Переименовать"
+                style={{ fontSize: 11, padding: '1px 4px', background: 'none', border: 'none', cursor: 'pointer', color: '#bbb' }}>✏️</button>
+            </div>
+            <label title="Клиентов этой стадии можно записывать на занятия в расписании" style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: bookableForLessons ? '#4a90e2' : '#aaa', cursor: 'pointer', marginTop: 2 }}>
+              <input type="checkbox" checked={bookableForLessons} onChange={onToggleBookable} style={{ cursor: 'pointer', accentColor: '#4a90e2' }} />
+              📅 Запись на занятия
+            </label>
           </div>
         )}
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: '#666', display: 'flex', justifyContent: 'space-between' }}>

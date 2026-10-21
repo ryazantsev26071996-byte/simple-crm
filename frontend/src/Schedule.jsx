@@ -83,6 +83,17 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   const [matSuggestions, setMatSuggestions] = React.useState([]);
   const [showMatSuggestions, setShowMatSuggestions] = React.useState(false);
 
+  const [bookableStages, setBookableStages] = React.useState(() => new Set(['ученик']));
+
+  React.useEffect(() => {
+    apiFetch('client_stages?select=name,bookable_for_lessons').then(data => {
+      if (Array.isArray(data)) {
+        const names = data.filter(s => s.bookable_for_lessons).map(s => s.name);
+        setBookableStages(new Set(names.length > 0 ? names : ['ученик']));
+      }
+    }).catch(() => {});
+  }, []);
+
   React.useEffect(() => {
     if (modal) {
       try { localStorage.setItem('crm_schedule_modal', JSON.stringify({ date: modal.date, time: modal.time, entryId: modal.entry?.id ?? null })); } catch {}
@@ -97,7 +108,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   }, [clientModal]);
 
   const days = getWeekDays(weekStart);
-  const activeClients = clients.filter(c => c.stage === "ученик").sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  const activeClients = clients.filter(c => bookableStages.has(c.stage)).sort((a, b) => a.name.localeCompare(b.name, "ru"));
   const filteredClients = activeClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
   const [blocks, setBlocks] = React.useState([]);
@@ -243,7 +254,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
           await apiFetch(`schedule?id=eq.${ge.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ attended: null, visit_group: null, visit_slots: null, lessons_charged: 1 }) });
         }
         const cl = activeClients.find(c => c.id === Number(form.client_id));
-        if (cl && !cl.is_unlimited) {
+        if (cl && !cl.is_unlimited && cl.stage === 'ученик') {
           const newUsed = Math.max(0, roundLessons((cl.lessons_used||0) - charged));
           await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ lessons_used: newUsed }) });
         }
@@ -325,21 +336,21 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
           } catch (e) { console.error('chain slot update failed:', e); }
         }
 
-        // Списание один раз
-        if (cl && !cl.is_unlimited) {
+        // Списание один раз (только для учеников)
+        if (cl && !cl.is_unlimited && cl.stage === 'ученик') {
           const newUsed = roundLessons((cl.lessons_used||0) + charged);
           const visitUpdate = { lessons_used: newUsed };
           if (!cl.last_visit || modal.date > cl.last_visit) visitUpdate.last_visit = modal.date;
           await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify(visitUpdate) });
           try { await apiFetch("audit_log", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ action: 'lessons_deducted', entity: 'client', entity_id: cl.id, old_value: String(cl.lessons_used||0), new_value: `${newUsed} (−${charged} за ${modal.date})`, performed_by: userId||null, performed_by_name: authorName||null }) }); } catch (err) { console.error('audit_log insert failed:', err); }
-        } else if (cl?.is_unlimited && (!cl.last_visit || modal.date > cl.last_visit)) {
+        } else if (cl?.is_unlimited && cl.stage === 'ученик' && (!cl.last_visit || modal.date > cl.last_visit)) {
           await apiFetch(`clients?id=eq.${form.client_id}`, { method: "PATCH", body: JSON.stringify({ last_visit: modal.date }) });
         }
 
         // Один комментарий на всё посещение
         const lastTime = chainTimes[chainTimes.length - 1];
         const timeRange = N > 1 ? `${modal.time}–${addTwoHours(lastTime)}` : modal.time;
-        const deducted = cl && !cl.is_unlimited;
+        const deducted = cl && !cl.is_unlimited && cl.stage === 'ученик';
         const matCommentPart = form.no_new_materials
           ? "Материалы: без новых (готовые с прошлого занятия)."
           : (form.materials_note?.trim() && usedMaterials.length === 0 ? `Материалы: ${form.materials_note.trim()}.` : "");
@@ -511,8 +522,11 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                       style={{padding:"8px 12px",cursor:"pointer",fontSize:13,borderBottom:"1px solid #f0f0f0"}}
                       onMouseEnter={e=>e.currentTarget.style.background="#f0f7ff"}
                       onMouseLeave={e=>e.currentTarget.style.background="white"}>
-                      <div>{c.name}</div>
-                      <div style={{fontSize:11,color:"#888"}}>{c.subscription_type||"без абонемента"} · осталось {c.is_unlimited?"∞":fmtLessons(Math.max(0,(c.lessons_total||0)-(c.lessons_used||0)))} зан.</div>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        {c.name}
+                        {c.stage !== 'ученик' && <span style={{fontSize:10,color:"#999",background:"#f0f0f0",borderRadius:3,padding:"1px 5px",flexShrink:0}}>{c.stage}</span>}
+                      </div>
+                      {c.stage === 'ученик' && <div style={{fontSize:11,color:"#888"}}>{c.subscription_type||"без абонемента"} · осталось {c.is_unlimited?"∞":fmtLessons(Math.max(0,(c.lessons_total||0)-(c.lessons_used||0)))} зан.</div>}
                     </div>
                   ))}
                 </div>
@@ -523,9 +537,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                 <span onClick={()=>openClientModal(Number(form.client_id))} style={{color:"#4a90e2",cursor:"pointer",textDecoration:"underline",fontWeight:600,fontSize:14}}>
                   {form.client_name}
                 </span>
-                <div style={{fontSize:12,color:"#888",marginTop:2}}>
-                  {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));return cl?`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":fmtLessons(Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0)))} зан.`:"";})()}
-                </div>
+                {(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));if(!cl||cl.stage!=='ученик')return null;return(<div style={{fontSize:12,color:"#888",marginTop:2}}>{`Абонемент: ${cl.subscription_type||"—"} · Осталось: ${cl.is_unlimited?"∞":fmtLessons(Math.max(0,(cl.lessons_total||0)-(cl.lessons_used||0)))} зан.`}</div>);})()}
               </div>
             )}
 
@@ -566,6 +578,8 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
             </div>
 
             {form.attended===true&&form.client_id&&(()=>{
+              const clCheck = activeClients.find(c=>c.id===Number(form.client_id));
+              if (clCheck?.stage !== 'ученик') return null;
               const groupLocked = Boolean(modal.entry?.visit_group);
               const timeIdx = TIMES.indexOf(modal.time);
               const N = Math.max(1, Number(form.visitSlots)||1);
@@ -614,7 +628,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                 </div>
                 <textarea style={{...inp,minHeight:80,resize:"vertical",borderColor:req&&!form.lesson_comment.trim()?"#e55":"#ddd",marginBottom:4}}
                   value={form.lesson_comment} onChange={e=>setForm(f=>({...f,lesson_comment:e.target.value}))} placeholder="Что делали, прогресс, пожелания..." />
-                {form.attended===true&&form.client_id&&!groupLocked&&(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));const charged=Number(form.chargeSlots)||1;return(<div style={{fontSize:11,color:"#888"}}>Спишется {fmtLessons(charged)} зан. и комментарий добавится в карточку ученика</div>);})()}
+                {form.attended===true&&form.client_id&&!groupLocked&&(()=>{const cl=activeClients.find(c=>c.id===Number(form.client_id));const charged=Number(form.chargeSlots)||1;return cl?.stage==='ученик'?(<div style={{fontSize:11,color:"#888"}}>Спишется {fmtLessons(charged)} зан. и комментарий добавится в карточку ученика</div>):(<div style={{fontSize:11,color:"#aaa"}}>Без абонемента: занятия не списываются; комментарий добавится в карточку</div>);})()}
                 </>);})()}
               </div>
             )}
