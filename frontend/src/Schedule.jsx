@@ -112,12 +112,42 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   const filteredClients = activeClients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
 
   const [blocks, setBlocks] = React.useState([]);
+  const [capacities, setCapacities] = React.useState({});
+
+  async function loadCapacities() {
+    try {
+      const caps = await apiFetch(`slot_capacity?date=gte.${fmt(days[0])}&date=lte.${fmt(days[6])}`);
+      const map = {};
+      for (const c of (caps || [])) map[`${c.date}|${c.time}`] = c.capacity;
+      setCapacities(map);
+    } catch(e) {}
+  }
+
+  function capOf(dateStr, time) { return capacities[`${dateStr}|${time}`] || MAX_PER_SLOT; }
+
+  async function saveCapacity(dateStr, time, entries) {
+    const cur = capacities[`${dateStr}|${time}`] || MAX_PER_SLOT;
+    const raw = window.prompt(`Число мест для слота ${dateStr} ${time} (по умолч. ${MAX_PER_SLOT}):`, String(cur));
+    if (raw === null) return;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 200) { alert('Введите целое число от 1 до 200'); return; }
+    if (n < entries.length) { alert(`Уже записано ${entries.length} человек`); return; }
+    try {
+      if (n === MAX_PER_SLOT) {
+        await apiFetch(`slot_capacity?date=eq.${dateStr}&time=eq.${time}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      } else {
+        await apiFetch(`slot_capacity?on_conflict=date,time`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ date: dateStr, time, capacity: n }) });
+      }
+      await loadCapacities();
+    } catch(e) { alert(e.message); }
+  }
 
   async function loadBlocks() {
     try {
       const data = await apiFetch(`schedule_blocks?date=gte.${fmt(days[0])}&date=lte.${fmt(days[6])}`);
       setBlocks(data.filter(b => b.schedule_type === "lessons" || b.schedule_type === "both"));
     } catch(e) {}
+    await loadCapacities();
   }
 
   const [slotsReady, setSlotsReady] = React.useState(false);
@@ -464,7 +494,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                   <td style={{padding:"6px 8px",border:"1px solid #ddd",fontWeight:600,fontSize:13,textAlign:"center",backgroundColor:"#fafafa",position:"sticky",left:0,zIndex:2,borderRight:"2px solid #ccc"}}>{time}</td>
                   {days.map(d => {
                     const entries = slotEntries(d, time);
-                    const isFull = entries.length >= MAX_PER_SLOT;
+                    const isFull = entries.length >= capOf(fmt(d), time);
                     const blocked = isBlocked(d, time);
                     return (
                       <td key={fmt(d)} style={{padding:4,border:"1px solid #ddd",verticalAlign:"top",minWidth:180,background:blocked?"#f0f0f0":fmt(d)===fmt(new Date())?"#f8fbff":"white"}}>
@@ -488,8 +518,10 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                                 </div>
                               </div>
                             ))}
-                            {!isFull&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {MAX_PER_SLOT-entries.length} мест</button>}
+                            {capacities[`${fmt(d)}|${time}`]&&<div style={{fontSize:10,color:"#f59e0b",textAlign:"center",marginBottom:2}}>мест: {capOf(fmt(d),time)}</div>}
+                            {!isFull&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {capOf(fmt(d),time)-entries.length} мест</button>}
                             {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
+                            {role==="admin"&&<button onClick={()=>saveCapacity(fmt(d),time,entries)} style={{display:"block",width:"100%",marginTop:2,padding:"1px 0",fontSize:10,border:"none",background:"transparent",cursor:"pointer",color:"#bbb",textAlign:"center"}}>✎ мест</button>}
                           </>
                         )}
                       </td>
