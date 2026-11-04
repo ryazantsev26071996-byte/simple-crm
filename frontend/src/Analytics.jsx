@@ -9,7 +9,11 @@ import { canDelete } from "./permissions.js";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const MANAGERS = ["Салампи", "Татьяна"];
+const MANAGERS_OLD = ["Салампи", "Татьяна"];
+const MANAGERS_NEW = ["Арина", "Татьяна"];
+function managersFor(year, month) {
+  return year > 2026 || (year === 2026 && month >= 11) ? MANAGERS_NEW : MANAGERS_OLD;
+}
 const ACCOUNT_MANAGERS = []; // Арина и Вероника уволены — уволенных сотрудников из аналитики убираем, история их продаж в базе сохраняется
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKS = [
@@ -183,6 +187,7 @@ export default function Analytics() {
   const now = new Date();
   const [month, setMonth] = React.useState(now.getMonth() + 1);
   const [year, setYear]   = React.useState(now.getFullYear());
+  const MANAGERS = managersFor(year, month);
   const [clients, setClients] = React.useState([]);
   const [trials,  setTrials]  = React.useState([]);
   const [lessons, setLessons] = React.useState([]);
@@ -424,7 +429,7 @@ export default function Analytics() {
       workSchedule.filter(ws => MANAGERS.some(m => ws.employee_name === m)).map(ws => ws.date)
     );
     return dates.size;
-  }, [workSchedule]);
+  }, [workSchedule, year, month]);
 
   const myManagerName = (role === "manager" || role === "accountmanager")
     ? MANAGERS.find(m => authorName === m || authorName.toLowerCase().startsWith(m.toLowerCase()))

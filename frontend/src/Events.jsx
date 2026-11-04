@@ -2,6 +2,7 @@ import React from "react";
 import { supabase } from "./supabase";
 import { useAuth } from "./AuthContext";
 import { canDelete } from "./permissions.js";
+import { isActiveStaff } from "./inactiveStaff.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -10,6 +11,9 @@ const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","
 const WEEKDAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const TEACHERS = ["Юлия","Екатерина","Александра","Александра Ф","Дарья","Полина"];
 const ACCOUNTS = [];
+const STAFF_FOR_SECOND_RESP = [...TEACHERS, ...ACCOUNTS, "Татьяна", "Арина"]
+  .filter(isActiveStaff)
+  .filter(n => n !== "Салампи");
 
 const CHIP_COLORS = ["#4a90e2","#e67e22","#2a9d8f","#7c3aed","#e55","#1b9a59","#c0392b","#2980b9"];
 
@@ -48,7 +52,7 @@ function chipColor(event) {
 
 const EMPTY_FORM = {
   title: "", date: "", time: "", description: "",
-  teacher: "", account_manager: "",
+  teacher: "", account_manager: "", second_responsible: "",
   scenario: "", materials: "", post_text: "",
   post_date: "", post_time: "",
   scenario_ready: false, materials_ready: false, post_ready: false,
@@ -94,7 +98,8 @@ export default function Events() {
       time:            ev.time?.slice(0,5) || "",
       description:     ev.description || "",
       teacher:         ev.teacher || "",
-      account_manager: ev.account_manager || "",
+      account_manager:   ev.account_manager || "",
+      second_responsible: ev.second_responsible || "",
       scenario:        ev.scenario || "",
       materials:       ev.materials || "",
       post_text:       ev.post_text || "",
@@ -119,7 +124,8 @@ export default function Events() {
         time:            form.time || null,
         description:     form.description || null,
         teacher:         form.teacher || null,
-        account_manager: form.account_manager || null,
+        account_manager:   form.account_manager || null,
+        second_responsible: form.second_responsible || null,
         scenario:        form.scenario || null,
         materials:       form.materials || null,
         post_text:       form.post_text || null,
@@ -270,7 +276,10 @@ export default function Events() {
                       </div>
                     </td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>{ev.teacher || "—"}</td>
-                    <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>{ev.account_manager || "—"}</td>
+                    <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>
+                      {ev.account_manager || "—"}
+                      {ev.second_responsible && <div style={{ fontSize: 11, color: "#aaa" }}>{ev.second_responsible}</div>}
+                    </td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", textAlign: "center" }}>{ev.scenario_ready ? "✅" : "—"}</td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", textAlign: "center" }}>{ev.materials_ready ? "✅" : "—"}</td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", textAlign: "center" }}>{ev.post_ready ? "✅" : "—"}</td>
@@ -324,6 +333,13 @@ export default function Events() {
                 <select style={inp} value={form.account_manager} onChange={e => setForm(f => ({ ...f, account_manager: e.target.value }))}>
                   <option value="">— выбрать —</option>
                   {ACCOUNTS.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+              <div>
+                <span style={label}>Второй ответственный</span>
+                <select style={inp} value={form.second_responsible} onChange={e => setForm(f => ({ ...f, second_responsible: e.target.value }))}>
+                  <option value="">— выбрать —</option>
+                  {STAFF_FOR_SECOND_RESP.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
