@@ -280,18 +280,20 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
     if (readOnly || !editMat) return;
     try {
       const body = {
-        name: editMatForm.name,
-        color_number: editMatForm.color_number || null,
-        brand: editMatForm.brand || null,
-        unit: editMatForm.unit || "шт",
+        ...(countOnly ? {} : {
+          name: editMatForm.name,
+          color_number: editMatForm.color_number || null,
+          brand: editMatForm.brand || null,
+          unit: editMatForm.unit || "шт",
+          min_threshold: editMatForm.min_threshold !== "" && editMatForm.min_threshold != null ? round1(Number(editMatForm.min_threshold)) : null,
+          last_counted_at: editMatForm.last_counted_at || null,
+          notes: editMatForm.notes || null,
+        }),
         qty_full: round1(Number(editMatForm.qty_full) || 0),
         qty_half: editMatForm.qty_half !== "" && editMatForm.qty_half != null ? round1(Number(editMatForm.qty_half)) : null,
         qty_almost_empty: editMatForm.qty_almost_empty !== "" && editMatForm.qty_almost_empty != null ? round1(Number(editMatForm.qty_almost_empty)) : null,
         qty_reserve: editMatForm.qty_reserve !== "" && editMatForm.qty_reserve != null ? round1(Number(editMatForm.qty_reserve)) : null,
         qty_warehouse: editMatForm.qty_warehouse !== "" && editMatForm.qty_warehouse != null ? round1(Number(editMatForm.qty_warehouse)) : null,
-        min_threshold: editMatForm.min_threshold !== "" && editMatForm.min_threshold != null ? round1(Number(editMatForm.min_threshold)) : null,
-        last_counted_at: editMatForm.last_counted_at || null,
-        notes: editMatForm.notes || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -834,7 +836,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
         )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {!readOnly && <button onClick={() => openMove(mat)} title="Движение" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>📦</button>}
-          {!readOnly && !countOnly && <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>}
+          {!readOnly && <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>}
           <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги" style={{ minWidth: 36, minHeight: 36, fontSize: 14, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🔍</button>
           {!readOnly && !countOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
             ? <span style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "#f0f0f0", color: "#aaa", minHeight: 36, display: "flex", alignItems: "center" }}>в заявке</span>
@@ -1019,7 +1021,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                           <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{fmtQty(mat.min_threshold)}</td>
                           <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                             <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
-                            {!countOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
+                            <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
                             <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍 Аналоги</button>
                             {!countOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
                               ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
@@ -1200,34 +1202,34 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                                           {mat.unit}
                                         </span>}
                                   </td>
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
-                                    {showEditMode
+                                  <td style={{ padding: (showEditMode || countOnly) ? "4px 6px" : "7px 12px", textAlign: "right", fontWeight: 500 }}>
+                                    {(showEditMode || countOnly)
                                       ? <input key={`${mat.id}_qty_full_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_full != null ? String(mat.qty_full) : "0"} onBlur={e => saveInlineField(mat, "qty_full", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                       : fmtQty(mat.qty_full)}
                                   </td>
                                   {catHasHalf && (
-                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                      {showEditMode
+                                    <td style={{ padding: (showEditMode || countOnly) ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                      {(showEditMode || countOnly)
                                         ? <input key={`${mat.id}_qty_half_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_half != null ? String(mat.qty_half) : ""} onBlur={e => saveInlineField(mat, "qty_half", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                         : fmtQty(mat.qty_half)}
                                     </td>
                                   )}
                                   {catHasAlmostEmpty && (
-                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                      {showEditMode
+                                    <td style={{ padding: (showEditMode || countOnly) ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                      {(showEditMode || countOnly)
                                         ? <input key={`${mat.id}_qty_ae_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_almost_empty != null ? String(mat.qty_almost_empty) : ""} onBlur={e => saveInlineField(mat, "qty_almost_empty", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                         : fmtQty(mat.qty_almost_empty)}
                                     </td>
                                   )}
                                   {catHasReserve && (
-                                    <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                      {showEditMode
+                                    <td style={{ padding: (showEditMode || countOnly) ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                      {(showEditMode || countOnly)
                                         ? <input key={`${mat.id}_qty_res_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_reserve != null ? String(mat.qty_reserve) : ""} onBlur={e => saveInlineField(mat, "qty_reserve", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                         : fmtQty(mat.qty_reserve)}
                                     </td>
                                   )}
-                                  <td style={{ padding: showEditMode ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
-                                    {showEditMode
+                                  <td style={{ padding: (showEditMode || countOnly) ? "4px 6px" : "7px 12px", textAlign: "right", color: "#888" }}>
+                                    {(showEditMode || countOnly)
                                       ? <input key={`${mat.id}_qty_wh_${mat.updated_at||''}`} type="number" min="0" step="0.5" defaultValue={mat.qty_warehouse != null ? String(mat.qty_warehouse) : ""} onBlur={e => saveInlineField(mat, "qty_warehouse", e.target.value)} style={{ width: 60, padding: "2px 4px", borderRadius: 3, border: "1px solid #c8b4f0", fontSize: 12, textAlign: "right", fontFamily: "inherit", background: "#faf7ff" }} />
                                       : fmtQty(mat.qty_warehouse)}
                                   </td>
@@ -1241,8 +1243,8 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                                         onKeyDown={e => { if (e.key === "Enter") e.target.blur(); if (e.key === "Escape") setInlineMinId(null); }}
                                         style={{ width: 60, padding: "2px 4px", borderRadius: 4, border: "1px solid #7c3aed", fontSize: 12, textAlign: "right", fontFamily: "inherit" }} />
                                     ) : (
-                                      <span onClick={() => { setInlineMinId(mat.id); setInlineMinVal(mat.min_threshold != null ? String(mat.min_threshold) : ""); }}
-                                        style={{ cursor: "pointer", borderBottom: "1px dashed #ccc", paddingBottom: 1 }} title="Нажмите для редактирования">
+                                      <span onClick={!countOnly ? () => { setInlineMinId(mat.id); setInlineMinVal(mat.min_threshold != null ? String(mat.min_threshold) : ""); } : undefined}
+                                        style={{ cursor: countOnly ? "default" : "pointer", borderBottom: countOnly ? "none" : "1px dashed #ccc", paddingBottom: 1 }} title={!countOnly ? "Нажмите для редактирования" : undefined}>
                                         {fmtQty(mat.min_threshold)}
                                       </span>
                                     )}
@@ -1258,7 +1260,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                                   </td>}
                                   <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                                     {!readOnly && <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>}
-                                    {!readOnly && !countOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
+                                    {!readOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
                                     <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
                                     {!readOnly && !countOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
                                       ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
@@ -1935,20 +1937,20 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
             <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Название</label>
-                <input value={editMatForm.name} onChange={e => setEditMatForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
+                <input value={editMatForm.name} onChange={e => setEditMatForm(f => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, ...(countOnly ? { background: '#f5f5f5', color: '#888' } : {}) }} disabled={countOnly} />
               </div>
               <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10 }}>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Производитель</label>
-                  <input value={editMatForm.brand} onChange={e => setEditMatForm(f => ({ ...f, brand: e.target.value }))} style={inputStyle} placeholder="Напр. Брауберг" />
+                  <input value={editMatForm.brand} onChange={e => setEditMatForm(f => ({ ...f, brand: e.target.value }))} style={{ ...inputStyle, ...(countOnly ? { background: '#f5f5f5', color: '#888' } : {}) }} placeholder="Напр. Брауберг" disabled={countOnly} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Номер цвета</label>
-                  <input value={editMatForm.color_number} onChange={e => setEditMatForm(f => ({ ...f, color_number: e.target.value }))} style={inputStyle} />
+                  <input value={editMatForm.color_number} onChange={e => setEditMatForm(f => ({ ...f, color_number: e.target.value }))} style={{ ...inputStyle, ...(countOnly ? { background: '#f5f5f5', color: '#888' } : {}) }} disabled={countOnly} />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={labelStyle}>Единица</label>
-                  <input value={editMatForm.unit} onChange={e => setEditMatForm(f => ({ ...f, unit: e.target.value }))} style={inputStyle} />
+                  <input value={editMatForm.unit} onChange={e => setEditMatForm(f => ({ ...f, unit: e.target.value }))} style={{ ...inputStyle, ...(countOnly ? { background: '#f5f5f5', color: '#888' } : {}) }} disabled={countOnly} />
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 10 }}>
@@ -1977,7 +1979,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                   <input type="number" min="0" step="0.5" value={editMatForm.qty_warehouse} onChange={e => setEditMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+              {!countOnly && <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Мин. порог</label>
                   <input type="number" min="0" step="0.5" value={editMatForm.min_threshold} onChange={e => setEditMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} />
@@ -1986,11 +1988,11 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                   <label style={labelStyle}>Дата пересчёта</label>
                   <input type="date" value={editMatForm.last_counted_at} onChange={e => setEditMatForm(f => ({ ...f, last_counted_at: e.target.value }))} style={inputStyle} />
                 </div>
-              </div>
-              <div>
+              </div>}
+              {!countOnly && <div>
                 <label style={labelStyle}>Заметки</label>
                 <textarea value={editMatForm.notes} onChange={e => setEditMatForm(f => ({ ...f, notes: e.target.value }))} style={{ ...inputStyle, resize: "vertical", minHeight: 60 }} />
-              </div>
+              </div>}
               <div style={{ fontSize: 11, color: "#aaa", marginTop: -4 }}>Изменение остатков создаст запись корректировки в журнале движений.</div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
                 <button onClick={() => setEditMat(null)} style={{ fontSize: 13, padding: "7px 16px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>Отмена</button>
