@@ -56,9 +56,9 @@ const QUALITATIVE_UNITS = [
 const STATUS_COLORS = { "новая": "#fff3cd", "заказано": "#cce5ff", "куплено": "#d4edda" };
 const STATUS_TEXT = { "новая": "#856404", "заказано": "#004085", "куплено": "#155724" };
 
-export default function Materials({ isOwner = true, readOnly = false }) {
+export default function Materials({ isOwner = true, readOnly = false, countOnly = false }) {
   const { user, profile } = useAuth();
-  const [tab, setTab] = React.useState((isOwner || readOnly) ? "Справочник" : "Заявки на закупку");
+  const [tab, setTab] = React.useState((isOwner || readOnly || countOnly) ? "Справочник" : "Заявки на закупку");
 
   // categories
   const [categories, setCategories] = React.useState([]);
@@ -834,13 +834,13 @@ export default function Materials({ isOwner = true, readOnly = false }) {
         )}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {!readOnly && <button onClick={() => openMove(mat)} title="Движение" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer" }}>📦</button>}
-          {!readOnly && <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>}
+          {!readOnly && !countOnly && <button onClick={() => openEdit(mat)} style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed" }}>✏️</button>}
           <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги" style={{ minWidth: 36, minHeight: 36, fontSize: 14, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🔍</button>
-          {!readOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
+          {!readOnly && !countOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
             ? <span style={{ fontSize: 11, padding: "4px 8px", borderRadius: 6, background: "#f0f0f0", color: "#aaa", minHeight: 36, display: "flex", alignItems: "center" }}>в заявке</span>
             : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed" }}>🛒</button>
           )}
-          {!readOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
+          {!readOnly && !countOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ minWidth: 36, minHeight: 36, fontSize: 15, padding: "4px 8px", borderRadius: 6, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
         </div>
       </div>
     );
@@ -850,7 +850,7 @@ export default function Materials({ isOwner = true, readOnly = false }) {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Top tab bar */}
       <div style={{ display: "flex", gap: 4, padding: "10px 16px 0", borderBottom: "1px solid #eee", flexShrink: 0, overflowX: isMobile ? "auto" : "visible" }}>
-        {(readOnly ? ["Справочник"] : (isOwner ? TABS : ["Заявки на закупку"])).map(t => (
+        {((readOnly || countOnly) ? ["Справочник"] : (isOwner ? TABS : ["Заявки на закупку"])).map(t => (
           <button key={t} onClick={() => setTab(t)}
             style={{ fontSize: isMobile ? 11 : 13, padding: isMobile ? "5px 10px" : "6px 16px", borderRadius: "6px 6px 0 0", border: "1px solid #ddd", borderBottom: tab === t ? "2px solid #7c3aed" : "1px solid #ddd", background: tab === t ? "#f5f3ff" : "white", color: tab === t ? "#7c3aed" : "#555", fontWeight: tab === t ? 600 : 400, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
             {t}
@@ -949,7 +949,7 @@ export default function Materials({ isOwner = true, readOnly = false }) {
                   </div>
                 ))}
               </div>
-              {!readOnly && <div style={{ padding: 10, borderTop: "1px solid #f0f0f0" }}>
+              {!readOnly && !countOnly && <div style={{ padding: 10, borderTop: "1px solid #f0f0f0" }}>
                 {addingCat ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <input value={newCatName} onChange={e => setNewCatName(e.target.value)}
@@ -1019,13 +1019,13 @@ export default function Materials({ isOwner = true, readOnly = false }) {
                           <td style={{ padding: "7px 12px", textAlign: "right", color: "#aaa", fontSize: 12 }}>{fmtQty(mat.min_threshold)}</td>
                           <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                             <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>
-                            <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>
+                            {!countOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
                             <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍 Аналоги</button>
-                            {isLow(mat) && (activeRequestMatIds.has(mat.id)
+                            {!countOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
                               ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
                               : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
                             )}
-                            <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>
+                            {!countOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
                           </td>
                         </tr>
                       );
@@ -1098,7 +1098,7 @@ export default function Materials({ isOwner = true, readOnly = false }) {
                         Сбросить все
                       </button>
                     )}
-                    {!readOnly && <button onClick={() => setShowEditMode(v => !v)}
+                    {!readOnly && !countOnly && <button onClick={() => setShowEditMode(v => !v)}
                       style={{ marginLeft: isMobile ? 0 : "auto", fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: `1px solid ${showEditMode ? "#e53935" : "#aaa"}`, background: showEditMode ? "#fdecea" : "white", color: showEditMode ? "#e53935" : "#666", cursor: "pointer" }}>
                       ✏️ {showEditMode ? (isMobile ? "Вкл." : "Режим вкл.") : (isMobile ? "Ред." : "Режим редактирования")}
                     </button>}
@@ -1106,7 +1106,7 @@ export default function Materials({ isOwner = true, readOnly = false }) {
                       style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
                       📝 {isMobile ? "Инв." : "Инвентаризация"}
                     </button>}
-                    {!readOnly && <button onClick={() => setShowAddMat(true)}
+                    {!readOnly && !countOnly && <button onClick={() => setShowAddMat(true)}
                       style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
                       + Материал
                     </button>}
@@ -1258,13 +1258,13 @@ export default function Materials({ isOwner = true, readOnly = false }) {
                                   </td>}
                                   <td style={{ padding: "7px 12px", textAlign: "center", whiteSpace: "nowrap" }}>
                                     {!readOnly && <button onClick={() => openMove(mat)} title="Движение" style={{ fontSize: 13, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", marginRight: 3 }}>📦</button>}
-                                    {!readOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
+                                    {!readOnly && !countOnly && <button onClick={() => openEdit(mat)} style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #ddd", background: "white", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>✏️</button>}
                                     <button onClick={() => { setMatSearch(normName(mat.name)); setGroupBy("color"); setSearchEverywhere(true); }} title="Аналоги того же цвета" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🔍</button>
-                                    {!readOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
+                                    {!readOnly && !countOnly && isLow(mat) && (activeRequestMatIds.has(mat.id)
                                       ? <span style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, background: "#f0f0f0", color: "#aaa", marginRight: 3, display: "inline-block" }}>уже в заявке</span>
                                       : <button onClick={() => addToCart(mat)} title="В список покупок" style={{ fontSize: 11, padding: "2px 6px", borderRadius: 5, border: "1px solid #e0d7f9", background: "#f5f3ff", cursor: "pointer", color: "#7c3aed", marginRight: 3 }}>🛒</button>
                                     )}
-                                    {!readOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
+                                    {!readOnly && !countOnly && <button onClick={() => deleteMaterial(mat)} title="Удалить" style={{ fontSize: 12, padding: "3px 7px", borderRadius: 5, border: "1px solid #fcc", background: "white", cursor: "pointer", color: "#e53935" }}>🗑️</button>}
                                   </td>
                                 </tr>
                               );

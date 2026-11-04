@@ -87,6 +87,7 @@ export default function App() {
   const [view, setView] = React.useState(() => { const saved = localStorage.getItem('crm_view'); return saved || 'myoffice'; });
 
   React.useEffect(() => { localStorage.setItem('crm_view', view); }, [view]);
+  React.useEffect(() => { if (restricted && view === 'list') setView('kanban'); }, [restricted, view]);
   React.useEffect(() => {
     if (selectedId) localStorage.setItem('crm_selected_client_id', String(selectedId));
     else localStorage.removeItem('crm_selected_client_id');
@@ -233,7 +234,7 @@ export default function App() {
     { key: 'myoffice', label: 'Мой кабинет' },
     ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor' ? [
       { key: 'kanban', label: 'Канбан' },
-      { key: 'list', label: 'Список' },
+      ...(!restricted ? [{ key: 'list', label: 'Список' }] : []),
       { key: 'trial', label: 'Пробные' },
     ] : []),
     ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor' ? [
@@ -249,7 +250,7 @@ export default function App() {
     { key: 'students', label: 'Ученики' },
     { key: 'tasks', label: 'Задачи' },
     ...(role === 'admin' || role === 'manager' || role === 'supervisor' ? [{ key: 'mailings', label: 'Рассылки' }] : []),
-    ...((user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') ? [{ key: 'materials', label: 'Материалы' }] : []),
+    ...((user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher' || restricted) ? [{ key: 'materials', label: 'Материалы' }] : []),
   ];
 
 
@@ -313,7 +314,7 @@ export default function App() {
               <button className="tabBtn" onClick={() => setView('myoffice')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'myoffice' ? '#7c3aed' : 'white', color: view === 'myoffice' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Мой кабинет</button>
               {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <>
                 <button className="tabBtn" onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
-                <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
+                {!restricted && <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>}
                 <button className="tabBtn" onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Пробные</button>
                 {!restricted && <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>}
                 {(role === 'admin' || role === 'supervisor') && <button className="tabBtn" onClick={() => setView('teacheranalytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'teacheranalytics' ? '#7c3aed' : 'white', color: view === 'teacheranalytics' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Педагоги</button>}
@@ -329,7 +330,7 @@ export default function App() {
                 {myTasksBadge > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{myTasksBadge}</span>}
               </button>
               {(role === 'admin' || role === 'manager' || role === 'supervisor') && <button className="tabBtn" onClick={() => setView('mailings')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'mailings' ? '#e67e22' : 'white', color: view === 'mailings' ? 'white' : '#e67e22', cursor: 'pointer' }}>Рассылки</button>}
-              {(user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') && (
+              {(user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher' || restricted) && (
                 <button className="tabBtn" onClick={() => setView('materials')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'materials' ? '#7c3aed' : 'white', color: view === 'materials' ? 'white' : '#7c3aed', cursor: 'pointer', position: 'relative' }}>
                   Материалы
                   {lowStockCount > 0 && role !== 'teacher' && <span style={{ position: 'absolute', top: -4, right: -4, background: '#e53935', color: 'white', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '1px 4px', lineHeight: 1.2 }}>{lowStockCount}</span>}
@@ -425,12 +426,12 @@ export default function App() {
           {view === 'analytics' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'supervisor') && <Analytics />}
           {view === 'teacheranalytics' && (role === 'admin' || role === 'supervisor') && <TeacherAnalytics onOpenLesson={openLessonFromAnalytics} />}
           {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher' || role === 'supervisor') && <WorkSchedule />}
-          {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
-          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} readOnly={restricted} focusEntry={scheduleFocus} onFocusHandled={() => setScheduleFocus(null)} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
+          {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} restricted={restricted} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
+          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} focusEntry={scheduleFocus} onFocusHandled={() => setScheduleFocus(null)} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
           {view === 'mailings' && (role === 'admin' || role === 'manager' || role === 'supervisor') && <Mailings clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated?.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? { ...c, ...updated } : c) : [updated, ...prev]; }); }} />}
-          {view === 'materials' && (user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') && <Materials isOwner={user?.email === 'crm@artschool.ru'} readOnly={role === 'teacher'} />}
+          {view === 'materials' && (user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher' || restricted) && <Materials isOwner={user?.email === 'crm@artschool.ru'} readOnly={role === 'teacher'} countOnly={restricted} />}
 
-          {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && view === 'list' && (
+          {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && !restricted && view === 'list' && (
             <div style={{ padding: 16, borderBottom: '1px solid #eee' }}>
               <ClientForm mode="Новый клиент" disabled={false} submitLabel="Добавить"
                 onSubmit={async (payload) => {
@@ -494,7 +495,7 @@ export default function App() {
                 }
                 handleClientSelect(id);
               }}
-              onAddClient={() => setView('list')}
+              onAddClient={restricted ? () => {} : () => setView('list')}
               onClientCreated={async (payload) => {
                 const newClient = await createClient({ role, name: authorName }, payload);
                 setClients(prev => [newClient, ...prev]);
@@ -503,7 +504,7 @@ export default function App() {
             />
           )}
 
-          {!loadingClients && view === 'list' && role !== 'teacher' && (
+          {!loadingClients && view === 'list' && role !== 'teacher' && !restricted && (
             <>
               <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee' }}>
                 <input value={listSearch} onChange={e => setListSearch(e.target.value)}

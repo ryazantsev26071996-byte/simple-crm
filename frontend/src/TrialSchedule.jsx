@@ -2,7 +2,7 @@ import React from "react";
 import ClientCard from "./components/ClientCard.jsx";
 import ScheduleBlocksModal from "./components/ScheduleBlocksModal.jsx";
 import { useClientStages } from "./hooks/useClientStages.js";
-import { canDelete } from "./permissions.js";
+import { canDelete, RESTRICTED_TRIAL_FROM } from "./permissions.js";
 
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 4;
@@ -48,7 +48,7 @@ function fmt(date) { const d = new Date(date); return d.getFullYear() + "-" + St
 function fmtDisplay(date) { return date.toLocaleDateString("ru-RU", { weekday: "short", day: "numeric", month: "short" }); }
 function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 
-export default function TrialSchedule({ clients, role, authorName, userId, userEmail, onClientsChange }) {
+export default function TrialSchedule({ clients, role, authorName, userId, userEmail, onClientsChange, restricted = false }) {
   const { stageNames: STAGES } = useClientStages();
   const [showBlocks, setShowBlocks] = React.useState(false);
   const [pendingModalRestore] = React.useState(() => {
@@ -120,7 +120,8 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
   async function loadSlots() {
     setLoading(true);
     try {
-      const data = await apiFetch(`trial_schedule?date=gte.${fmt(days[0])}&date=lte.${fmt(days[6])}&order=date.asc,time.asc`);
+      const lowerDate = restricted && fmt(days[0]) < RESTRICTED_TRIAL_FROM ? RESTRICTED_TRIAL_FROM : fmt(days[0]);
+      const data = await apiFetch(`trial_schedule?date=gte.${lowerDate}&date=lte.${fmt(days[6])}&order=date.asc,time.asc`);
       setSlots(data);
     } catch(e) { console.error(e); }
     setLoading(false);
@@ -419,7 +420,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
     <div style={{ padding: "0 16px 16px" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16, paddingTop: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ minWidth: 44, minHeight: 44, padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", flexShrink: 0 }}>←</button>
+          <button onClick={() => { if (restricted && fmt(days[0]) <= fmt(getWeekDays(new Date(RESTRICTED_TRIAL_FROM))[0])) return; const d = new Date(weekStart); d.setDate(d.getDate()-7); setWeekStart(d); }} style={{ minWidth: 44, minHeight: 44, padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: restricted && fmt(days[0]) <= fmt(getWeekDays(new Date(RESTRICTED_TRIAL_FROM))[0]) ? "default" : "pointer", opacity: restricted && fmt(days[0]) <= fmt(getWeekDays(new Date(RESTRICTED_TRIAL_FROM))[0]) ? 0.4 : 1, flexShrink: 0 }}>←</button>
           <strong style={{ fontSize: 14, flex: 1, textAlign: "center", minWidth: 0 }}>{days[0].toLocaleDateString("ru-RU",{day:"numeric",month:"long"})} — {days[6].toLocaleDateString("ru-RU",{day:"numeric",month:"long",year:"numeric"})}</strong>
           <button onClick={() => { const d = new Date(weekStart); d.setDate(d.getDate()+7); setWeekStart(d); }} style={{ minWidth: 44, minHeight: 44, padding: "8px 12px", borderRadius: 6, border: "1px solid #ddd", background: "white", cursor: "pointer", flexShrink: 0 }}>→</button>
         </div>

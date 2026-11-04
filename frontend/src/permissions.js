@@ -1,3 +1,4 @@
+export const RESTRICTED_TRIAL_FROM = '2026-11-01';
 export const NO_DELETE_EMAILS = ['salampi@artschool.ru', 'arina@artschool.ru'];
 export const RESTRICTED_EMAILS = ['arina@artschool.ru'];
 export const isRestricted = (user) => RESTRICTED_EMAILS.includes(user?.email?.toLowerCase());
