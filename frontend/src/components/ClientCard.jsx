@@ -25,6 +25,7 @@ import ContractBlock from "./ContractBlock.jsx";
 import LearningStrategy from "./LearningStrategy.jsx";
 import StudentProgress from "./StudentProgress.jsx";
 import { createComment, getComments, updateClient, getNextContractNumber } from "../api.js";
+import { isRestricted } from "../permissions.js";
 import { supabase } from "../supabase";
 import MailingsPopup from "./MailingsPopup.jsx";
 import StageHistory from "./StageHistory.jsx";
@@ -108,6 +109,7 @@ function HistoryPopup({ client, onClose }) {
 }
 
 export default function ClientCard({ client, clients, role, authorName, userId, userEmail, onUpdate, onDelete, onClose, asModal = false }) {
+  const restricted = isRestricted({ email: userEmail });
   const [comments, setComments] = React.useState([]);
   const [loadingComments, setLoadingComments] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -161,7 +163,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
               🕓 История
             </button>
           )}
-          {(role === 'admin' || role === 'manager' || role === 'accountmanager') && (
+          {(role === 'admin' || role === 'manager' || role === 'accountmanager') && !restricted && (
             <button onClick={async () => {
               if (!window.confirm('Удалить клиента ' + client.name + '?')) return;
               const { error } = await supabase.from('clients').delete().eq('id', client.id);
@@ -192,7 +194,7 @@ export default function ClientCard({ client, clients, role, authorName, userId, 
         />
 
         {(role === 'manager' || role === 'accountmanager' || role === 'admin') && (
-          <ClientForm mode="Редактировать" initialValue={client} disabled={false} submitLabel="Сохранить"
+          <ClientForm mode="Редактировать" initialValue={client} disabled={false} basicReadOnly={restricted} submitLabel="Сохранить"
             onSubmit={async (payload) => {
               try {
                 const oldStage = client?.stage;

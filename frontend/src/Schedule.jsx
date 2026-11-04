@@ -55,7 +55,7 @@ function formatDate(d) { return d ? d.split('-').reverse().join('.') : '—'; }
 function addTwoHours(timeStr) { const [h, m] = timeStr.split(':').map(Number); return `${String(h + 2).padStart(2, '0')}:${String(m).padStart(2, '0')}`; }
 function roundLessons(n) { return Math.round((Number(n) || 0) * 10) / 10; }
 
-export default function Schedule({ clients, role, authorName, userId, userEmail, onClientsChange, focusEntry, onFocusHandled }) {
+export default function Schedule({ clients, role, authorName, userId, userEmail, onClientsChange, focusEntry, onFocusHandled, readOnly = false }) {
   const [showBlocks, setShowBlocks] = React.useState(false);
   const [showEvents, setShowEvents] = React.useState(false);
   const [pendingModalRestore] = React.useState(() => {
@@ -210,6 +210,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
   }
 
   async function openModal(date, time, entry = null) {
+    if (readOnly && !entry) return;
     setModal({ date, time, entry });
     setClientSearch(entry?.client_name || "");
     setShowSuggestions(false);
@@ -519,7 +520,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
                               </div>
                             ))}
                             {capacities[`${fmt(d)}|${time}`]&&<div style={{fontSize:10,color:"#f59e0b",textAlign:"center",marginBottom:2}}>мест: {capOf(fmt(d),time)}</div>}
-                            {!isFull&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {capOf(fmt(d),time)-entries.length} мест</button>}
+                            {!isFull&&!readOnly&&<button onClick={()=>openModal(fmt(d),time)} style={{width:"100%",padding:"2px 0",fontSize:11,border:"1px dashed #ccc",background:"transparent",cursor:"pointer",borderRadius:4,color:"#aaa"}}>+ {capOf(fmt(d),time)-entries.length} мест</button>}
                             {isFull&&<div style={{fontSize:10,color:"#e55",textAlign:"center"}}>Мест нет</div>}
                             {role==="admin"&&<button onClick={()=>saveCapacity(fmt(d),time,entries)} style={{display:"block",width:"100%",marginTop:2,padding:"1px 0",fontSize:10,border:"none",background:"transparent",cursor:"pointer",color:"#bbb",textAlign:"center"}}>✎ мест</button>}
                           </>
@@ -741,9 +742,9 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
             );})()}
 
             <div style={{display:"flex",gap:8}}>
-              <button onClick={handleSave} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
+              {!readOnly&&<button onClick={handleSave} style={{flex:1,padding:"8px 0",borderRadius:6,border:"none",background:"#4a90e2",color:"white",cursor:"pointer",fontWeight:500}}>
                 {modal.entry?"Сохранить":"Записать"}
-              </button>
+              </button>}
               {modal.entry&&canDelete({ email: userEmail }, role)&&<button onClick={handleDelete} style={{padding:"8px 16px",borderRadius:6,border:"1px solid #fcc",background:"white",color:"#e55",cursor:"pointer"}}>Удалить</button>}
             </div>
           </div>

@@ -94,7 +94,7 @@ function addDays(date, days) {
   return d.toISOString().split('T')[0]
 }
 
-export default function ClientForm({ mode, initialValue, disabled, onSubmit, submitLabel, onOpenClient }) {
+export default function ClientForm({ mode, initialValue, disabled, basicReadOnly = false, onSubmit, submitLabel, onOpenClient }) {
   const { stageNames: STAGES } = useClientStages();
   const [form, setForm] = React.useState({
     name: initialValue?.name || "",
@@ -306,13 +306,13 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Имя</div>
-          <input className="input" value={form.name} disabled={disabled} onChange={set('name')} placeholder="Имя клиента" required />
+          <input className="input" value={form.name} disabled={disabled || basicReadOnly} onChange={set('name')} placeholder="Имя клиента" required />
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Контакт</div>
-          {disabled && renderContact(form.phone)
+          {(disabled || basicReadOnly) && renderContact(form.phone)
             ? <div className="input" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderContact(form.phone)}</div>
-            : <input className="input" value={form.phone} disabled={disabled} onChange={handlePhoneChange} onBlur={handlePhoneBlur} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
+            : <input className="input" value={form.phone} disabled={disabled || basicReadOnly} onChange={handlePhoneChange} onBlur={handlePhoneBlur} placeholder="+7 или @username" style={{ borderColor: phoneError ? '#e55' : '' }} />
           }
           {phoneError && <div style={{ color: '#e55', fontSize: 11, marginTop: 3 }}>{phoneError}</div>}
           {dupWarning && (
@@ -333,16 +333,16 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Telegram</div>
-          {disabled && form.telegram
+          {(disabled || basicReadOnly) && form.telegram
             ? <div className="input" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderTelegram(form.telegram)}</div>
-            : <input className="input" value={form.telegram} disabled={disabled} onChange={set('telegram')} placeholder="@username или t.me/username" />
+            : <input className="input" value={form.telegram} disabled={disabled || basicReadOnly} onChange={set('telegram')} placeholder="@username или t.me/username" />
           }
         </div>
         <div className="formGroup">
           <div className="fieldLabel">ВКонтакте</div>
-          {disabled && form.vk
+          {(disabled || basicReadOnly) && form.vk
             ? <div className="input" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>{renderVk(form.vk)}</div>
-            : <input className="input" value={form.vk} disabled={disabled} onChange={set('vk')} placeholder="vk.com/username или id123456" />
+            : <input className="input" value={form.vk} disabled={disabled || basicReadOnly} onChange={set('vk')} placeholder="vk.com/username или id123456" />
           }
         </div>
       </div>
@@ -350,11 +350,11 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Источник</div>
-          <input className="input" value={form.source} disabled={disabled} onChange={set('source')} placeholder="Авито, рекомендация..." />
+          <input className="input" value={form.source} disabled={disabled || basicReadOnly} onChange={set('source')} placeholder="Авито, рекомендация..." />
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Дата прихода лида</div>
-          <input className="input" type="datetime-local" value={form.lead_date} disabled={disabled} onChange={set('lead_date')} />
+          <input className="input" type="datetime-local" value={form.lead_date} disabled={disabled || basicReadOnly} onChange={set('lead_date')} />
         </div>
         <div className="formGroup">
           <div className="fieldLabel">Дата пробного занятия</div>
@@ -369,7 +369,7 @@ export default function ClientForm({ mode, initialValue, disabled, onSubmit, sub
       <div className="grid2">
         <div className="formGroup">
           <div className="fieldLabel">Стадия</div>
-          <select className="input" value={form.stage} disabled={disabled} onChange={set('stage')}>
+          <select className="input" value={form.stage} disabled={disabled || basicReadOnly} onChange={set('stage')}>
             <option value="">— выбрать —</option>
             {STAGES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>

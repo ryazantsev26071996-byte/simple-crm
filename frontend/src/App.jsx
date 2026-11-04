@@ -60,7 +60,7 @@ import MyOffice from "./MyOffice.jsx";
 import Mailings from "./Mailings.jsx";
 import Materials from "./Materials.jsx";
 import { canSeeTask } from "./taskVisibility.js";
-import { canDelete } from "./permissions.js";
+import { canDelete, isRestricted } from "./permissions.js";
 import MailingsPopup from "./components/MailingsPopup.jsx";
 import StageHistory from "./components/StageHistory.jsx";
 import TeacherAbonementCard from "./components/TeacherAbonementCard.jsx";
@@ -73,6 +73,7 @@ export default function App() {
 
   const role = profile?.role || "teacher";
   const authorName = profile?.full_name || user?.email || "";
+  const restricted = isRestricted(user);
 
   const [clients, setClients] = React.useState([]);
   const [selectedId, setSelectedId] = React.useState(() => {
@@ -239,7 +240,7 @@ export default function App() {
       { key: 'schedule', label: 'Занятия' },
       { key: 'grafik', label: 'График' },
     ] : []),
-    ...(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor' ? [
+    ...((role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && !restricted ? [
       { key: 'analytics', label: 'Аналитика' },
     ] : []),
     ...(role === 'admin' || role === 'supervisor' ? [
@@ -314,7 +315,7 @@ export default function App() {
                 <button className="tabBtn" onClick={() => setView('kanban')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'kanban' ? '#4a90e2' : 'white', color: view === 'kanban' ? 'white' : '#333', cursor: 'pointer' }}>Канбан</button>
                 <button className="tabBtn" onClick={() => setView('list')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'list' ? '#4a90e2' : 'white', color: view === 'list' ? 'white' : '#333', cursor: 'pointer' }}>Список</button>
                 <button className="tabBtn" onClick={() => setView('trial')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'trial' ? '#e67e22' : 'white', color: view === 'trial' ? 'white' : '#333', cursor: 'pointer' }}>Пробные</button>
-                <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>
+                {!restricted && <button className="tabBtn" onClick={() => setView('analytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'analytics' ? '#0e7a6c' : 'white', color: view === 'analytics' ? 'white' : '#0e7a6c', cursor: 'pointer' }}>Аналитика</button>}
                 {(role === 'admin' || role === 'supervisor') && <button className="tabBtn" onClick={() => setView('teacheranalytics')} style={{ fontSize: 12, padding: '4px 12px', borderRadius: 6, border: '1px solid #ddd', background: view === 'teacheranalytics' ? '#7c3aed' : 'white', color: view === 'teacheranalytics' ? 'white' : '#7c3aed', cursor: 'pointer' }}>Педагоги</button>}
               </>}
               {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <>
@@ -425,7 +426,7 @@ export default function App() {
           {view === 'teacheranalytics' && (role === 'admin' || role === 'supervisor') && <TeacherAnalytics onOpenLesson={openLessonFromAnalytics} />}
           {view === 'grafik' && (role === 'admin' || role === 'manager' || role === 'accountmanager' || role === 'teacher' || role === 'supervisor') && <WorkSchedule />}
           {view === 'trial' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && <TrialSchedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? {...c,...updated} : c) : [updated, ...prev]; }); }} />}
-          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} focusEntry={scheduleFocus} onFocusHandled={() => setScheduleFocus(null)} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
+          {view === 'schedule' && (role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'teacher' || role === 'supervisor') && <Schedule clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} readOnly={restricted} focusEntry={scheduleFocus} onFocusHandled={() => setScheduleFocus(null)} onClientsChange={(updated, deletedId) => { if (deletedId) setClients(prev => prev.filter(c => c.id !== deletedId)); else if (updated) setClients(prev => prev.map(c => c.id === updated.id ? updated : c)); }} />}
           {view === 'mailings' && (role === 'admin' || role === 'manager' || role === 'supervisor') && <Mailings clients={clients} role={role} authorName={authorName} userId={user?.id} userEmail={user?.email} onClientsChange={(updated) => { if (updated?.id) setClients(prev => { const exists = prev.find(c => c.id === updated.id); return exists ? prev.map(c => c.id === updated.id ? { ...c, ...updated } : c) : [updated, ...prev]; }); }} />}
           {view === 'materials' && (user?.email === 'crm@artschool.ru' || role === 'supervisor' || role === 'teacher') && <Materials isOwner={user?.email === 'crm@artschool.ru'} readOnly={role === 'teacher'} />}
 
@@ -463,6 +464,13 @@ export default function App() {
               onStageChange={async (id, stage) => {
                 const target = clients.find(c => c.id === id);
                 const oldStage = target?.stage || null;
+                if (restricted) {
+                  const norm = s => (s || '').trim().toLowerCase();
+                  const from = norm(oldStage);
+                  const to = norm(stage);
+                  if (from === 'ученик' && to !== 'продажа') { alert('Недоступно: из «ученик» можно переходить только в «продажа»'); return; }
+                  if (to === 'ученик' && from !== 'кончился абонемент') { alert('Недоступно: в «ученик» можно переходить только из «кончился абонемент»'); return; }
+                }
                 const payload = { stage };
                 if (stage !== oldStage && stage?.trim().toLowerCase() === 'ученики' && !target?.contract_number) {
                   try {
@@ -638,7 +646,7 @@ export default function App() {
             />
 
             {(role === 'manager' || role === 'accountmanager' || role === 'admin' || role === 'supervisor') && (
-              <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} submitLabel="Сохранить"
+              <ClientForm mode="Редактировать" initialValue={selectedClient} disabled={false} basicReadOnly={restricted} submitLabel="Сохранить"
                 onSubmit={async (payload) => {
                   setError("");
                   try {
