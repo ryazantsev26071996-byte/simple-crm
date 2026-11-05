@@ -446,8 +446,16 @@ export default function Analytics() {
 
   const monthSum = sumRows(dailyRows);
 
-  const salesClients = clients.filter(c => ["продажа","ученик"].includes(c.stage) && c.manager_name);
-  const salesClientsWithHistory = [...clients, ...historicalSales].filter(c => ["продажа","ученик"].includes(c.stage) && c.manager_name);
+  const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
+  const salesClients = clients.filter(c => {
+    const d = c.payment_date || c.contract_date;
+    return ["продажа","ученик"].includes(c.stage) && c.manager_name && d && d.slice(0,7) === yearMonth;
+  });
+  const salesClientIds = new Set(salesClients.map(c => c.id));
+  const salesClientsWithHistory = [
+    ...salesClients,
+    ...historicalSales.filter(h => !salesClientIds.has(h.id)),
+  ];
 
   function mgStats(manager) {
     const yearMonth = `${year}-${String(month).padStart(2,"0")}`;
