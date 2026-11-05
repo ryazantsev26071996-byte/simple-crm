@@ -10,8 +10,8 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const MONTH_NAMES = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 const WEEKDAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 const TEACHERS = ["Юлия","Екатерина","Александра","Александра Ф","Дарья","Полина"];
-const ACCOUNTS = [];
-const STAFF_FOR_SECOND_RESP = [...TEACHERS, ...ACCOUNTS, "Татьяна", "Арина"]
+const ACCOUNTS = ["Арина"];
+const STAFF_FOR_SECOND_RESP = [...TEACHERS, ...ACCOUNTS, "Татьяна"]
   .filter(isActiveStaff)
   .filter(n => n !== "Салампи");
 
@@ -255,7 +255,7 @@ export default function Events() {
             <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
               <thead>
                 <tr style={{ background: "#f0f4ff" }}>
-                  {["Дата","Время","Название","Педагог","Аккаунт","Сценарий","Материалы","Пост","Дата поста"].map(h => (
+                  {["Дата","Время","Название","Педагог","Аккаунт","Второй ответственный","Сценарий","Материалы","Пост","Дата поста"].map(h => (
                     <th key={h} style={{ padding: "6px 10px", border: "1px solid #dde", fontWeight: 600, whiteSpace: "nowrap", textAlign: "left", ...(h === "Название" ? { minWidth: 200 } : {}) }}>{h}</th>
                   ))}
                 </tr>
@@ -276,10 +276,8 @@ export default function Events() {
                       </div>
                     </td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>{ev.teacher || "—"}</td>
-                    <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>
-                      {ev.account_manager || "—"}
-                      {ev.second_responsible && <div style={{ fontSize: 11, color: "#aaa" }}>{ev.second_responsible}</div>}
-                    </td>
+                    <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>{ev.account_manager || "—"}</td>
+                    <td style={{ padding: "6px 10px", border: "1px solid #eee", color: "#666" }}>{ev.second_responsible || "—"}</td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", textAlign: "center" }}>{ev.scenario_ready ? "✅" : "—"}</td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", textAlign: "center" }}>{ev.materials_ready ? "✅" : "—"}</td>
                     <td style={{ padding: "6px 10px", border: "1px solid #eee", textAlign: "center" }}>{ev.post_ready ? "✅" : "—"}</td>
