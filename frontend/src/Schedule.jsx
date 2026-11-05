@@ -8,7 +8,7 @@ import { canDelete } from "./permissions.js";
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 12;
 const TEACHERS = ["Юлия", "Екатерина", "Александра", "Александра Ф", "Дарья", "Полина"];
-const RECORDERS = ["Юлия", "Екатерина", "Александра", "Александра Ф", "Дарья", "Полина", "Администратор-VIP"];
+const RECORDERS = ["Юлия", "Екатерина", "Александра", "Александра Ф", "Дарья", "Полина", "Татьяна", "Арина", "Администратор-VIP"];
 const LESSON_TYPES = ["занятие с педагогом", "свободное посещение", "нулевой урок", "ПРОБНОЕ", "МК", "ЛП", "СМОТР", "АРТ сквиз", "мероприятие", "тест-драйв 1", "тест-драйв 2", "тест-драйв 3"];
 const QUALITATIVE_UNITS = [
   { label: "Капля", weight: 1 },
@@ -590,6 +590,7 @@ export default function Schedule({ clients, role, authorName, userId, userEmail,
             <select style={inp} value={form.recorded_by} onChange={e=>setForm(f=>({...f,recorded_by:e.target.value}))}>
               <option value="">— выбрать —</option>
               {RECORDERS.map(r=><option key={r} value={r}>{r}</option>)}
+              {form.recorded_by && !RECORDERS.includes(form.recorded_by) && <option key={form.recorded_by} value={form.recorded_by}>{form.recorded_by}</option>}
             </select>
 
             <div style={{fontSize:12,color:"#888",marginBottom:4}}>Заметка к записи (опционально)</div>

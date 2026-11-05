@@ -383,7 +383,8 @@ export default function ContractBlock({ client, onUpdate, role, userEmail }) {
               <select style={inputStyle} value={form.registered_by}
                 onChange={e => setForm(f => ({ ...f, registered_by: e.target.value }))}>
                 <option value="">— выбрать —</option>
-                {["Салампи","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
+                {["Арина","Татьяна"].map(n => <option key={n} value={n}>{n}</option>)}
+                {form.registered_by && !["Арина","Татьяна"].includes(form.registered_by) && <option key={form.registered_by} value={form.registered_by}>{form.registered_by}</option>}
               </select>
             ) : (
               <input style={inputStyle} value={form.registered_by} readOnly placeholder="Не заполнено" />

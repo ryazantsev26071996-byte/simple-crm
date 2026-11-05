@@ -6,11 +6,12 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 const ACTIVE_EMPLOYEES = {
   "Аккаунты":  ["Арина"],
-  "Менеджеры": ["Татьяна", "Салампи"],
+  "Менеджеры": ["Татьяна"],
   "Педагоги":  ["Юлия", "Екатерина", "Александра", "Александра Ф", "Дарья", "Полина"],
 };
 const ALL_EMPLOYEES = {
   ...ACTIVE_EMPLOYEES,
+  "Менеджеры": [...ACTIVE_EMPLOYEES["Менеджеры"], "Салампи"],
   "Педагоги": [...ACTIVE_EMPLOYEES["Педагоги"], "Софья", "Анастасия"],
 };
 

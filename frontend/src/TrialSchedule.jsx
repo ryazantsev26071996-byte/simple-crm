@@ -7,9 +7,9 @@ import { canDelete, RESTRICTED_TRIAL_FROM } from "./permissions.js";
 const TIMES = ["10:00", "12:00", "15:00", "17:00", "19:00"];
 const MAX_PER_SLOT = 4;
 const LESSON_TYPES = ["Акварель", "Акрил", "Цифровой", "Портрет", "2-ое пробное", "Open Day", "К педагогу", "Графика", "Пастель"];
-const MANAGERS = ["Салампи", "Татьяна"];
+const MANAGERS = ["Арина", "Татьяна"];
 const ACCOUNT_MANAGERS = [];
-const RECORDERS = ["Татьяна", "Салампи", "Администратор-VIP"];
+const RECORDERS = ["Татьяна", "Арина", "Администратор-VIP"];
 const SOURCES = ["Квизы", "Сайт", "Авито", "Соц сети", "Рекомендация", "Оффлайн", "Партнерка", "Звонок", "Другое"];
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -565,6 +565,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
                 <select style={inp} value={form.manager||""} onChange={e=>setForm(f=>({...f,manager:e.target.value}))}>
                   <option value="">— выбрать —</option>
                   {MANAGERS.map(m=><option key={m} value={m}>{m}</option>)}
+                  {form.manager && !MANAGERS.includes(form.manager) && <option key={form.manager} value={form.manager}>{form.manager}</option>}
                 </select>
               </div>
               <div>
@@ -579,6 +580,7 @@ export default function TrialSchedule({ clients, role, authorName, userId, userE
                 <select style={inp} value={form.recorded_by||""} onChange={e=>setForm(f=>({...f,recorded_by:e.target.value}))}>
                   <option value="">— выбрать —</option>
                   {RECORDERS.map(m=><option key={m} value={m}>{m}</option>)}
+                  {form.recorded_by && !RECORDERS.includes(form.recorded_by) && <option key={form.recorded_by} value={form.recorded_by}>{form.recorded_by}</option>}
                 </select>
               </div>
             </div>
