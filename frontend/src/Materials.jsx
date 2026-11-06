@@ -280,7 +280,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
     if (readOnly || !editMat) return;
     try {
       const body = {
-        ...(countOnly ? {} : {
+        ...(countOnly ? { name: editMatForm.name } : {
           name: editMatForm.name,
           color_number: editMatForm.color_number || null,
           brand: editMatForm.brand || null,
@@ -1108,7 +1108,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                       style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "1px solid #7c3aed", background: "white", color: "#7c3aed", cursor: "pointer" }}>
                       📝 {isMobile ? "Инв." : "Инвентаризация"}
                     </button>}
-                    {!readOnly && !countOnly && <button onClick={() => setShowAddMat(true)}
+                    {!readOnly && <button onClick={() => setShowAddMat(true)}
                       style={{ fontSize: isMobile ? 12 : 13, padding: isMobile ? "5px 10px" : "6px 14px", borderRadius: 6, border: "none", background: "#7c3aed", color: "white", cursor: "pointer" }}>
                       + Материал
                     </button>}
@@ -1907,10 +1907,10 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
                   <label style={labelStyle}>На складе</label>
                   <input type="number" min="0" value={addMatForm.qty_warehouse} onChange={e => setAddMatForm(f => ({ ...f, qty_warehouse: e.target.value }))} style={inputStyle} />
                 </div>
-                <div>
+                {!countOnly && <div>
                   <label style={labelStyle}>Мин. порог</label>
                   <input type="number" min="0" value={addMatForm.min_threshold} onChange={e => setAddMatForm(f => ({ ...f, min_threshold: e.target.value }))} style={inputStyle} />
-                </div>
+                </div>}
               </div>
               <div>
                 <label style={labelStyle}>Заметка</label>
@@ -1937,7 +1937,7 @@ export default function Materials({ isOwner = true, readOnly = false, countOnly 
             <div style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
               <div>
                 <label style={labelStyle}>Название</label>
-                <input value={editMatForm.name} onChange={e => setEditMatForm(f => ({ ...f, name: e.target.value }))} style={{ ...inputStyle, ...(countOnly ? { background: '#f5f5f5', color: '#888' } : {}) }} disabled={countOnly} />
+                <input value={editMatForm.name} onChange={e => setEditMatForm(f => ({ ...f, name: e.target.value }))} style={inputStyle} />
               </div>
               <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10 }}>
                 <div style={{ flex: 1 }}>
